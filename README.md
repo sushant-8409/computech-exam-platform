@@ -61,41 +61,6 @@ git clone https://github.com/your-username/computech-exam-platform.git
 cd computech-exam-platform
 ```
 
-### 2. Environment Configuration
-Create a `.env` file in the root directory with your credentials:
-
-```env
-# MongoDB Configuration
-MONGO_URI=mongodb+srv://mdalamrahman4:qX1pVqlNO1B7seKE@cluster0.euyvnad.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
-
-# Cloudflare R2 Configuration
-CLOUDFLARE_ACCOUNT_ID=5697077f3da2f1f6a397e0d611c7c11f
-CLOUDFLARE_ACCESS_KEY=e1aca988bbfc222ab3da2ff96a7d38a2
-CLOUDFLARE_SECRET_KEY=f6fdf3e5fe04dbfd58c3293dc56a5a8fffe89844748f455e34aa4974105bee52
-CLOUDFLARE_ENDPOINT=https://5697077f3da2f1f6a397e0d611c7c11f.r2.cloudflarestorage.com
-CLOUDFLARE_BUCKET_NAME=computech-exam-files
-
-# Admin Credentials
-ADMIN_EMAIL=mdalamrahman4@gmail.com
-ADMIN_PASSWORD=Zerocheck@admin1
-
-# Email Configuration
-EMAIL_USER=computechmailer@gmail.com
-EMAIL_PASS=exyyzlpgzuadcjge
-
-# Security
-JWT_SECRET=aVeryLongRandomStringForJWTSigning123456789
-SESSION_SECRET=aVeryLongRandomString
-
-# Application Configuration
-PORT=5000
-NODE_ENV=development
-
-# External URLs
-SIGNUP_URL=https://computech-07f0.onrender.com/signup.html
-FORGOT_PASSWORD_URL=https://computech-07f0.onrender.com/forget-password.html
-```
-
 ### 3. Install Dependencies
 ```bash
 # Install backend dependencies
