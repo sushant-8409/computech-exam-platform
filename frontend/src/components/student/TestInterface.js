@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
-import Swal from 'sweetalert2';
-import 'sweetalert2/dist/sweetalert2.min.css';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../LoadingSpinner';
 import axios from 'axios';
@@ -11,7 +9,7 @@ const TestInterface = () => {
   const { testId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   const mountedRef = useRef(true);
   const [autoSubmit, setAutoSubmit] = useState(false);
   const [autoSubmitReason, setAutoSubmitReason] = useState('');
@@ -67,7 +65,7 @@ const TestInterface = () => {
   const [pdfUrl, setPdfUrl] = useState('');
   const [isBetterViewer, setIsBetterViewer] = useState(false);
   const [pdfScale, setPdfScale] = useState(1);
-  
+
   // Enhanced violation detection
   const recordViolation = useCallback((type, details, severity = 'medium') => {
     if (isSubmitted || submissionLockRef.current) return; // Don't record violations after submission
@@ -772,28 +770,19 @@ const TestInterface = () => {
     if (isSubmitted) return;
 
     // 1) Gentle warning if no answer sheet
+
     if (!answerSheetUrl) {
-      const { isConfirmed } = await Swal.fire({
-        title: 'No Answer Sheet Uploaded',
-        text: 'Are you sure you want to exit without uploading?',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, Exit',
-        cancelButtonText: 'Go Back'
-      });
-      if (!isConfirmed) return;
+      const ok = window.confirm(
+        'No Answer Sheet Uploaded.\nAre you sure you want to exit without uploading?'
+      );
+      if (!ok) return;
     }
 
-    // 2) Final test‐exit confirmation
-    const { isConfirmed } = await Swal.fire({
-      title: 'Exit Test',
-      text: 'Your progress will be saved and you cannot restart. Continue?',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Exit',
-      cancelButtonText: 'Stay'
-    });
-    if (!isConfirmed) return;
+    // 2) Final exit confirmation
+    const proceed = window.confirm(
+      'Exit Test\nYour progress will be saved and you cannot restart.\nContinue?'
+    );
+    if (!proceed) return;
 
 
     try {
