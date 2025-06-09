@@ -1,0 +1,82 @@
+/* StudentDetail.css */
+
+/*────────── Theme Variables ──────────*/
+:root {
+  --clr-bg:           #f9fafb;
+  --clr-panel:        #ffffff;
+  --clr-primary:      #6366f1;
+  --clr-text:         #1e293b;
+  --clr-text-light:   #475569;
+  --clr-border:       #e2e8f0;
+  --radius:           8px;
+  --gap:              1rem;
+  --font:             'Inter', sans-serif;
+}
+
+/*────────── Page Layout ──────────*/
+.student-detail-page {
+  background: var(--clr-bg);
+  padding: calc(var(--gap) * 2);
+  font-family: var(--font);
+  color: var(--clr-text);
+}
+
+.detail-wrapper {
+  background: var(--clr-panel);
+  border-radius: var(--radius);
+  padding: calc(var(--gap) * 1.5);
+  max-width: 800px;
+  margin: 0 auto;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+/*────────── Header & Back Button ──────────*/
+.student-detail-page h1 {
+  margin: 0 0 var(--gap);
+  text-align: center;
+  font-size: 2rem;
+  color: var(--clr-primary);
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--clr-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: var(--gap);
+  transition: color var(--transition);
+}
+
+.back-btn:hover {
+  color: var(--clr-text);
+}
+
+/*────────── Details Grid ──────────*/
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  row-gap: var(--gap);
+  column-gap: calc(var(--gap) * 1.5);
+}
+
+dt {
+  font-weight: 600;
+  color: var(--clr-text-light);
+}
+
+dd {
+  margin: 0;
+}
+
+/*────────── Responsive ──────────*/
+@media (max-width: 600px) {
+  dl {
+    grid-template-columns: 1fr;
+    row-gap: calc(var(--gap) * 1.2);
+  }
+
+  .back-btn {
+    text-align: left;
+  }
+}

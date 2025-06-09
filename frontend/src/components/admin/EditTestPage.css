@@ -1,0 +1,197 @@
+/* edittestpage.css */
+
+/*────────────────────────── Variables ──────────────────────────*/
+:root {
+  --bg-page:          #f7f9fc;
+  --bg-form:          #ffffff;
+  --text-primary:     #1f2a3c;
+  --text-secondary:   #4a5568;
+  --border-color:     #d2dae2;
+  --input-bg:         #f0f4f8;
+  --accent-hover:     #3a76d1;
+  --error-color:      #e53e3e;
+  --success-color:    #2f855a;
+  --radius:           8px;
+  --spacing:          1rem;
+  --transition:       0.2s ease-in-out;
+  --font-family:      'Inter', sans-serif;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-page:        #1a1f29;
+    --bg-form:        #242a35;
+    --text-primary:   #e2e8f0;
+    --text-secondary: #a0aec0;
+    --border-color:   #2d3748;
+    --input-bg:       #2a303a;
+  }
+}
+
+/*────────────────── Utility Containers ───────────────────*/
+/* Centers content up to a max width, fluid on small screens */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 calc(var(--spacing) * 1);
+  box-sizing: border-box;
+}
+
+/* Edge-to-edge full-width breakout */
+.full-width {
+  position: relative;
+  left: 0%;
+  right: 0%;
+  margin-left: 0vw;
+  margin-right: 0vw;
+  width: 69vw;
+}
+
+/*────────────────── Page & Form Layout ────────────────────*/
+.edit-test-page {
+  background: var(--bg-page);
+  font-family: var(--font-family);
+  color: var(--text-primary);
+  min-height: 100vh;
+  padding: calc(var(--spacing) * 2) 0;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+}
+
+.form-wrapper {
+  background: var(--bg-form);
+  padding: calc(var(--spacing) * 1.5);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  width: 100%;
+}
+
+/*───────────────────── Form Elements ─────────────────────*/
+.edit-test-page h1 {
+  margin: 0 0 var(--spacing);
+  font-size: 2rem;
+  text-align: center;
+  color: var(--accent);
+}
+
+.edit-test-page form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing);
+}
+
+/* Single-column fields (textarea, toggles) span both columns */
+.edit-test-page textarea,
+.edit-test-page .checkbox-group,
+.edit-test-page .button-group {
+  grid-column: 1 / -1;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+input,
+textarea {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  min-width: 70vw;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79,142,247,0.2);
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/*────────────────── Checkbox & Toggles ───────────────────*/
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: var(--spacing);
+}
+
+.checkbox-group input {
+  width: auto;
+  margin: 0;
+}
+
+/*──────────────────── Buttons ─────────────────────*/
+.button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing);
+  margin-top: var(--spacing);
+}
+
+button {
+  padding: 0.65rem 1.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background-color var(--transition), transform var(--transition);
+}
+
+button.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+button.secondary {
+  background: var(--input-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+button.secondary:hover {
+  background: var(--border-color);
+}
+
+/*───────────────── Validation Messages ──────────────────*/
+.error {
+  color: var(--error-color);
+  font-size: 0.9rem;
+}
+
+.success {
+  color: var(--success-color);
+  font-size: 0.9rem;
+}
+
+/*────────────────── Responsive Tweaks ───────────────────*/
+@media (max-width: 768px) {
+  .edit-test-page form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0 calc(var(--spacing) * 0.5);
+  }
+}
