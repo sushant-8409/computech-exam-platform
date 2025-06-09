@@ -5,7 +5,6 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { ToastContainer, toast } from 'react-toastify';
 import axios from 'axios';
 import 'react-toastify/dist/ReactToastify.css';
-import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import ReviewRequestPage from './components/student/ReviewRequestPage';
 import QuestionWiseResults from './components/student/QuestionWiseResults';
