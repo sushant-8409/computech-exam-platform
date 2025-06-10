@@ -34,7 +34,8 @@
   "devDependencies": {
     "concurrently": "^8.2.0",
     "nodemon": "^3.0.1",
-    "sass": "^1.89.1"
+    "sass": "^1.89.1",
+    "wrangler": "^4.19.1"
   },
   "engines": {
     "node": ">=14.0.0",
