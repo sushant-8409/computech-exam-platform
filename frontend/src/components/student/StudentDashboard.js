@@ -65,8 +65,9 @@ const StudentDashboard = () => {
       if (!res2.data.success) throw new Error(res2.data.message);
 
       setResults(res1.data.results);
-      setReviews(res2.data.reviewResults);
+      setReviews(Array.isArray(res2.data.reviewResults) ? res2.data.reviewResults : []);
     } catch (err) {
+      setReviews([]);
       console.error(err);
       toast.error('Failed to load dashboard');
     } finally {

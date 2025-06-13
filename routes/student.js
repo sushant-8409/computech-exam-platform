@@ -4,12 +4,14 @@ const { authenticateStudent } = require('../middleware/auth');
 const Test = require('../models/Test');
 const Result = require('../models/Result');
 const Student = require('../models/Student');
-const multer = require('multer');           
-                   // ← add this
-const { uploadToCloudflare,generateSignedUrl } = require('../services/cloudflare');
+const multer = require('multer');
+// ← add this
+const { uploadToCloudflare, generateSignedUrl } = require('../services/cloudflare');
 const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
+const moment = require('moment-timezone');
+const nowIST = moment().tz('Asia/Kolkata').toDate();
 // Apply student authentication middleware to all routes
 router.use(authenticateStudent); // This is line 11 - make sure authenticateStudent is properly exported
 
@@ -26,8 +28,8 @@ router.get('/dashboard', async (req, res) => {
     const now = new Date();
     const availableTests = await Test.find({
       active: true,
-      startDate: { $lte: now },
-      endDate: { $gte: now },
+      startDate: { $lte: nowIST },
+      endDate: { $gte: nowIST },
       blockedStudents: { $nin: [studentId] }
     }).select('title subject class board duration totalMarks startDate endDate');
 
@@ -87,7 +89,7 @@ router.post(
 
       const studentId = req.user.id;
       const { testId } = req.params;
-      const { answers, timeTaken, violations=[], browserInfo={} } = req.body;
+      const { answers, timeTaken, violations = [], browserInfo = {} } = req.body;
 
       // 2) Load or create the Result doc
       let result = await Result.findOne({ studentId, testId });
@@ -100,14 +102,14 @@ router.post(
 
       // 3) Save answers & metadata
       const test = await Test.findById(testId);
-      result.answers          = Array.isArray(answers) ? answers : Object.entries(answers).map(([i,a])=>({ questionIndex:+i,answer:a }));
-      result.timeTaken        = timeTaken;
-      result.violations       = violations;
-      result.browserInfo      = browserInfo;
-      result.totalMarks       = test.totalMarks;
-      result.testTitle        = test.title;           // ensure title is set
-      result.submittedAt      = new Date();
-      result.status           = 'pending';
+      result.answers = Array.isArray(answers) ? answers : Object.entries(answers).map(([i, a]) => ({ questionIndex: +i, answer: a }));
+      result.timeTaken = timeTaken;
+      result.violations = violations;
+      result.browserInfo = browserInfo;
+      result.totalMarks = test.totalMarks;
+      result.testTitle = test.title;           // ensure title is set
+      result.submittedAt = new Date();
+      result.status = 'pending';
 
       await result.save();
 
@@ -133,8 +135,7 @@ router.get('/tests', async (req, res) => {
 
     // Normalize class: remove "Class " prefix if present
     const rawClass = student.class || '';
-    const clsValue = rawClass.replace(/^Class\s*/i, ''); // "11"
-
+    const clsValue = rawClass.replace(/^Class\s*/i, '').trim();; // "11"
     // Find tests that match either plain "11" or prefixed "Class 11"
     const tests = await Test.find({
       active: true,
@@ -169,8 +170,8 @@ router.get('/result/:resultId/detailed', async (req, res, next) => {
       success: true,
       result,
       test: {
-        title:        result.test.title,
-        totalMarks:   result.totalMarks,
+        title: result.test.title,
+        totalMarks: result.totalMarks,
         questionsCount: result.questionWiseMarks.length
       }
     });
@@ -342,8 +343,8 @@ router.get(
       const { testId } = req.params;
       // 1. Fetch only the questionPaperURL field
       const test = await Test.findById(testId)
-                             .select('questionPaperURL')
-                             .lean();
+        .select('questionPaperURL')
+        .lean();
 
       if (!test) {
         return res
@@ -360,7 +361,7 @@ router.get(
       // 2. Return the stored URL directly
       return res.json({
         success: true,
-        url:     test.questionPaperURL
+        url: test.questionPaperURL
       });
     } catch (err) {
       next(err);
@@ -393,7 +394,7 @@ router.post(
             studentId,
             testId,
             testTitle: '',          // fill below
-            startedAt:  new Date(), // record when they first upload (approx start)
+            startedAt: new Date(), // record when they first upload (approx start)
             totalMarks: 0
           },
           $set: { answerSheetUrl: url }
@@ -428,7 +429,7 @@ router.post('/test/:testId/exit', async (req, res, next) => {
           testId,
           totalMarks: 0,
           testTitle: '',
-          startedAt:  new Date()
+          startedAt: new Date()
         },
         $set: { submittedAt: new Date() }
       },
@@ -653,7 +654,7 @@ router.post(
             studentId,
             testId,
             testTitle: '',          // fill below
-            startedAt:  new Date(), // record when they first upload (approx start)
+            startedAt: new Date(), // record when they first upload (approx start)
             totalMarks: 0
           },
           $set: { answerSheetUrl: url }
@@ -688,7 +689,7 @@ router.post('/test/:testId/exit', async (req, res, next) => {
           testId,
           totalMarks: 0,
           testTitle: '',
-          startedAt:  new Date()
+          startedAt: new Date()
         },
         $set: { submittedAt: new Date() }
       },

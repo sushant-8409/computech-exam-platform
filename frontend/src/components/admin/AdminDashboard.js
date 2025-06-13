@@ -1276,8 +1276,8 @@ const handleCreateTest = useCallback(async e => {
                   </td>
                   <td>
                     <div className="test-schedule">
-                      <small>Start: {new Date(test.startDate).toLocaleDateString()}</small>
-                      <small>End: {new Date(test.endDate).toLocaleDateString()}</small>
+                      <small>Start: {test.startDate ? new Date(test.startDate).toLocaleString('en-IN') : 'N/A'}</small>
+                      <small>End: {test.endDate ? new Date(test.endDate).toLocaleString('en-IN') : 'N/A'}</small>
                     </div>
                   </td>
                   <td>

@@ -16,9 +16,16 @@ const reviewResultSchema = new mongoose.Schema({
     markedBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     markedAt:      { type: Date }
   }],
+  // Add to ReviewResult schema
+testVisibility: {
+  startDate: { type: Date, required: true },
+  endDate: { type: Date, required: true },
+  active: { type: Boolean, default: true }
+},
   adminComments:    { type: String, default: '' },
   status:           { type: String, enum: ['pending','reviewed','published','under review'], default: 'pending' }
-}, {
+}, 
+{
   timestamps: true
 });
 
