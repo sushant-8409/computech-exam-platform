@@ -29,6 +29,16 @@ const TestInterface = () => {
     }, 1000);
     return () => clearInterval(iv);
   }, []);
+  // Add to useEffect in TestInterface.js
+useEffect(() => {
+  const refreshInterval = setInterval(() => {
+    if (pdfUrl && !isSubmitted) {
+      refreshPdfUrl();
+    }
+  }, 55 * 60 * 1000); // Refresh every 55 minutes (for 1-hour URLs)
+
+  return () => clearInterval(refreshInterval);
+}, [pdfUrl, isSubmitted]);
 
   // Capture browser info once
   const [browserInfo] = useState({
@@ -516,7 +526,15 @@ const TestInterface = () => {
       const response = await axios.get(`/api/student/test/${testId}`);
 
       if (response.data.success) {
-        setTest(response.data.test);
+        const testData = response.data.test;
+        const key = getFileKeyFromUrl(testData.questionPaperURL);
+      if (key) {
+        const { data: urlData } = await axios.get(`/api/student/answer-sheet/${key}`);
+        if (urlData.success) {
+          testData.questionPaperURL = urlData.url;
+        }
+      }
+        setTest(testData);
         console.log('✅ Test loaded:', response.data.test.title);
 
         const savedAnswers = localStorage.getItem(`test-answers-${testId}`);
@@ -541,7 +559,14 @@ const TestInterface = () => {
       setLoading(false);
     }
   };
-
+  const getFileKeyFromUrl = (url) => {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.pathname.split('/').pop(); // Extracts "file-key" from "/bucket-name/file-key"
+  } catch {
+    return null;
+  }
+};
   const setupProctoring = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange, true);
     document.addEventListener('contextmenu', handleRightClick, true);
@@ -674,35 +699,28 @@ const TestInterface = () => {
 
   // inside TestInterface.js
   const refreshPdfUrl = async () => {
-    if (isSubmitted) return;
+  if (isSubmitted) return;
 
-    setPdfLoading(true);
-    console.log('🔄 Requesting fresh PDF URL…');
+  setPdfLoading(true);
+  try {
+    const key = getFileKeyFromUrl(pdfUrl || test.questionPaperURL);
+    if (!key) throw new Error('Invalid PDF URL');
 
-    try {
-      const { data } = await axios.get(
-        `/api/student/tests/${testId}/refresh-pdf`
-      );
-
-      if (data.success && data.url) {
-        setPdfUrl(data.url);
-        setTest(prev => ({
-          ...prev,
-          questionPaperURL: data.url
-        }));
-        setPdfError(false);
-        toast.success('✅ Question paper refreshed');
-        console.log('✅ New PDF URL:', data.url);
-      } else {
-        throw new Error(data.message || 'No URL returned');
-      }
-    } catch (error) {
-      console.error('❌ Refresh failed:', error);
-      toast.warning('⚠️ Could not refresh PDF. Try opening in a new tab.');
-    } finally {
-      setPdfLoading(false);
+    const { data } = await axios.get(`/api/student/answer-sheet/${key}`);
+    
+    if (data.success && data.url) {
+      setPdfUrl(data.url);
+      setTest(prev => ({ ...prev, questionPaperURL: data.url }));
+      toast.success('✅ Question paper refreshed');
+    } else {
+      throw new Error(data.message || 'Failed to refresh');
     }
-  };
+  } catch (error) {
+    toast.error('❌ Refresh failed: ' + error.message);
+  } finally {
+    setPdfLoading(false);
+  }
+};
 
 
 
@@ -945,7 +963,7 @@ const TestInterface = () => {
 
           <div className="pdf-container">
             <iframe
-              src={`${effectivePdfUrl}#toolbar=0&navpanes=0&scrollbar=1`}
+              src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1`}
               title="Question Paper"
               className="pdf-viewer"
               width="100%"

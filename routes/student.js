@@ -904,6 +904,15 @@ router.get('/profile', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch profile' });
   }
 });
+// In your Express route for getting answer sheets
+router.get('/answer-sheet/:key', async (req, res) => {
+  try {
+    const url = await generateSignedUrl(req.params.key, 3600); // 1 hour
+    res.json({ success: true, url });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to generate URL' });
+  }
+});
 
 
 // Update student profile
