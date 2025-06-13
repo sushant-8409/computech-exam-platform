@@ -21,7 +21,7 @@ import ResultDetail from './components/student/ResultDetail';
 import LoadingSpinner from './components/LoadingSpinner';
 
 // Set axios base URL
-axios.defaults.baseURL = 'https://computech-exam-platform.vercel.app';
+axios.defaults.baseURL = 'https://computech-exam-platform.onrender.com/';
 
 // Auth & Theme contexts
 const AuthContext = createContext();
