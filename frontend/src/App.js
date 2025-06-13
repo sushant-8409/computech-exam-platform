@@ -22,7 +22,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 
 // Set axios base URL
 axios.defaults.baseURL = 'https://computech-exam-platform.onrender.com';
-
+axios.defaults.withCredentials = true;
 // Auth & Theme contexts
 const AuthContext = createContext();
 const ThemeContext = createContext();

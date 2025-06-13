@@ -9,10 +9,8 @@ const app = express();
 
 // ================== Middleware ==================
 app.use(cors({
-  origin: ['https://computech-exam-platform.onrender.com', 'http://localhost:3000'],
+  origin: 'https://computech-exam-platform.onrender.com',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json({ limit: '10mb' }));
