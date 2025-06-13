@@ -40,5 +40,11 @@ const testSchema = new mongoose.Schema({
   timestamps: true,
   strict: false
 });
-
+testSchema.pre('save', function(next) {
+  if (this.isModified('questionPaperURL')) {
+    this.questionPaperURL = this.questionPaperURL.split('/').pop();
+  }
+  // Repeat for other URL fields
+  next();
+});
 module.exports = mongoose.model('Test', testSchema);

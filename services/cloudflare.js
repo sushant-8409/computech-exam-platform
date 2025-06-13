@@ -25,11 +25,16 @@ const s3Client = new S3Client({
 async function generateSignedUrl(fileName, expiresIn = 3600) {
   const command = new GetObjectCommand({
     Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
-    Key:    fileName
+    Key: fileName,
+    // Add these parameters ↓
+    ResponseContentDisposition: 'inline',
+    ResponseContentType: fileName.endsWith('.pdf') 
+      ? 'application/pdf' 
+      : 'application/octet-stream'
   });
-  // await is inside an async function — this is valid
   return await getSignedUrl(s3Client, command, { expiresIn });
 }
+
 
 // 3) Async function: upload buffer, then get a signed URL
 async function uploadToCloudflare(fileBuffer, fileName, contentType) {
