@@ -56,5 +56,5 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "https://computech-exam-platform.onrender.com"
+  "proxy": "https://localhost:5000"
 }
