@@ -601,23 +601,50 @@ router.post(
   ]),
   async (req, res, next) => {
     try {
-      const urls = {};
+      const fileData = {};
+      const nowIST = moment().tz('Asia/Kolkata');
+
       for (const field of ['questionPaper', 'answerSheet', 'answerKey']) {
         const fileArr = req.files[field];
-        if (fileArr && fileArr[0]) {
-          const file = fileArr[0];
-          const key = `${field}/${Date.now()}_${file.originalname}`;
-          const { url } = await uploadToCloudflare(
-            file.buffer, key, file.mimetype
-          );
-          // normalize your field names:
-          urls[`${field}URL`] = url;
-        }
+        if (!fileArr?.[0]) continue;
+
+        const file = fileArr[0];
+        
+        // 1. Generate clean object key
+        const sanitizedFilename = file.originalname.replace(/[^a-z0-9_.-]/gi, '_');
+        const key = `${field.toLowerCase()}/${nowIST.format('YYYYMMDD-HHmmss')}_${sanitizedFilename}`;
+
+        // 2. Upload to R2 (store key, not URL)
+        const uploadResult = await uploadToCloudflare(
+          file.buffer, 
+          key,
+          file.mimetype
+        );
+
+        // 3. Generate short-lived URL for immediate preview
+        const previewUrl = await generateSignedUrl(key, 300); // 5 minutes
+        
+        fileData[field] = {
+          key: uploadResult.key, // Store key for permanent reference
+          previewUrl,            // Temporary preview URL
+          originalName: file.originalname
+        };
       }
-      // Return the URLs only—no DB writes here
-      return res.json({ success: true, urls });
+
+      res.json({ 
+        success: true, 
+        message: 'Files uploaded successfully',
+        data: fileData
+      });
+
     } catch (err) {
-      return next(err);
+      console.error('⚠️ File upload error:', err);
+      res.status(500).json({
+        success: false,
+        message: process.env.NODE_ENV === 'development' 
+          ? `File upload failed: ${err.message}`
+          : 'File upload failed. Please try again.'
+      });
     }
   }
 );

@@ -106,6 +106,13 @@ const TestInterface = () => {
       return newViolations;
     });
   }, [testId, isSubmitted]);
+  // When fetching PDF URL:
+  // When needing to display a file:
+  const fetchFileUrl = async (type, key) => {
+    const { data } = await axios.get(`/api/files/${type}/${key}`);
+    return data.url;
+  };
+
 
   // Enhanced visibility change handler
   const handleVisibilityChange = useCallback(() => {
@@ -518,12 +525,12 @@ const TestInterface = () => {
       if (response.data.success) {
         const testData = response.data.test;
         const key = getFileKeyFromUrl(testData.questionPaperURL);
-      if (key) {
-        const { data: urlData } = await axios.get(`/api/student/answer-sheet/${key}`);
-        if (urlData.success) {
-          testData.questionPaperURL = urlData.url;
+        if (key) {
+          const { data: urlData } = await axios.get(`/api/student/answer-sheet/${key}`);
+          if (urlData.success) {
+            testData.questionPaperURL = urlData.url;
+          }
         }
-      }
         setTest(testData);
         console.log('✅ Test loaded:', response.data.test.title);
 
@@ -550,13 +557,13 @@ const TestInterface = () => {
     }
   };
   const getFileKeyFromUrl = (url) => {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.pathname.split('/').pop(); // Extracts "file-key" from "/bucket-name/file-key"
-  } catch {
-    return null;
-  }
-};
+    try {
+      const urlObj = new URL(url);
+      return urlObj.pathname.split('/').pop(); // Extracts "file-key" from "/bucket-name/file-key"
+    } catch {
+      return null;
+    }
+  };
   const setupProctoring = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange, true);
     document.addEventListener('contextmenu', handleRightClick, true);
@@ -689,17 +696,20 @@ const TestInterface = () => {
 
   // inside TestInterface.js
   // In TestInterface.js
-const refreshPdfUrl = async () => {
-  if (!test?.questionPaperURL) return;
+  const refreshPdfUrl = async () => {
+    if (!test?.questionPaperURL) return;
+    setPdfLoading(true);
+    try {
+      const signedUrl = await fetchFileUrl('questionpaper', test.questionPaperURL);
+      setPdfUrl(signedUrl);
+      toast.success('✅ Question paper refreshed');
+    } catch (error) {
+      toast.error('❌ Failed to refresh question paper');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
-  const url = new URL(test.questionPaperURL);
-  const expiresAt = url.searchParams.get('X-Amz-Expires');
-  
-  // Refresh 2 minutes before expiration
-  if (Date.now() + 120000 > new Date(expiresAt).getTime()) {
-    // Call your /api/files/signed-url endpoint
-  }
-};
 
 
 
@@ -943,7 +953,7 @@ const refreshPdfUrl = async () => {
 
           <div className="pdf-container">
             <iframe
-              src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=fitH`} 
+              src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=fitH`}
               title="Question Paper"
               className="pdf-viewer"
               width="100%"
