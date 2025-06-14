@@ -1,4 +1,6 @@
 // services/cloudflare.js
+const { NodeHttpHandler } = require('@smithy/node-http-handler');
+const https = require('https');
 require('dotenv').config();
 const {
   S3Client,
@@ -9,16 +11,18 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 // 1) Instantiate client (no await here)
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'auto',
+  region: 'auto',
   endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId:    process.env.CLOUDFLARE_ACCESS_KEY,
+    accessKeyId: process.env.CLOUDFLARE_ACCESS_KEY,
     secretAccessKey: process.env.CLOUDFLARE_SECRET_KEY
   },
-  contentDisposition: 'inline',
-  contentEncoding: 'base64',
-  forcePathStyle:   true,
-  signatureVersion: 'v4'
+  forcePathStyle: true,
+  tls: true,
+  requestHandler: new NodeHttpHandler({
+    httpsAgent: new https.Agent({ family: 4 }) // Force IPv4
+  }),
+  maxAttempts: 3 // Retry on ENOTFOUND
 });
 
 // 2) Async function: generate signed URL
