@@ -4,9 +4,11 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const router = express.Router();
 const moment = require('moment-timezone');
+const nowIST = moment().tz('Asia/Kolkata').toDate();
 const testController = require('../controllers/testController'); // Adjust path as neede
 const studentController = require('../controllers/StudentController');
 const { uploadToCloudflare, generateSignedUrl } = require('../services/cloudflare'); // Adjust path as needed
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 // validation rules for creating a test
