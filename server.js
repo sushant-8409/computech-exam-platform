@@ -9,7 +9,7 @@ const app = express();
 
 // ================== Middleware ==================
 app.use(cors({
-  origin: 'http://localhost:3000', // Add protocol
+  origin: 'https://computech-exam-platform.onrender.com', // Add protocol
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
