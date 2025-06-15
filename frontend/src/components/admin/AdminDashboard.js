@@ -3,8 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import moment from 'moment';
-import 'moment-timezone';
 import {
   Chart as ChartJS,
   CategoryScale,
