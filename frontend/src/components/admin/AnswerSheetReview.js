@@ -6,13 +6,13 @@ import LoadingSpinner from '../LoadingSpinner';
 import './AnswerSheetReview.css';
 
 export default function AnswerSheetReview() {
-  const [results, setResults]           = useState([]);
+  const [results, setResults] = useState([]);
   const [selectedResult, setSelectedResult] = useState(null);
-  const [loading, setLoading]           = useState(false);
-  const [questionMarks, setQuestionMarks]   = useState({});
-  const [adminComments, setAdminComments]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const [questionMarks, setQuestionMarks] = useState({});
+  const [adminComments, setAdminComments] = useState('');
   const [currentQuestion, setCurrentQuestion] = useState(1);
-  const [searchTerm, setSearchTerm]      = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // 1) Load pending results
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function AnswerSheetReview() {
     setCurrentQuestion(1);
 
     const totalMarks = r.testId.totalMarks || 0;
-    const qCount     = r.testId.questionsCount || 0;
+    const qCount = r.testId.questionsCount || 0;
     const perQuestion = totalMarks / Math.max(qCount, 1);
 
     // Initialize each question’s max/obtained/remarks
@@ -44,9 +44,9 @@ export default function AnswerSheetReview() {
     for (let i = 1; i <= qCount; i++) {
       const existing = r.questionWiseMarks?.find(q => q.questionNo === i);
       init[i] = {
-        maxMarks:       existing?.maxMarks ?? perQuestion,
-        obtainedMarks:  existing?.obtainedMarks ?? 0,
-        remarks:        existing?.remarks ?? ''
+        maxMarks: existing?.maxMarks ?? perQuestion,
+        obtainedMarks: existing?.obtainedMarks ?? 0,
+        remarks: existing?.remarks ?? ''
       };
     }
     setQuestionMarks(init);
@@ -104,15 +104,15 @@ export default function AnswerSheetReview() {
     setLoading(true);
     try {
       const totalObtained = calculateTotal();
-      const denom         = selectedResult.testId.totalMarks || 1;
-      const percentage    = +((totalObtained / denom) * 100).toFixed(2);
+      const denom = selectedResult.testId.totalMarks || 1;
+      const percentage = +((totalObtained / denom) * 100).toFixed(2);
 
       const payload = {
         questionWiseMarks: Object.entries(questionMarks).map(([no, qm]) => ({
-          questionNo:   +no,
-          maxMarks:     qm.maxMarks,
-          obtainedMarks:qm.obtainedMarks,
-          remarks:      qm.remarks
+          questionNo: +no,
+          maxMarks: qm.maxMarks,
+          obtainedMarks: qm.obtainedMarks,
+          remarks: qm.remarks
         })),
         marksObtained: totalObtained,
         percentage,
@@ -148,9 +148,9 @@ export default function AnswerSheetReview() {
 
   // Filter results by student or test
   const filtered = results.filter(r => {
-    const name  = r.studentId?.name?.toLowerCase() || '';
+    const name = r.studentId?.name?.toLowerCase() || '';
     const title = r.testId?.title?.toLowerCase() || '';
-    const term  = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase();
     return name.includes(term) || title.includes(term);
   });
 
@@ -182,6 +182,19 @@ export default function AnswerSheetReview() {
             </div>
           ))}
         </div>
+        {selectedResult?.answerSheetUrl && (
+          <div className="answer-sheet-viewer">
+            <h4>Answer Sheet</h4>
+            <iframe
+              src={selectedResult.answerSheetUrl}
+              title="Answer Sheet PDF"
+              width="100%"
+              height="600"
+              allow="autoplay"
+              style={{ border: '1px solid #ccc', borderRadius: 8, background: '#fff' }}
+            />
+          </div>
+        )}
 
         {/* Right: marking panel */}
         {selectedResult && (
@@ -210,7 +223,7 @@ export default function AnswerSheetReview() {
               {/* Max Marks input */}
               {(() => {
                 const totalMarks = selectedResult.testId.totalMarks || 0;
-                const sumOther   = Object.entries(questionMarks)
+                const sumOther = Object.entries(questionMarks)
                   .filter(([k]) => +k !== currentQuestion)
                   .reduce((s, [, qm]) => s + qm.maxMarks, 0);
                 // cannot exceed totalMarks nor push sum > totalMarks
@@ -284,8 +297,8 @@ export default function AnswerSheetReview() {
             <footer>
               {(() => {
                 const totalObtained = calculateTotal();
-                const denom         = selectedResult.testId.totalMarks || 1;
-                const pct           = ((totalObtained / denom) * 100).toFixed(1);
+                const denom = selectedResult.testId.totalMarks || 1;
+                const pct = ((totalObtained / denom) * 100).toFixed(1);
                 return (
                   <strong>
                     Total: {totalObtained}/{denom} ({pct}%)

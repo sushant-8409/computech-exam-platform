@@ -7,8 +7,8 @@ const moment = require('moment-timezone');
 const nowIST = moment().tz('Asia/Kolkata').toDate();
 const testController = require('../controllers/testController'); // Adjust path as neede
 const studentController = require('../controllers/StudentController');
-const { uploadToCloudflare, generateSignedUrl } = require('../services/cloudflare'); // Adjust path as needed
-
+// Adjust path as needed
+const { uploadToGDrive } = require('../services/gdrive'); // Adjust path as neede
 const upload = multer({ storage: multer.memoryStorage() });
 
 // validation rules for creating a test
@@ -494,7 +494,6 @@ router.patch('/results/:id/marks', async (req, res, next) => {
       questionWiseMarks,
       marksObtained,
       adminComments,
-      marksApproved
     } = req.body;
 
     // 1) Load the existing Result & its Test
@@ -612,45 +611,41 @@ router.post(
         if (!fileArr?.[0]) continue;
 
         const file = fileArr[0];
-        
-        // 1. Generate clean object key
         const sanitizedFilename = file.originalname.replace(/[^a-z0-9_.-]/gi, '_');
-        const key = `${field.toLowerCase()}/${nowIST.format('YYYYMMDD-HHmmss')}_${sanitizedFilename}`;
+        const gdriveFileName = `${nowIST.format('YYYYMMDD-HHmmss')}_${sanitizedFilename}`;
 
-        // 2. Upload to R2 (store key, not URL)
-        const uploadResult = await uploadToCloudflare(
-          file.buffer, 
-          key,
+        const uploadResult = await uploadToGDrive(
+          file.buffer,
+          gdriveFileName,
           file.mimetype
         );
 
-        // 3. Generate short-lived URL for immediate preview
-        const previewUrl = await generateSignedUrl(key, 300); // 5 minutes
-        
         fileData[field] = {
-          key: uploadResult.key, // Store key for permanent reference
-          previewUrl,            // Temporary preview URL
+          url: uploadResult.url,       // Permanent Google Drive preview URL
+          fileId: uploadResult.fileId, // Google Drive file ID
           originalName: file.originalname
         };
       }
 
-      res.json({ 
-        success: true, 
-        message: 'Files uploaded successfully',
+      res.json({
+        success: true,
+        message: 'Files uploaded to Google Drive successfully',
         data: fileData
       });
 
     } catch (err) {
-      console.error('⚠️ File upload error:', err);
+      console.error('⚠️ Google Drive upload error:', err);
       res.status(500).json({
         success: false,
-        message: process.env.NODE_ENV === 'development' 
-          ? `File upload failed: ${err.message}`
+        message: process.env.NODE_ENV === 'development'
+          ? `Google Drive upload failed: ${err.message}`
           : 'File upload failed. Please try again.'
       });
     }
   }
 );
+
+
 // Bulk action for tests, students, results
 router.post('/bulk-action', async (req, res) => {
   const { action, items, type } = req.body;
@@ -662,9 +657,9 @@ router.post('/bulk-action', async (req, res) => {
   // Determine which model to operate on
   let Model;
   switch (type) {
-    case 'tests':    Model = Test;    break;
+    case 'tests': Model = Test; break;
     case 'students': Model = Student; break;
-    case 'results':  Model = Result;  break;
+    case 'results': Model = Result; break;
     default:
       return res.status(400).json({ success: false, message: `Unknown type: ${type}` });
   }
@@ -722,9 +717,11 @@ router.get('/results-for-review', async (req, res) => {
     const pending = await Result.find({
       $or: [
         { marksApproved: false },
-        { marksApproved: { $exists: false } }
+        { marksApproved: { $exists: false } },
+        { status: 'pending' }
       ]
     })
+
       .populate('studentId', 'name rollNo class board email')
       .populate(
         'testId',

@@ -39,6 +39,7 @@ const AdminDashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null);
+  const [isUploaded, setIsUploaded] = useState(false);
   const fileInputRef = useRef(null);
   const { testId } = useParams();
   // Dashboard Data
@@ -94,6 +95,13 @@ const AdminDashboard = () => {
       blockKeyboardShortcuts: true
     }
   });
+  const initialFormState = {
+    title: '', subject: '', class: '', board: '',
+    duration: 60, totalMarks: 100, passingMarks: 40,
+    questionsCount: 10, startDate: '', endDate: '',
+    answerKeyVisible: false, resumeEnabled: true,
+    proctoringSettings: { strictMode: true, allowTabSwitch: 0, requireFullscreen: true, blockRightClick: true, blockKeyboardShortcuts: true }
+  };
   // Form States
   const [form, setForm] = useState({
     title: '', description: '', subject: '', class: '', board: '',
@@ -118,11 +126,13 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [uploading, setUploading] = useState(false);
+  // In AdminDashboard component
   const [fileUrls, setFileUrls] = useState({
-    questionPaperURL: '',
-    answerSheetURL: '',
-    answerKeyURL: ''
+    questionPaper: { key: '', previewUrl: '' },
+    answerSheet: { key: '', previewUrl: '' },
+    answerKey: { key: '', previewUrl: '' }
   });
+
   const [bulkActionMode, setBulkActionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]);
   useEffect(() => {
@@ -182,42 +192,42 @@ const AdminDashboard = () => {
   };
   // inside AdminDashboard component, alongside other handlers
 
-const handleEditTest = test => {
-  navigate(`/admin/tests/edit/${testId}`);
-};
+  const handleEditTest = test => {
+    navigate(`/admin/tests/edit/${testId}`);
+  };
 
 
-const handleViewResults = test => {
-  // switch to the Results tab and filter by this test
-  setActiveTab('results');
-  setSearchTerm(test.title);
-};
+  const handleViewResults = test => {
+    // switch to the Results tab and filter by this test
+    setActiveTab('results');
+    setSearchTerm(test.title);
+  };
 
-const handleDuplicateTest = async test => {
-  try {
-    const payload = { ...test, title: test.title + ' (Copy)' };
-    delete payload._id;             // remove id so MongoDB creates a new document
-    const { data } = await axios.post('/api/admin/tests', payload);
-    toast.success('Test duplicated!');
-    fetchDashboardData();           // refresh list
-  } catch (err) {
-    toast.error('Failed to duplicate test');
-  }
-};
+  const handleDuplicateTest = async test => {
+    try {
+      const payload = { ...test, title: test.title + ' (Copy)' };
+      delete payload._id;             // remove id so MongoDB creates a new document
+      const { data } = await axios.post('/api/admin/tests', payload);
+      toast.success('Test duplicated!');
+      fetchDashboardData();           // refresh list
+    } catch (err) {
+      toast.error('Failed to duplicate test');
+    }
+  };
 
-// in component scope
-const handleDeleteTest = async testId => {
-  
-  if (!window.confirm('Delete this test permanently?')) return;
-  try {
-    await axios.delete(`/api/admin/tests/${testId}`);
-    console.log('Deleting testId:', testId);
-    toast.success('Test deleted');
-    fetchDashboardData();
-  } catch (err) {
-    toast.error('Failed to delete test');
-  }
-};
+  // in component scope
+  const handleDeleteTest = async testId => {
+
+    if (!window.confirm('Delete this test permanently?')) return;
+    try {
+      await axios.delete(`/api/admin/tests/${testId}`);
+      console.log('Deleting testId:', testId);
+      toast.success('Test deleted');
+      fetchDashboardData();
+    } catch (err) {
+      toast.error('Failed to delete test');
+    }
+  };
 
 
   // Initialize dashboard
@@ -306,7 +316,7 @@ const handleDeleteTest = async testId => {
       toast.error(`Failed to ${action} items`);
     }
   };
-  
+
 
   /**
    * Step 2: Create the test record in MongoDB
@@ -314,93 +324,90 @@ const handleDeleteTest = async testId => {
    * – reuses your `loading` boolean to block double-submits
    * – navigates to /admin/tests after 2s on success
    */
-const handleUploadFiles = useCallback(async () => {
-  if (uploading) return;
-  if (!files.questionPaper) {
-    return toast.error('📄 Select the question paper PDF first');
-  }
+  const handleCreateTest = useCallback(async e => {
+    e.preventDefault();
+    if (loading) return;
 
-  setUploading(true);
-  try {
-    const token = localStorage.getItem('token');
-    const fd = new FormData();
-    fd.append('questionPaper', files.questionPaper);
-    if (files.answerSheet) fd.append('answerSheet', files.answerSheet);
-    if (files.answerKey)   fd.append('answerKey', files.answerKey);
+    if (!fileUrls.questionPaper) {
+      return toast.error('🚫 You must upload the question paper first');
+    }
 
-    // Call your simplified upload-temp API
-    const { data } = await axios.post(
-      '/api/admin/tests/upload-temp',
-      fd,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
-        },
-        onUploadProgress: e => {
-          const pct = Math.round((e.loaded / e.total) * 100);
-          setUploadProgress({ total: pct });
-        }
-      }
-    );
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        ...testForm,
+        questionPaperURL: fileUrls.questionPaper,
+        answerSheetURL: fileUrls.answerSheet,
+        answerKeyURL: fileUrls.answerKey
+      };
 
-    // Store returned URLs into state
-    setFileUrls(data.urls);
-    toast.success('✅ Files uploaded');
-  } catch (err) {
-    console.error(err);
-    toast.error(err.response?.data?.message || 'Upload failed');
-  } finally {
-    setUploading(false);
-  }
-}, [
-  uploading,
-  files.questionPaper,
-  files.answerSheet,
-  files.answerKey
-]);
+      await axios.post(
+        '/api/admin/tests',
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setTestForm(initialFormState);
+      setFiles({ questionPaper: null, answerSheet: null, answerKey: null });
+      setFileUrls({ questionPaper: '', answerSheet: '', answerKey: '' });
+      setIsUploaded(false);
+      toast.success('🚀 Test created! Redirecting…');
+      navigate(-1);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Creation failed');
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    loading,
+    fileUrls.questionPaper,
+    fileUrls.answerSheet,
+    fileUrls.answerKey,
+    testForm,
+    navigate
+  ]);
 
-// 2) Test creation handler
-const handleCreateTest = useCallback(async e => {
-  e.preventDefault();
-  if (loading) return;
+  const handleUploadFiles = useCallback(async () => {
+    if (uploading) return;
+    if (!files.questionPaper) {
+      return toast.error('📄 Select the question paper PDF first');
+    }
 
-  if (!fileUrls.questionPaperURL) {
-    return toast.error('🚫 You must upload the question paper first');
-  }
+    setUploading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const fd = new FormData();
+      fd.append('questionPaper', files.questionPaper);
+      if (files.answerSheet) fd.append('answerSheet', files.answerSheet);
+      if (files.answerKey) fd.append('answerKey', files.answerKey);
 
-  setLoading(true);
-  try {
-    const token = localStorage.getItem('token');
-    const payload = {
-      ...testForm,
-      questionPaperURL: fileUrls.questionPaperURL,
-      answerSheetURL:   fileUrls.answerSheetURL,
-      answerKeyURL:     fileUrls.answerKeyURL
-    };
+      // Call updated upload-temp API that returns MEGA URLs
+      const { data } = await axios.post('/api/admin/tests/upload-temp', fd, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    await axios.post(
-      '/api/admin/tests',
-      payload,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+      // Store direct MEGA URLs in state
+      setFileUrls({
+        questionPaper: data.data.questionPaper?.url || '',
+        answerSheet: data.data.answerSheet?.url || '',
+        answerKey: data.data.answerKey?.url || ''
+      });
+      setIsUploaded(true);
+      toast.success('✅ Files uploaded to Google Drive successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Google Drive upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }, [
+    uploading,
+    files.questionPaper,
+    files.answerSheet,
+    files.answerKey
+  ]);
 
-    toast.success('🚀 Test created! Redirecting…');
-    setTimeout(() => navigate('/admin/tests'), 2000);
-  } catch (err) {
-    console.error(err);
-    toast.error(err.response?.data?.message || 'Creation failed');
-  } finally {
-    setLoading(false);
-  }
-}, [
-  loading,
-  fileUrls.questionPaperURL,
-  fileUrls.answerSheetURL,
-  fileUrls.answerKeyURL,
-  testForm,
-  navigate
-]);
 
 
 
@@ -1065,24 +1072,18 @@ const handleCreateTest = useCallback(async e => {
         {/* Submit */}
         <div className="form-actions">
           <button
-            type="button"
             onClick={handleUploadFiles}
-            disabled={uploading}
+            disabled={uploading || isUploaded || (!files.questionPaper && !files.answerSheet && !files.answerKey)}
           >
-            {uploading
-              ? `Uploading… ${uploadProgress}%`
-              : '📁 Upload Files'}
+            {uploading ? 'Uploading...' : '📁 Upload Files'}
           </button>
 
-          {/* Step 2: Create Test button */}
           <button
             type="submit"
             onClick={handleCreateTest}
-            disabled={!fileUrls.questionPaperURL || loading}
+            disabled={!isUploaded || loading}
           >
-            {loading
-              ? '🚀 Creating Test…'
-              : '🚀 Create Test'}
+            {loading ? 'Creating...' : '🚀 Create Test'}
           </button>
         </div>
 
@@ -1476,7 +1477,7 @@ const handleCreateTest = useCallback(async e => {
                       >
                         {student.approved ? '🚫 Block' : '✅ Approve'}
                       </button>
-                      <button className="btn btn-sm btn-info" title="View Details"  onClick={() => navigate(`/admin/students/${student._id}`)}>
+                      <button className="btn btn-sm btn-info" title="View Details" onClick={() => navigate(`/admin/students/${student._id}`)}>
                         👁️
                       </button>
                       <button className="btn btn-sm btn-outline" title="Edit" onClick={() => navigate(`/admin/students/edit/${student._id}`)}>

@@ -1,68 +1,36 @@
-// services/cloudflare.js
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 require('dotenv').config();
-const {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand
-} = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-// 1) Instantiate client (no await here)
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'auto',
-  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+const s3 = new S3Client({
+  region: 'ca-east-006',
+  endpoint: process.env.B2_ENDPOINT,
   credentials: {
-    accessKeyId:    process.env.CLOUDFLARE_ACCESS_KEY,
-    secretAccessKey: process.env.CLOUDFLARE_SECRET_KEY
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
   },
-  contentDisposition: 'inline',
-  contentEncoding: 'base64',
-  forcePathStyle:   true,
-  signatureVersion: 'v4'
+  forcePathStyle: true
 });
 
-// 2) Async function: generate signed URL
-async function generateSignedUrl(fileName, expiresIn = 3600) {
+// Upload example
+async function uploadFile(buffer, key, contentType) {
+  const command = new PutObjectCommand({
+    Bucket: process.env.B2_BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType
+  });
+  await s3.send(command);
+  console.log(`Uploaded ${key} successfully.`);
+}
+
+// Generate pre-signed URL example
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
+async function generatePresignedUrl(key) {
   const command = new GetObjectCommand({
-    Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
-    Key: fileName,
-    ResponseContentDisposition: 'inline',
-    ResponseContentType: fileName.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'
+    Bucket: process.env.B2_BUCKET,
+    Key: key
   });
-  return getSignedUrl(s3Client, command, { expiresIn });
+  const url = await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 hour expiry
+  return url;
 }
-
-
-
-// 3) Async function: upload buffer, then get a signed URL
-async function uploadToCloudflare(fileBuffer, fileName, contentType) {
-  const put = new PutObjectCommand({
-    Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
-    Key:    fileName,
-    Body:   fileBuffer,
-    ContentType: contentType,
-    Metadata: {
-      uploadedAt: new Date().toISOString(),
-      originalName: fileName.split('/').pop()
-    }
-  });
-
-  // await is inside this async function
-  const result = await s3Client.send(put);
-
-  // also inside the async function
-  const signedUrl = await generateSignedUrl(fileName, 24 * 60 * 60);
-
-  return {
-    success: true,
-    url:     signedUrl,
-    key:     fileName,
-    etag:    result.ETag
-  };
-}
-
-// 4) Export only the async functions
-module.exports = {
-  uploadToCloudflare,
-  generateSignedUrl
-};

@@ -521,30 +521,9 @@ const TestInterface = () => {
       console.log('🔍 Fetching test details for:', testId);
 
       const response = await axios.get(`/api/student/test/${testId}`);
-
       if (response.data.success) {
-        const testData = response.data.test;
-        const key = getFileKeyFromUrl(testData.questionPaperURL);
-        if (key) {
-          const { data: urlData } = await axios.get(`/api/student/answer-sheet/${key}`);
-          if (urlData.success) {
-            testData.questionPaperURL = urlData.url;
-          }
-        }
-        setTest(testData);
-        console.log('✅ Test loaded:', response.data.test.title);
-
-        const savedAnswers = localStorage.getItem(`test-answers-${testId}`);
-        if (savedAnswers) {
-          try {
-            setAnswers(JSON.parse(savedAnswers));
-            toast.info('📝 Previous answers restored');
-          } catch (e) {
-            console.warn('Failed to load saved answers');
-          }
-        }
-      } else {
-        throw new Error(response.data.message || 'Failed to load test');
+        setTest(response.data.test);
+        setPdfUrl(response.data.test.questionPaperURL); // Use MEGA URL directly
       }
     } catch (error) {
       console.error('❌ Error fetching test:', error);
@@ -951,23 +930,36 @@ const TestInterface = () => {
             </div>
           </div>
 
-          <div className="pdf-container">
+          <div style={{ position: 'relative', width: '100%', height: '80vh' }}>
             <iframe
-              src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=fitH`}
+              src={test.questionPaperURL}
               title="Question Paper"
               className="pdf-viewer"
-              width="100%"
-              height="500px"
-              onError={() => {
-                console.warn('PDF iframe failed');
-                setPdfError(true);
+              style={{ width: '100%', height: '100%', border: 0 }}
+              onError={(e) => {
+                console.error('PDF load error:', e);
+                toast.error('Failed to load PDF. Retrying...');
               }}
               onLoad={() => {
-                console.log('✅ PDF loaded successfully');
-                setPdfError(false);
+                console.log('PDF loaded successfully');
+              }}
+              allow="autoplay"
+            />
+            {/* Overlay to block top-right popout button */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: 60, // Adjust width/height to cover the button
+                height: 55,
+                zIndex: 2,
+                background: 'black',
+                cursor: 'default'
               }}
             />
           </div>
+
 
           <div className="pdf-info">
             <small className="text-muted">
@@ -995,33 +987,10 @@ const TestInterface = () => {
 
             {/* Zoom controls */}
             <div className="better-viewer-zoom">
-              <button
-                className="zoom-btn"
-                onClick={() => handlePdfZoom('out')}
-                disabled={pdfScale <= 0.5}
-                title="Zoom Out (Ctrl+-)"
-              >
-                🔍➖
-              </button>
-              <span className="zoom-display">{Math.round(pdfScale * 100)}%</span>
-              <button
-                className="zoom-btn"
-                onClick={() => handlePdfZoom('in')}
-                disabled={pdfScale >= 3}
-                title="Zoom In (Ctrl++)"
-              >
-                🔍➕
-              </button>
-              <button
-                className="zoom-btn"
-                onClick={() => setPdfScale(1)}
-                title="Reset Zoom (Ctrl+0)"
-              >
-                🎯
-              </button>
+              {/* ... existing zoom buttons ... */}
             </div>
 
-            {/* PDF Content */}
+            {/* PDF Content with Popout Protection */}
             <div className="better-viewer-content">
               <div
                 className="pdf-container-better"
@@ -1031,20 +1000,25 @@ const TestInterface = () => {
                   transition: 'transform 0.3s ease'
                 }}
               >
-                <iframe
-                  ref={pdfViewerRef}
-                  src={`${effectivePdfUrl}#toolbar=0&navpanes=0&scrollbar=1`}
-                  title="Question Paper Better Viewer"
-                  className="pdf-viewer-better"
-                  width="100%"
-                  height="100%"
-                  onError={() => setPdfError(true)}
-                  onLoad={() => setPdfError(false)}
-                />
+                <div className="popout-blocker-container">
+                  <iframe
+                    ref={pdfViewerRef}
+                    src={`${effectivePdfUrl}#toolbar=0&navpanes=0&scrollbar=1`}
+                    title="Question Paper Better Viewer"
+                    className="pdf-viewer-better"
+                    width="100%"
+                    height="100%"
+                    onError={() => setPdfError(true)}
+                    onLoad={() => setPdfError(false)}
+                  />
+                  {/* Popout button blocker overlay */}
+                  <div className="popout-blocker-overlay"></div>
+                </div>
               </div>
             </div>
           </div>
         )}
+
       </>
     );
   };

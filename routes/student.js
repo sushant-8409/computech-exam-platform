@@ -6,7 +6,7 @@ const Result = require('../models/Result');
 const Student = require('../models/Student');
 const multer = require('multer');
 // ← add this
-const { uploadToCloudflare, generateSignedUrl } = require('../services/cloudflare');
+const { uploadToGDrive } = require('../services/gdrive'); // Adjust path as needed
 const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -233,7 +233,7 @@ router.get('/test/:testId', async (req, res) => {
     const { testId } = req.params;
     const studentId = req.user.id;
 
-    // Check if student already submitted this test
+    // Check existing submissions
     const existingResult = await Result.findOne({ studentId, testId });
     if (existingResult) {
       return res.status(400).json({
@@ -242,7 +242,10 @@ router.get('/test/:testId', async (req, res) => {
       });
     }
 
-    const test = await Test.findById(testId).select('-questions.correctAnswer');
+    // Fetch test without correct answers
+    const test = await Test.findById(testId)
+      .select('-questions.correctAnswer')
+      .lean();
 
     if (!test) {
       return res.status(404).json({
@@ -251,7 +254,7 @@ router.get('/test/:testId', async (req, res) => {
       });
     }
 
-    // Check if test is active and within time range
+    // Validate test availability
     const now = new Date();
     if (!test.active || now < test.startDate || now > test.endDate) {
       return res.status(400).json({
@@ -260,18 +263,42 @@ router.get('/test/:testId', async (req, res) => {
       });
     }
 
-    // Check if student is blocked
-    if (Array.isArray(test.blockedStudents) && test.blockedStudents.includes(studentId)) {
+    // Check student block status
+    if (test.blockedStudents?.includes(studentId)) {
       return res.status(403).json({
         success: false,
         message: 'You are blocked from taking this test'
       });
     }
 
+    // Generate signed URL for question paper
+    // In routes/student.js (test/:testId endpoint)
+    // In routes/student.js (test/:testId endpoint)
+    // Modify the test/:testId endpoint's signed URL generation
+    if (test.questionPaperURL) {
+      try {
+        // Handle both full URLs and raw keys
+        let key = test.questionPaperURL;
+        try {
+          const urlObj = new URL(key);
+          key = urlObj.pathname.replace(`/${process.env.B2_BUCKET}/`, '');
+        } catch {
+          // Already a key, do nothing
+        }
+        test.questionPaperURL = test.questionPaperURL || null;
+      } catch (err) {
+        console.error('Signed URL error:', err);
+        test.questionPaperURL = null;
+      }
+    }
+
+
+
     res.json({
       success: true,
       test
     });
+
   } catch (error) {
     console.error('Get test error:', error);
     res.status(500).json({
@@ -378,23 +405,28 @@ router.post(
     try {
       const studentId = req.user.id;
       const { testId } = req.params;
-      if (!req.file || !req.file.buffer) {
+      
+      if (!req.file?.buffer) {
         return res.status(400).json({ success: false, message: 'No file uploaded' });
       }
 
-      // 1) Upload to R2
-      const key = `answersheets/${studentId}/${testId}/${Date.now()}_${req.file.originalname}`;
-      const { url } = await uploadToCloudflare(req.file.buffer, key, req.file.mimetype);
+      // 1) Upload to Google Drive
+      const fileName = `answersheet_${studentId}_${testId}_${Date.now()}.pdf`;
+      const { url } = await uploadToGDrive(
+        req.file.buffer,
+        fileName,
+        req.file.mimetype
+      );
 
-      // 2) Upsert the Result doc (without touching submittedAt)
+      // 2) Upsert the Result doc
       const result = await Result.findOneAndUpdate(
         { studentId, testId },
         {
           $setOnInsert: {
             studentId,
             testId,
-            testTitle: '',          // fill below
-            startedAt: new Date(), // record when they first upload (approx start)
+            testTitle: '',
+            startedAt: new Date(),
             totalMarks: 0
           },
           $set: { answerSheetUrl: url }
@@ -409,12 +441,18 @@ router.post(
         await result.save();
       }
 
-      res.json({ success: true, answerSheetUrl: url, resultId: result._id });
+      res.json({ 
+        success: true, 
+        answerSheetUrl: url,
+        fileId: result.fileId, // Added Google Drive file ID
+        resultId: result._id 
+      });
     } catch (err) {
       next(err);
     }
   }
 );
+
 
 router.post('/test/:testId/exit', async (req, res, next) => {
   try {
@@ -630,51 +668,6 @@ router.post('/test/:testId/resume', async (req, res) => {
   }
 });
 
-// Submit test
-router.post(
-  '/test/:testId/upload',
-  upload.single('answerSheet'),
-  async (req, res, next) => {
-    try {
-      const studentId = req.user.id;
-      const { testId } = req.params;
-      if (!req.file || !req.file.buffer) {
-        return res.status(400).json({ success: false, message: 'No file uploaded' });
-      }
-
-      // 1) Upload to R2
-      const key = `answersheets/${studentId}/${testId}/${Date.now()}_${req.file.originalname}`;
-      const { url } = await uploadToCloudflare(req.file.buffer, key, req.file.mimetype);
-
-      // 2) Upsert the Result doc (without touching submittedAt)
-      const result = await Result.findOneAndUpdate(
-        { studentId, testId },
-        {
-          $setOnInsert: {
-            studentId,
-            testId,
-            testTitle: '',          // fill below
-            startedAt: new Date(), // record when they first upload (approx start)
-            totalMarks: 0
-          },
-          $set: { answerSheetUrl: url }
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-
-      // 3) Backfill testTitle if missing
-      if (!result.testTitle) {
-        const test = await Test.findById(testId).select('title');
-        result.testTitle = test?.title || '';
-        await result.save();
-      }
-
-      res.json({ success: true, answerSheetUrl: url, resultId: result._id });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
 
 router.post('/test/:testId/exit', async (req, res, next) => {
   try {
@@ -907,7 +900,7 @@ router.get('/profile', async (req, res) => {
 // In your Express route for getting answer sheets
 router.get('/answer-sheet/:key', async (req, res) => {
   try {
-    const url = await generateSignedUrl(req.params.key, 3600); // 1 hour
+    test.questionPaperURL = test.questionPaperURL || null; // 1 hour
     res.json({ success: true, url });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to generate URL' });

@@ -40,11 +40,17 @@ const testSchema = new mongoose.Schema({
   timestamps: true,
   strict: false
 });
+// Add this pre-save hook to ensure proper key storage
+// In models/Test.js pre-save hook
 testSchema.pre('save', function(next) {
   if (this.isModified('questionPaperURL')) {
-    this.questionPaperURL = this.questionPaperURL.split('/').pop();
+    // Remove any Backblaze key processing
+    // Just store the URL as-is
+    this.questionPaperURL = this.questionPaperURL;
   }
-  // Repeat for other URL fields
   next();
 });
+
+
+
 module.exports = mongoose.model('Test', testSchema);
