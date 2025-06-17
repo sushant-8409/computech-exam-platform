@@ -49,7 +49,7 @@ async function uploadToGDrive(fileBuffer, fileName, mimeType) {
     });
 
     return {
-      url: `https://drive.google.com/file/d/${file.id}/preview`,
+      url: `https://drive.google.com/viewer?url=https://drive.google.com/uc?id=${file.id}&embedded=true`,
       fileId: file.id
     };
 
