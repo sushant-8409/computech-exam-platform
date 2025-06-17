@@ -9,10 +9,11 @@ const app = express();
 
 // ================== Middleware ==================
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://computech-exam-platform.onrender.com'], // Add protocol
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: ['http://localhost:3000', 'https://computech-exam-platform.onrender.com'], // React dev server
+  methods: 'GET,POST,PUT,DELETE',
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 
@@ -29,10 +30,10 @@ app.use(require('./middleware/urlDecoder'));
 // ================== API Routes ==================
 app.use('/api/tests', require('./routes/tests'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api', require('./routes/analytics'));
 const adminReviewResults = require('./routes/adminReviewResults');
 app.use('/api/admin', adminReviewResults);
 app.use('/api/files', require('./routes/files'));
-
 // In Express middleware
 app.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', "frame-src 'self' drive.google.com docs.google.com");

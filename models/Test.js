@@ -48,6 +48,9 @@ testSchema.pre('save', function(next) {
     // Just store the URL as-is
     this.questionPaperURL = this.questionPaperURL;
   }
+  if (this.totalMarks <= 0) {
+    this.invalidate('totalMarks', 'Total marks must be greater than zero');
+  }
   next();
 });
 

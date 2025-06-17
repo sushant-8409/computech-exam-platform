@@ -487,42 +487,66 @@ router.get('/health', (req, res) => {
     }
   });
 });
-router.patch('/results/:id/marks', async (req, res, next) => {
+router.patch('/results/:id/marks', async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      questionWiseMarks,
-      marksObtained,
-      adminComments,
-    } = req.body;
+    const { questionWiseMarks, marksObtained, adminComments } = req.body;
 
-    // 1) Load the existing Result & its Test
-    const result = await Result.findById(id);
-    if (!result) {
-      return res.status(404).json({ success: false, message: 'Result not found' });
-    }
-    const test = await Test.findById(result.testId).select('totalMarks');
-    if (!test) {
-      return res.status(404).json({ success: false, message: 'Test not found' });
+    // 1. Find Result and Test with error handling
+    const result = await Result.findById(id)
+      .orFail(new Error('Result not found'));
+    const test = await Test.findById(result.testId)
+      .select('totalMarks questionsCount')
+      .orFail(new Error('Test not found'));
+
+    // 2. Validate total marks
+    if (test.totalMarks <= 0) {
+      throw new Error('Test total marks must be greater than zero');
     }
 
-    // 2) Update all fields, including totalMarks
-    result.questionWiseMarks = questionWiseMarks;
-    result.marksObtained = marksObtained;
-    result.totalMarks = test.totalMarks;        // ← Persist the total marks
-    result.percentage = ((marksObtained / test.totalMarks) * 100).toFixed(2);
-    result.adminComments = adminComments;
-    result.marksApproved = true;
-    result.markedBy = req.user.id; // assuming req.user is set by auth middleware
-    result.markedAt = new Date();
-    result.status = 'published'; // mark as published
-    // 3) Save and return
-    await result.save();
-    res.json({ success: true, result });
+    // 3. Validate question-wise marks
+    const totalQuestions = test.questionsCount;
+    if (Object.keys(questionWiseMarks).length !== totalQuestions) {
+      throw new Error(`Marks for all ${totalQuestions} questions required`);
+    }
+
+    // 4. Calculate percentage safely
+    const percentage = ((marksObtained / test.totalMarks) * 100).toFixed(2);
+
+    // 5. Update and save with version checking
+    const updatedResult = await Result.findOneAndUpdate(
+      { _id: id, __v: result.__v },
+      {
+        questionWiseMarks: Object.entries(questionWiseMarks).map(([no, qm]) => ({
+          questionNo: +no,
+          maxMarks: qm.maxMarks,
+          obtainedMarks: qm.obtainedMarks,
+          remarks: qm.remarks
+        })),
+        marksObtained,
+        percentage,
+        adminComments,
+        marksApproved: true,
+        markedBy: req.user.id,
+        markedAt: new Date(),
+        status: 'published'
+      },
+      { new: true, runValidators: true }
+    ).orFail(new Error('Update conflict or document not found'));
+
+    res.json({ success: true, result: updatedResult });
+
   } catch (err) {
-    next(err);
+    console.error('Mark update error:', err.message);
+    res.status(400).json({
+      success: false,
+      message: err.message,
+      errorType: err.name // e.g., 'ValidationError'
+    });
   }
 });
+
+
 
 // Rest of the routes remain the same...
 
@@ -716,8 +740,6 @@ router.get('/results-for-review', async (req, res) => {
   try {
     const pending = await Result.find({
       $or: [
-        { marksApproved: false },
-        { marksApproved: { $exists: false } },
         { status: 'pending' }
       ]
     })
