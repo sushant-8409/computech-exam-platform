@@ -1,42 +1,65 @@
+// services/gdrive.js
 const { google } = require('googleapis');
 const { Readable } = require('stream');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
-const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
-const KEYFILEPATH = path.join(__dirname, '../gdrive-credentials.json');
+const SCOPES = ['https://www.googleapis.com/auth/drive'];
+const KEYFILEPATH = path.resolve(__dirname, '../gdrive-credentials.json');
+
+// 1. Load and fix credentials
+const rawCredentials = JSON.parse(fs.readFileSync(KEYFILEPATH));
+const credentials = {
+  ...rawCredentials,
+  private_key: rawCredentials.private_key
+};
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: KEYFILEPATH,
-  scopes: SCOPES,
+  credentials,
+  scopes: SCOPES
 });
+
 const drive = google.drive({ version: 'v3', auth });
 
 async function uploadToGDrive(fileBuffer, fileName, mimeType) {
-  const fileMetadata = { name: fileName };
-  const media = {
-    mimeType,
-    body: Readable.from(fileBuffer), // <-- Fix is here
-  };
+  try {
+    const fileMetadata = {
+      name: fileName,
+      parents: [process.env.GOOGLE_DRIVE_FOLDER_ID]
+    };
 
-  const file = await drive.files.create({
-    resource: fileMetadata,
-    media,
-    fields: 'id',
-  });
+    const media = {
+      mimeType,
+      body: Readable.from(fileBuffer)
+    };
 
-  await drive.permissions.create({
-    fileId: file.data.id,
-    requestBody: {
-      role: 'reader',
-      type: 'anyone',
-    },
-  });
+    const { data: file } = await drive.files.create({
+      resource: fileMetadata,
+      media,
+      fields: 'id'
+    });
 
-  return {
-    url: `https://drive.google.com/file/d/${file.data.id}/preview`,
-    fileId: file.data.id,
-  };
+    await drive.permissions.create({
+      fileId: file.id,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone'
+      }
+    });
+
+    return {
+      url: `https://drive.google.com/file/d/${file.id}/preview`,
+      fileId: file.id
+    };
+
+  } catch (error) {
+    console.error('Google Drive API Error:', error.message);
+    if (error.code === 400) {
+      throw new Error('Invalid authentication - check service account credentials');
+    }
+    throw error;
+  }
 }
 
 module.exports = { uploadToGDrive };
