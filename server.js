@@ -32,11 +32,13 @@ app.use('/api/admin', require('./routes/admin'));
 const adminReviewResults = require('./routes/adminReviewResults');
 app.use('/api/admin', adminReviewResults);
 app.use('/api/files', require('./routes/files'));
+
 // In Express middleware
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', "frame-src 'self' mega.nz");
+  res.setHeader('Content-Security-Policy', "frame-src 'self' drive.google.com docs.google.com");
   next();
 });
+
 
 // Load auth and student routes
 let authRoutes, studentRoutes;
