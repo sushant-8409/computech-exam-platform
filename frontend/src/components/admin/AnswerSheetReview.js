@@ -123,7 +123,8 @@ export default function AnswerSheetReview() {
       const { data } = await axios.patch(
         `/api/admin/results/${selectedResult._id}/marks`,
         payload,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } ,
+      validateStatus: (status) => status < 500 }
       );
 
       if (data.success) {

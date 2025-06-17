@@ -987,7 +987,35 @@ const TestInterface = () => {
 
             {/* Zoom controls */}
             <div className="better-viewer-zoom">
-              {/* ... existing zoom buttons ... */}
+              <button
+                className="zoom-btn"
+                onClick={() => setPdfScale(prev => Math.max(prev - 0.25, 0.5))}
+                disabled={pdfScale <= 0.5}
+                title="Zoom Out (Ctrl+-)"
+              >
+                🔍➖
+              </button>
+
+              <span className="zoom-display">
+                {Math.round(pdfScale * 100)}%
+              </span>
+
+              <button
+                className="zoom-btn"
+                onClick={() => setPdfScale(prev => Math.min(prev + 0.25, 3))}
+                disabled={pdfScale >= 3}
+                title="Zoom In (Ctrl++)"
+              >
+                🔍➕
+              </button>
+
+              <button
+                className="zoom-btn"
+                onClick={() => setPdfScale(1.25)}
+                title="Reset Zoom (Ctrl+0)"
+              >
+                🎯
+              </button>
             </div>
 
             {/* PDF Content with Popout Protection */}

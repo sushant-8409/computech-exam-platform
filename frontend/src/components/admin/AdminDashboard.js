@@ -1629,7 +1629,7 @@ const AdminDashboard = () => {
             </button>
             <button
               className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
-              onClick={() => setActiveTab('analytics')}
+              onClick={() => navigate('/admin/analytics')}
             >
               <span className="nav-icon">📈</span>
               <span className="nav-text">Analytics</span>

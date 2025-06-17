@@ -1,0 +1,157 @@
+/* AdminAnalytics.module.css
+   everything is nested under .analyticsRoot → compiled to .analyticsRoot___hash */
+.analyticsRoot {
+  contain: layout paint style;   /* isolates the subtree from global CSS[7] */
+  --primary : #6366f1;
+  --success : #10b981;
+  --border  : #e2e8f0;
+  --text    : #0f172a;
+  --surface : #ffffff;
+  --shadow  : rgba(0,0,0,.06);
+  padding   : 2rem 1rem;
+  min-height: 100vh;
+  background: var(--surface);
+  color     : var(--text);
+  font-family: 'Inter',system-ui,sans-serif;
+}
+
+/* ------------- overview cards ------------- */
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.statCard {
+  background   : var(--primary);
+  color        : #fff;
+  border-radius: 12px;
+  padding      : 2rem;
+  text-align   : center;
+  box-shadow   : 0 8px 24px var(--shadow);
+  transition   : transform .2s;
+}
+.statCard:hover { transform: translateY(-4px); }
+
+.statValue { font-size: 2.5rem; font-weight: 700; margin-bottom: .5rem; }
+.statLabel { opacity:.85; }
+
+/* ------------- subject table ------------- */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0 3rem 0;
+}
+.table th,
+.table td {
+  padding: .8rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.table th {
+  background: var(--primary);
+  color: #fff;
+  text-align: left;
+  font-weight: 600;
+  font-size: .875rem;
+}
+
+/* ------------- search box ------------- */
+.searchBox {
+  width: 100%;
+  max-width: 400px;
+  margin: 2rem 0 1rem 0;
+}
+.searchInput {
+  width: 100%;
+  padding: .75rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color .2s;
+}
+.searchInput:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* ------------- student card ------------- */
+.studentCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 4px 18px var(--shadow);
+  margin-bottom: 2rem;
+}
+.studentHeader { font-size: 1.25rem; font-weight: 600; margin-bottom:.25rem; }
+.studentSub    { color: var(--primary); margin-bottom: 1rem; }
+
+.resultList   { list-style:none; padding:0; margin:1rem 0 0 0; }
+.resultItem   { margin-bottom:.5rem; font-size:.9rem; }
+
+/* ------------- buttons ------------- */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:.65rem 1.5rem; border:none; border-radius:8px; cursor:pointer;
+  font-weight:600; font-size:.9rem; transition:background .2s;
+}
+.btnPrimary { background: var(--primary);  color:#fff; }
+.btnPrimary:hover { background:#4f46e5; }
+.btnSuccess { background: var(--success); color:#fff; }
+.btnSuccess:hover { background:#059669; }
+
+/* ------------- responsive tweaks ------------- */
+@media (max-width:600px){
+  .statValue{font-size:2rem;}
+}
+/* —— report-modal layout —— */
+.reportModal            :global(.modal-dialog) {
+  max-width: 800px;                     /* custom width[3]   */
+}
+.reportModal            :global(.modal-content) {
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.15);
+  border: none;
+}
+
+/* Header */
+.reportModal :global(.modal-header){
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.25rem;
+}
+
+/* Body */
+.selectAll{
+  font-weight: 600;
+  margin-bottom: .75rem;
+}
+.testList{
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 320px;     /* keeps modal compact   */
+  overflow-y: auto;      /* scroll inside body[1] */
+}
+.testItem{
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .5rem .25rem;
+  border-bottom: 1px solid var(--border);
+}
+.testTitle{ font-weight: 500; }
+.testSub  { color: #64748b; }
+
+/* Footer */
+.modalFooter{
+  border-top: 1px solid var(--border);
+  padding: .8rem 1.25rem;
+}
+/* inside AdminAnalytics.module.css */
+
+/* existing .testItem already sets layout & border */
+.testInfo     { flex:1; overflow:hidden; }
+.testTitle    { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.testMeta     { font-size:.8rem; color:#64748b; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

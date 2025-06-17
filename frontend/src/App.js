@@ -19,6 +19,7 @@ import StudentDashboard from './components/student/StudentDashboard';
 import TestInterface from './components/student/TestInterface';
 import ResultDetail from './components/student/ResultDetail';
 import LoadingSpinner from './components/LoadingSpinner';
+import Analytics from './components/admin/Analytics';
 
 // Set axios base URL
 axios.defaults.baseURL = 'https://computech-exam-platform.onrender.com'; // Change to your server URL
@@ -186,6 +187,7 @@ export default function App() {
                 <Route path="answer-review" element={<AnswerSheetReview />} />
                 <Route path="students/:id" element={<StudentDetail />} />
                 <Route path="students/edit/:id" element={<EditStudentPage />} />
+                <Route path="analytics" element={<Analytics />} /> 
               </Route>
 
               {/* Student section */}
