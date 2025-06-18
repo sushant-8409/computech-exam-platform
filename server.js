@@ -12,6 +12,7 @@ app.use(cors({
   origin: ['http://localhost:3000', 'https://computech-exam-platform.onrender.com'], // React dev server
   methods: 'GET,POST,PUT,DELETE',
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true, 
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
