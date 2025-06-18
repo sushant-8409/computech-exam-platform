@@ -20,6 +20,9 @@ import TestInterface from './components/student/TestInterface';
 import ResultDetail from './components/student/ResultDetail';
 import LoadingSpinner from './components/LoadingSpinner';
 import Analytics from './components/admin/Analytics';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
+import offlineHandler from './utils/offlineHandler';
+
 
 // Set axios base URL
 axios.defaults.baseURL = 'https://computech-exam-platform.onrender.com'; // Change to your server URL
@@ -155,10 +158,19 @@ function ProtectedRoute({ children, adminOnly = false }) {
 }
 
 export default function App() {
+   useEffect(() => {
+    // The offline handler is already instantiated as a singleton
+    // This just ensures it's active when the app loads
+    console.log('Offline handler initialized');
+    
+    // Optional: You can access it here if needed
+    // offlineHandler.someMethod();
+  }, []);
   return (
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
+          <PWAInstallPrompt />
           <Routes>
 
             {/* Public login */}
