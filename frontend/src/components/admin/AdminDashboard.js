@@ -42,6 +42,7 @@ const AdminDashboard = () => {
   const [isUploaded, setIsUploaded] = useState(false);
   const fileInputRef = useRef(null);
   const { testId } = useParams();
+  const answerKeyInputRef = useRef(null);
   // Dashboard Data
   const [dashboardStats, setDashboardStats] = useState({
     totalStudents: 0,
@@ -122,14 +123,13 @@ const AdminDashboard = () => {
       blockKeyboardShortcuts: true
     }
   });
-  const [files, setFiles] = useState({ questionPaper: null, answerSheet: null, answerKey: null });
+  const [files, setFiles] = useState({ questionPaper: null, answerKey: null });
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [uploading, setUploading] = useState(false);
   // In AdminDashboard component
   const [fileUrls, setFileUrls] = useState({
     questionPaper: { key: '', previewUrl: '' },
-    answerSheet: { key: '', previewUrl: '' },
     answerKey: { key: '', previewUrl: '' }
   });
 
@@ -338,7 +338,6 @@ const AdminDashboard = () => {
       const payload = {
         ...testForm,
         questionPaperURL: fileUrls.questionPaper,
-        answerSheetURL: fileUrls.answerSheet,
         answerKeyURL: fileUrls.answerKey
       };
 
@@ -348,8 +347,8 @@ const AdminDashboard = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setTestForm(initialFormState);
-      setFiles({ questionPaper: null, answerSheet: null, answerKey: null });
-      setFileUrls({ questionPaper: '', answerSheet: '', answerKey: '' });
+      setFiles({ questionPaper: null, answerKey: null });
+      setFileUrls({ questionPaper: '', answerKey: '' });
       setIsUploaded(false);
       toast.success('🚀 Test created! Redirecting…');
       navigate(-1);
@@ -362,7 +361,6 @@ const AdminDashboard = () => {
   }, [
     loading,
     fileUrls.questionPaper,
-    fileUrls.answerSheet,
     fileUrls.answerKey,
     testForm,
     navigate
@@ -379,7 +377,6 @@ const AdminDashboard = () => {
       const token = localStorage.getItem('token');
       const fd = new FormData();
       fd.append('questionPaper', files.questionPaper);
-      if (files.answerSheet) fd.append('answerSheet', files.answerSheet);
       if (files.answerKey) fd.append('answerKey', files.answerKey);
 
       // Call updated upload-temp API that returns MEGA URLs
@@ -390,7 +387,6 @@ const AdminDashboard = () => {
       // Store direct MEGA URLs in state
       setFileUrls({
         questionPaper: data.data.questionPaper?.url || '',
-        answerSheet: data.data.answerSheet?.url || '',
         answerKey: data.data.answerKey?.url || ''
       });
       setIsUploaded(true);
@@ -404,7 +400,6 @@ const AdminDashboard = () => {
   }, [
     uploading,
     files.questionPaper,
-    files.answerSheet,
     files.answerKey
   ]);
 
@@ -881,71 +876,61 @@ const AdminDashboard = () => {
               )}
             </div>
 
-            {/* Answer Sheet */}
-            <div className="upload-group optional">
-              <label className="upload-label">
-                📋 Sample Answer Sheet (PDF) *
-                <span className="optional-badge">OPTIONAL</span>
-              </label>
-              <div className="upload-area">
-                {files.answerSheet ? (
-                  <div className="file-selected">
-                    <span className="file-icon">📋</span>
-                    <div className="file-info">
-                      <p>{files.answerSheet.name}</p>
-                      <small>{(files.answerSheet.size / 1024 / 1024).toFixed(2)} MB</small>
-                    </div>
-                    <button type="button" className="remove-file" onClick={() =>
-                      setFiles({ ...files, answerSheet: null })
-                    }>✕</button>
-                  </div>
-                ) : (
-                  <div className="upload-placeholder">
-                    <span className="upload-icon">⬆️</span>
-                    <p>Upload sample answer sheet</p>
-                    <small>PDF only, max 10MB</small>
-                  </div>
-                )}
-              </div>
-              <input
-                name="answerSheet"
-                type="file"
-                accept=".pdf"
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-              />
-            </div>
-
             {/* Answer Key */}
             <div className="upload-group optional">
-              <label className="upload-label">
+              <label className="upload-label" htmlFor="answerKeyInput">
                 🔑 Answer Key (PDF)
                 <span className="optional-badge">OPTIONAL</span>
               </label>
-              <div className="upload-area">
+
+              {/* CLICKING THIS DIV OPENS THE FILE-PICKER */}
+              <div
+                className="upload-area"
+                role="button"
+                tabIndex={0}
+                onClick={() => answerKeyInputRef.current?.click()}
+                onKeyDown={(e) =>
+                  (e.key === 'Enter' || e.key === ' ') && answerKeyInputRef.current?.click()
+                }
+              >
                 {files.answerKey ? (
                   <div className="file-selected">
                     <span className="file-icon">🔑</span>
                     <div className="file-info">
                       <p>{files.answerKey.name}</p>
-                      <small>{(files.answerKey.size / 1024 / 1024).toFixed(2)} MB</small>
+                      <small>
+                        {(files.answerKey.size / 1024 / 1024).toFixed(2)} MB
+                      </small>
                     </div>
-                    <button type="button" className="remove-file" onClick={() =>
-                      setFiles({ ...files, answerKey: null })
-                    }>✕</button>
+
+                    {/* stopPropagation so the click doesn’t reopen the picker */}
+                    <button
+                      type="button"
+                      className="remove-file"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFiles({ ...files, answerKey: null });
+                      }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ) : (
                   <div className="upload-placeholder">
                     <span className="upload-icon">⬆️</span>
-                    <p>Upload answer key (optional)</p>
-                    <small>PDF only, max 10MB</small>
+                    <p>Upload answer key</p>
+                    <small>PDF only, max 10 MB</small>
                   </div>
                 )}
               </div>
+
+              {/* HIDDEN INPUT */}
               <input
+                ref={answerKeyInputRef}
+                id="answerKeyInput"
                 name="answerKey"
                 type="file"
-                accept=".pdf"
+                accept="application/pdf"
                 onChange={handleFileSelect}
                 style={{ display: 'none' }}
               />
@@ -955,7 +940,9 @@ const AdminDashboard = () => {
                   <input
                     type="checkbox"
                     checked={testForm.answerKeyVisible}
-                    onChange={(e) => setTestForm({ ...testForm, answerKeyVisible: e.target.checked })}
+                    onChange={(e) =>
+                      setTestForm({ ...testForm, answerKeyVisible: e.target.checked })
+                    }
                   />
                   Show answer key to students after test completion
                 </label>
@@ -1073,7 +1060,7 @@ const AdminDashboard = () => {
         <div className="form-actions">
           <button
             onClick={handleUploadFiles}
-            disabled={uploading || isUploaded || (!files.questionPaper && !files.answerSheet && !files.answerKey)}
+            disabled={uploading || isUploaded || (!files.questionPaper && !files.answerKey)}
           >
             {uploading ? 'Uploading...' : '📁 Upload Files'}
           </button>
@@ -1116,7 +1103,7 @@ const AdminDashboard = () => {
               type="button"
               className="btn btn-secondary"
               onClick={handleUploadFiles}
-              disabled={uploading || !files.questionPaper && !files.answerSheet && !files.answerKey}
+              disabled={uploading || !files.questionPaper && !files.answerKey}
               style={{ marginLeft: '1rem' }}
             >
               {uploading

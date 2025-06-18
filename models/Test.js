@@ -12,7 +12,6 @@ const testSchema = new mongoose.Schema({
   passingMarks: { type: Number, required: true },
   questionsCount: { type: Number, required: true },
   questionPaperURL: { type: String },
-  answerSheetURL: { type: String, required: false },
   answerKeyURL: { type: String, required: false },
   answerKeyVisible: { type: Boolean, default: false },
   startDate: { type: Date, required: true },

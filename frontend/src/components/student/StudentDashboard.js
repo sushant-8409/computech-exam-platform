@@ -262,11 +262,13 @@ const StudentDashboard = () => {
           <tr key={r._id}>
             <td>{r.testTitle || r.testId?.title || 'Unknown'}</td>
             <td>
-              {r.marksObtained != null
+              {r.marksObtained != 0 && r.totalMarks!=0
                 ? `${r.marksObtained}/${r.totalMarks}`
                 : 'Pending'}
             </td>
-            <td>{`${pct}%`}</td>
+            <td>{r.marksObtained != 0 && r.totalMarks!=0
+                ? `${pct}%`
+                : 'Pending'}</td>
             <td>
               {isPublished
                 ? '✅ Final'
@@ -282,12 +284,6 @@ const StudentDashboard = () => {
             <td>
               {isPublished && (
                 <>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => navigate(`/student/result/${r._id}`)}
-                  >
-                    Review Result
-                  </button>{' '}
                   <button
                     className="btn btn-sm"
                     onClick={() =>

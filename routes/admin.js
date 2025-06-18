@@ -524,6 +524,7 @@ router.patch('/results/:id/marks', async (req, res) => {
           remarks: qm.remarks
         })),
         marksObtained,
+        totalMarks: test.totalMarks,
         percentage,
         adminComments,
         marksApproved: true,
@@ -579,8 +580,7 @@ router.post(
         subject, class: cls, board,
         duration, totalMarks, passingMarks, questionsCount,
         startDate, endDate,
-        questionPaperURL,   // ← new
-        answerSheetURL,     // ← new
+        questionPaperURL,   // ← new   // ← new
         answerKeyURL,       // ← new
         resumeEnabled = true,
         answerKeyVisible = false,
@@ -600,8 +600,7 @@ router.post(
         questionsCount,
         startDate,
         endDate,
-        questionPaperURL,   // persisted
-        answerSheetURL,     // persisted
+        questionPaperURL,   // persisted     // persisted
         answerKeyURL,       // persisted
         resumeEnabled,
         answerKeyVisible,
@@ -622,7 +621,6 @@ router.post(
   '/tests/upload-temp',
   upload.fields([
     { name: 'questionPaper', maxCount: 1 },
-    { name: 'answerSheet', maxCount: 1 },
     { name: 'answerKey', maxCount: 1 }
   ]),
   async (req, res, next) => {
@@ -630,7 +628,7 @@ router.post(
       const fileData = {};
       const nowIST = moment().tz('Asia/Kolkata');
 
-      for (const field of ['questionPaper', 'answerSheet', 'answerKey']) {
+      for (const field of ['questionPaper', 'answerKey']) {
         const fileArr = req.files[field];
         if (!fileArr?.[0]) continue;
 

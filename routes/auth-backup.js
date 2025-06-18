@@ -11,7 +11,6 @@ router.post('/login', [
 ], async (req, res) => {
   try {
     console.log('🔐 Login attempt for:', req.body.email);
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({

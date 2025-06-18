@@ -23,43 +23,24 @@ const auth = new google.auth.GoogleAuth({
 const drive = google.drive({ version: 'v3', auth });
 
 async function uploadToGDrive(fileBuffer, fileName, mimeType) {
-  try {
-    const fileMetadata = {
-      name: fileName,
-      parents: [process.env.GOOGLE_DRIVE_FOLDER_ID]
-    };
+  const fileMeta = { name: fileName, parents: [process.env.GOOGLE_DRIVE_FOLDER_ID] };
+  const media    = { mimeType, body: Readable.from(fileBuffer) };
 
-    const media = {
-      mimeType,
-      body: Readable.from(fileBuffer)
-    };
+  const { data: file } = await drive.files.create({
+    resource: fileMeta, media, fields: 'id'
+  });
 
-    const { data: file } = await drive.files.create({
-      resource: fileMetadata,
-      media,
-      fields: 'id'
-    });
+  // make the file public
+  await drive.permissions.create({
+    fileId: file.id,
+    requestBody: { role: 'reader', type: 'anyone' }
+  });
 
-    await drive.permissions.create({
-      fileId: file.id,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone'
-      }
-    });
-
-    return {
-      url: `https://drive.google.com/viewer?url=https://drive.google.com/uc?id=${file.id}&embedded=true`,
-      fileId: file.id
-    };
-
-  } catch (error) {
-    console.error('Google Drive API Error:', error.message);
-    if (error.code === 400) {
-      throw new Error('Invalid authentication - check service account credentials');
-    }
-    throw error;
-  }
+  return {
+    url: `https://drive.google.com/file/d/${file.id}/preview`, // <- changed
+    fileId: file.id
+  };
 }
+
 
 module.exports = { uploadToGDrive };

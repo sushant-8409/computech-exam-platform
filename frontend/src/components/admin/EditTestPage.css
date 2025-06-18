@@ -101,7 +101,6 @@ input,
 textarea {
   margin-top: 0.5rem;
   padding: 0.6rem 0.75rem;
-  min-width: 70vw;
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   background: var(--input-bg);

@@ -12,6 +12,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 const moment = require('moment-timezone');
 const nowIST = moment().tz('Asia/Kolkata').toDate();
+const QRCode = require('qrcode');
 // Apply student authentication middleware to all routes
 router.use(authenticateStudent); // This is line 11 - make sure authenticateStudent is properly exported
 
@@ -315,15 +316,17 @@ router.post(
     try {
       const studentId = req.user.id;
       const { testId } = req.params;
-
+      const test = await Test.findById(testId).select('totalMarks title');
       // Upsert a Result record with submittedAt = now
       const result = await Result.findOneAndUpdate(
         { studentId, testId },
         {
           $setOnInsert: {
             studentId,
+            testTitle: test.title,
             testId,
-            totalMarks: 0,        // placeholder
+            startedAt: new Date(),
+            totalMarks: test.totalMarks,
           },
           $set: {
             submittedAt: new Date(),
@@ -546,40 +549,16 @@ router.get('/result/:resultId/detailed', async (req, res) => {
 });
 // Get detailed result for student
 // Get single result with detailed information
-router.get('/result/:resultId', async (req, res) => {
+
+
+router.get('/qr', async (req, res) => {
+  const { data } = req.query;
+  if (!data) return res.status(400).send('Missing data');
   try {
-    const result = await Result.findById(req.params.resultId)
-      .populate({
-        path: 'test',
-        select: 'title subject'
-      })
-      .populate({
-        path: 'studentId',
-        match: { _id: req.user._id },
-        select: 'name email'
-      });
-
-    if (!result || !result.studentId) {
-      return res.status(404).json({
-        success: false,
-        message: 'Result not found or access denied'
-      });
-    }
-
-    res.json({
-      success: true,
-      result: {
-        ...result.toObject(),
-        status: result.status,
-        adminComments: result.adminComments
-      }
-    });
-  } catch (error) {
-    console.error('Result error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error loading result'
-    });
+    const png = await QRCode.toBuffer(data, { width: 200 });
+    res.type('png').send(png);
+  } catch (err) {
+    res.status(500).send('QR generation failed');
   }
 });
 
@@ -759,19 +738,22 @@ router.get('/result/:resultId/detailed', async (req, res) => {
     });
   }
 });
-// Get detailed result for student
-// Get single result with detailed information
+// routes/student.js (or wherever you fetch results)
+// routes/student.js - Fixed Result endpoint
+// Get detailed result with Test data
+// In your backend route (e.g., /api/student/result/:resultId)
+// In your backend route (e.g., /api/student/result/:resultId)
 router.get('/result/:resultId', async (req, res) => {
   try {
     const result = await Result.findById(req.params.resultId)
       .populate({
         path: 'test',
-        select: 'title subject'
+        select: 'title subject questionPaperURL answerKeyURL answerKeyVisible totalMarks passingMarks'
       })
       .populate({
         path: 'studentId',
         match: { _id: req.user._id },
-        select: 'name email'
+        select: 'name email class board school' // Include class and board
       });
 
     if (!result || !result.studentId) {
@@ -797,7 +779,6 @@ router.get('/result/:resultId', async (req, res) => {
     });
   }
 });
-
 
 // ============================================
 // TEST RESUME ENDPOINTS
