@@ -26,24 +26,50 @@ function dto(row, reviewMode = false) {
 /* ────────────────────────────────────────────────────────── */
 router.get('/results-for-review', authenticateAdmin, async (_req, res) => {
   try {
-    /* pending results */
+    /* 1 ▸ pending results (full papers) */
     const pending = await Result.find({ status: 'pending' })
       .populate('studentId', 'name email')
-      .populate('testId', 'title totalMarks questionsCount');
+      .populate('testId',    'title class board totalMarks questionsCount')
+      .lean();
 
-    /* under-review subset rows */
+    /* 2 ▸ under-review rows (only subset of Qs) */
     const under = await ReviewResult.find({ status: 'under review' })
       .populate('studentId', 'name email')
-      .populate('testId', 'title totalMarks questionsCount');
+      .populate('testId',    'title class board totalMarks questionsCount')
+      .lean();
+
+    /* 3 ▸ normalise into one shape */
+    const makeItem = (row, reviewMode = false) => ({
+      _id:              row._id,
+      reviewMode,                       // which PATCH route to hit
+      status:           row.status,     // 'pending' | 'under review'
+      /* student */
+      studentId:        row.studentId?._id,
+      studentName:      row.studentId?.name,
+      studentEmail:     row.studentId?.email,
+      /* test */
+      testId:           row.testId?._id,
+      testTitle:        row.testId?.title,
+      class:            row.testId?.class,
+      board:            row.testId?.board,
+      totalMarks:       row.testId?.totalMarks,
+      questionsCount:   row.testId?.questionsCount,
+      /* data for UI */
+      answerSheetUrl:   row.answerSheetUrl ?? null,
+      adminComments:    row.adminComments ?? '',
+      /* marks array */
+      questionWiseMarks: row.questionWiseMarks || []
+    });
 
     const list = [
-      ...pending.map(r => dto(r, false)),
-      ...under.map(r => dto(r, true))
-    ];
+      ...pending.map(r => makeItem(r, false)),
+      ...under  .map(r => makeItem(r, true ))
+    ].sort((a, b) => new Date(b._id.getTimestamp()) - new Date(a._id.getTimestamp()));
 
     res.json({ success: true, results: list });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+  } catch (err) {
+    console.error('results-for-review error:', err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
