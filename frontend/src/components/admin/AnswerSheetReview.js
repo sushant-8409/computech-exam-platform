@@ -1,320 +1,299 @@
-// src/components/admin/AnswerSheetReview.js
+// AnswerSheetReview.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import LoadingSpinner from '../LoadingSpinner';
-import './AnswerSheetReview.css';
+import styles from './AnswerSheetReview.module.css';
+
+const authHeader = () => ({
+  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+});
 
 export default function AnswerSheetReview() {
-  const [results, setResults] = useState([]);
-  const [selectedResult, setSelectedResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [questionMarks, setQuestionMarks] = useState({});
-  const [adminComments, setAdminComments] = useState('');
-  const [currentQuestion, setCurrentQuestion] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
+  /* ---------- state ---------- */
+  const [rows,     setRows]   = useState([]);
+  const [current,  setCurr]   = useState(null);     // selected row
+  const [qIndex,   setIdx]    = useState(1);        // pointer to question
+  const [marks,    setMarks]  = useState({});       // editable map
+  const [comment,  setCmt]    = useState('');
+  const [search,   setSrch]   = useState('');
+  const [busy,     setBusy]   = useState(false);
 
-  // 1) Load pending results
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const { data } = await axios.get('/api/admin/results-for-review');
-        setResults(data.results || []);
-      } catch {
-        toast.error('Failed to fetch results');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  /* ---------- fetch list on mount ---------- */
+  useEffect(() => { fetchList(); }, []);
 
-  // 2) Select a result and init questionMarks
-  const handleSelectResult = (r) => {
-    setSelectedResult(r);
-    setAdminComments(r.adminComments || '');
-    setCurrentQuestion(1);
-
-    const totalMarks = r.testId.totalMarks || 0;
-    const qCount = r.testId.questionsCount || 0;
-    const perQuestion = totalMarks / Math.max(qCount, 1);
-
-    // Initialize each question’s max/obtained/remarks
-    const init = {};
-    for (let i = 1; i <= qCount; i++) {
-      const existing = r.questionWiseMarks?.find(q => q.questionNo === i);
-      init[i] = {
-        maxMarks: existing?.maxMarks ?? perQuestion,
-        obtainedMarks: existing?.obtainedMarks ?? 0,
-        remarks: existing?.remarks ?? ''
-      };
-    }
-    setQuestionMarks(init);
-  };
-
-  // 3) Clamp and update marks
-  const handleQuestionMarkChange = (qNo, field, value) => {
-    setQuestionMarks(prev => {
-      const updated = { ...prev };
-      const totalMarks = selectedResult?.testId?.totalMarks || 0;
-
-      if (field === 'maxMarks') {
-        // 3a) Sum of all other maxMarks
-        const sumOther = Object.entries(prev)
-          .filter(([key]) => +key !== qNo)
-          .reduce((sum, [, qm]) => sum + qm.maxMarks, 0);
-
-        // 3b) Compute how much we can allocate to this question
-        const allowed = Math.max(0, totalMarks - sumOther);
-
-        // 3c) Clamp input to [0, allowed]
-        let numVal = parseFloat(value) || 0;
-        numVal = Math.min(Math.max(0, numVal), allowed);
-
-        updated[qNo] = {
-          ...updated[qNo],
-          maxMarks: numVal,
-          // also clamp obtainedMarks if it exceeds new maxMarks
-          obtainedMarks: Math.min(updated[qNo].obtainedMarks, numVal)
-        };
-      }
-      else if (field === 'obtainedMarks') {
-        // Clamp obtainedMarks to [0, maxMarks]
-        const max = prev[qNo].maxMarks;
-        let numVal = parseFloat(value) || 0;
-        numVal = Math.min(Math.max(0, numVal), max);
-        updated[qNo] = { ...updated[qNo], obtainedMarks: numVal };
-      }
-      else {
-        // Remarks
-        updated[qNo] = { ...updated[qNo], remarks: value };
-      }
-
-      return updated;
-    });
-  };
-
-  // 4) Compute total obtained marks
-  const calculateTotal = () =>
-    Object.values(questionMarks).reduce((sum, q) => sum + q.obtainedMarks, 0);
-
-  // 5) Save & approve marks
-  const handleUpdateMarks = async () => {
-    if (!selectedResult) return;
-    setLoading(true);
+  const fetchList = async () => {
     try {
-      const totalObtained = calculateTotal();
-      const denom = selectedResult.testId.totalMarks || 1;
-      const percentage = +((totalObtained / denom) * 100).toFixed(2);
-
-      const payload = {
-        questionWiseMarks: Object.entries(questionMarks).map(([no, qm]) => ({
-          questionNo: +no,
-          maxMarks: qm.maxMarks,
-          obtainedMarks: qm.obtainedMarks,
-          remarks: qm.remarks
-        })),
-        marksObtained: totalObtained,
-        percentage,
-        adminComments,
-        marksApproved: true
-      };
-
-      const { data } = await axios.patch(
-        `/api/admin/results/${selectedResult._id}/marks`,
-        payload,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } ,
-      validateStatus: (status) => status < 500 }
+      setBusy(true);
+      const { data } = await axios.get(
+        '/api/admin/results-for-review',
+        authHeader()
       );
-
-      if (data.success) {
-        toast.success('Marks saved!');
-        setSelectedResult(null);
-        const { data: fresh } = await axios.get('/api/admin/results-for-review');
-        setResults(fresh.results || []);
-      } else {
-        throw new Error(data.message);
-      }
+      setRows(data.results || []);
     } catch {
-      toast.error('Failed to update marks');
-    } finally {
-      setLoading(false);
-    }
+      toast.error('Could not load list');
+    } finally { setBusy(false); }
   };
 
-  // Spinner when loading list
-  if (loading && !selectedResult) {
-    return <LoadingSpinner text="Loading…" />;
-  }
+  /* ---------- select a row ---------- */
+  const choose = (row) => {
+    setCurr(row);
+    setCmt(row.adminComments || '');
+    setIdx(1);
 
-  // Filter results by student or test
-  const filtered = results.filter(r => {
-    const name = r.studentId?.name?.toLowerCase() || '';
-    const title = r.testId?.title?.toLowerCase() || '';
-    const term = searchTerm.toLowerCase();
-    return name.includes(term) || title.includes(term);
+    const obj = {};
+    if (row.reviewMode) {
+      row.questionWiseMarks.forEach(q => (obj[q.questionNo] = { ...q }));
+    } else {
+      const perQ = row.testId.totalMarks / row.testId.questionsCount;
+      for (let i = 1; i <= row.testId.questionsCount; i++) {
+        const old = row.questionWiseMarks.find(q => q.questionNo === i);
+        obj[i] = old
+          ? { ...old }
+          : { maxMarks: perQ, obtainedMarks: 0, remarks: '' };
+      }
+    }
+    setMarks(obj);
+  };
+
+  /* ---------- helpers ---------- */
+  const totalObtained = () =>
+    Object.values(marks).reduce((s, q) => s + Number(q.obtainedMarks), 0);
+
+  const updateField = (qNo, field, value) =>
+    setMarks(p => ({ ...p, [qNo]: { ...p[qNo], [field]: value } }));
+
+  /* ---------- save handler ---------- */
+  const save = async () => {
+    if (!current) return;
+    setBusy(true);
+
+    try {
+      if (current.reviewMode) {
+        // only changed questions
+        const changed = Object.entries(marks)
+          .filter(([n, q]) => {
+            const old = current.questionWiseMarks.find(o => o.questionNo === +n);
+            return (
+              !old ||
+              old.maxMarks      !== q.maxMarks ||
+              old.obtainedMarks !== q.obtainedMarks ||
+              old.remarks       !== q.remarks
+            );
+          })
+          .map(([n, q]) => ({ ...q, questionNo: +n }));
+
+        await axios.patch(
+          `/api/admin/review-results/${current._id}/marks`,
+          { questionWiseMarks: changed, adminComments: comment },
+          authHeader()
+        );
+      } else {
+        // full marking for pending results
+        const list = Object.entries(marks).map(([n, q]) => ({
+          ...q, questionNo: +n
+        }));
+        const percent =
+          +((totalObtained() / current.testId.totalMarks) * 100).toFixed(2);
+
+        await axios.patch(
+          `/api/admin/results/${current._id}/marks`,
+          {
+            questionWiseMarks: list,
+            marksObtained: totalObtained(),
+            percentage: percent,
+            adminComments: comment
+          },
+          authHeader()
+        );
+      }
+
+      toast.success('Saved');
+      setCurr(null);
+      fetchList();
+    } catch {
+      toast.error('Save error');
+    } finally { setBusy(false); }
+  };
+
+  /* ---------- filtered rows ---------- */
+  const filtered = rows.filter(r => {
+    const s = search.toLowerCase();
+    return (
+      (r.studentName || '').toLowerCase().includes(s) ||
+      (r.testTitle   || '').toLowerCase().includes(s)
+    );
   });
 
+  /* ---------- render ---------- */
   return (
-    <div className="answer-sheet-review">
-      <h2>Answer Sheet Review</h2>
-      <div className="two-pane">
-        {/* Left: results list */}
-        <div className="search">
+    <div className={styles.page}>
+      <h2>Answer-Sheet Review</h2>
+
+      <div className={styles.wrapper}>
+        {/* list pane */}
+        <aside className={styles.listPane}>
           <input
-            type="text"
-            placeholder="Search by student or test…"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
+            className={styles.search}
+            placeholder="Search…"
+            value={search}
+            onChange={e => setSrch(e.target.value)}
           />
-        </div>
-        <div className="results-list">
-          {filtered.map(r => r.testId && (
-            <div
-              key={r._id}
-              className={`item ${selectedResult?._id === r._id ? 'active' : ''}`}
-              onClick={() => handleSelectResult(r)}
-            >
-              <strong>{r.testId.title}</strong>
-              <div>{r.studentId.name}</div>
-              <div className={`status ${r.marksApproved ? 'ok' : 'pending'}`}>
-                {r.marksApproved ? 'Reviewed' : 'Pending'}
-              </div>
-            </div>
-          ))}
-        </div>
-        {selectedResult?.answerSheetUrl && (
-          <div className="answer-sheet-viewer">
-            <h4>Answer Sheet</h4>
-            <iframe
-              src={selectedResult.answerSheetUrl}
-              title="Answer Sheet PDF"
-              width="100%"
-              height="600"
-              allow="autoplay"
-              style={{ border: '1px solid #ccc', borderRadius: 8, background: '#fff' }}
-            />
-          </div>
-        )}
 
-        {/* Right: marking panel */}
-        {selectedResult && (
-          <div className="marking-panel">
-            <button className="btn btn-link" onClick={() => setSelectedResult(null)}>
-              ← Back
-            </button>
-            <h3>{selectedResult.testId.title}</h3>
-            <p>Total Marks: {selectedResult.testId.totalMarks}</p>
-
-            {/* Question navigation */}
-            <div className="nav">
-              <button
-                disabled={currentQuestion === 1}
-                onClick={() => setCurrentQuestion(q => q - 1)}
-              >←</button>
-              Question {currentQuestion} of {selectedResult.testId.questionsCount}
-              <button
-                disabled={currentQuestion === selectedResult.testId.questionsCount}
-                onClick={() => setCurrentQuestion(q => q + 1)}
-              >→</button>
-            </div>
-
-            {/* Marking fields */}
-            <div className="marking-fields">
-              {/* Max Marks input */}
-              {(() => {
-                const totalMarks = selectedResult.testId.totalMarks || 0;
-                const sumOther = Object.entries(questionMarks)
-                  .filter(([k]) => +k !== currentQuestion)
-                  .reduce((s, [, qm]) => s + qm.maxMarks, 0);
-                // cannot exceed totalMarks nor push sum > totalMarks
-                const allowedMax = Math.max(0, totalMarks - sumOther);
-
-                return (
-                  <label>
-                    Max marks:
-                    <input
-                      type="number"
-                      min={0}
-                      max={allowedMax}            // UI clamp
-                      value={questionMarks[currentQuestion]?.maxMarks || 0}
-                      onChange={e =>
-                        handleQuestionMarkChange(
-                          currentQuestion,
-                          'maxMarks',
-                          e.target.value
-                        )
-                      }
-                    />
-                    / {allowedMax}
-                  </label>
-                );
-              })()}
-
-              {/* Obtained Marks input */}
-              <label>
-                Obtained:
-                <input
-                  type="number"
-                  min={0}
-                  max={questionMarks[currentQuestion]?.maxMarks || 0}
-                  value={questionMarks[currentQuestion]?.obtainedMarks || 0}
-                  onChange={e =>
-                    handleQuestionMarkChange(
-                      currentQuestion,
-                      'obtainedMarks',
-                      e.target.value
-                    )
-                  }
-                />
-              </label>
-
-              {/* Remarks */}
-              <label>
-                Remarks:
-                <textarea
-                  value={questionMarks[currentQuestion]?.remarks || ''}
-                  onChange={e =>
-                    handleQuestionMarkChange(
-                      currentQuestion,
-                      'remarks',
-                      e.target.value
-                    )
-                  }
-                />
-              </label>
-            </div>
-
-            {/* Admin Comments */}
-            <div>
-              <h4>Comments</h4>
-              <textarea
-                value={adminComments}
-                onChange={e => setAdminComments(e.target.value)}
-              />
-            </div>
-
-            {/* Footer: total, percentage & save */}
-            <footer>
-              {(() => {
-                const totalObtained = calculateTotal();
-                const denom = selectedResult.testId.totalMarks || 1;
-                const pct = ((totalObtained / denom) * 100).toFixed(1);
-                return (
-                  <strong>
-                    Total: {totalObtained}/{denom} ({pct}%)
-                  </strong>
-                );
-              })()}
-              <button
-                className="btn btn-primary"
-                onClick={handleUpdateMarks}
-                disabled={loading}
+          <div className={styles.list}>
+            {filtered.map(r => (
+              <div
+                key={r._id}
+                className={`${styles.row} ${
+                  current?._id === r._id ? styles.active : ''
+                }`}
+                onClick={() => choose(r)}
               >
-                {loading ? 'Saving…' : 'Save & Approve'}
+                <strong>{r.testTitle}</strong>
+                <span>{r.studentName}</span>
+                <span
+                  className={
+                    r.reviewMode
+                      ? styles.under
+                      : r.status === 'pending'
+                      ? styles.pending
+                      : styles.done
+                  }
+                >
+                  {r.reviewMode ? 'under review' : r.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        {/* editor pane */}
+        {current && (
+          <main className={styles.editor}>
+            <button className={styles.back} onClick={() => setCurr(null)}>
+              ← back
+            </button>
+
+            <h3>{current.testTitle}</h3>
+            <p>
+              {current.studentName} — {current.testId.class}/
+              {current.testId.board}
+            </p>
+
+            {current.answerSheetUrl ? (
+              <div className={styles.viewer}>
+                <iframe
+                  title="Answer-sheet PDF"
+                  sandbox="allow-same-origin allow-scripts"
+                  src={`${current.answerSheetUrl}#toolbar=0&navpanes=0`}
+                />
+                <div className={styles.cover} />
+              </div>
+            ) : (
+              <p className={styles.noPdf}>No answer-sheet uploaded.</p>
+            )}
+
+            {!current.reviewMode && (
+              <div className={styles.nav}>
+                <button
+                  onClick={() => setIdx(i => i - 1)}
+                  disabled={qIndex === 1}
+                >
+                  ‹
+                </button>
+                Q&nbsp;{qIndex}/{current.testId.questionsCount}
+                <button
+                  onClick={() => setIdx(i => i + 1)}
+                  disabled={qIndex === current.testId.questionsCount}
+                >
+                  ›
+                </button>
+              </div>
+            )}
+
+            {/* mark form */}
+            <div className={styles.form}>
+              {(() => {
+                const q   = marks[qIndex] || {};
+                const max = current.testId.totalMarks;
+
+                const others = Object.entries(marks)
+                  .filter(([n]) => +n !== qIndex)
+                  .reduce((s, [, v]) => s + Number(v.maxMarks), 0);
+
+                const allow = Math.max(0, max - others);
+
+                return (
+                  <>
+                    <label>
+                      Max
+                      <input
+                        type="number"
+                        min="0"
+                        max={allow}
+                        value={q.maxMarks}
+                        onChange={e =>
+                          updateField(
+                            qIndex,
+                            'maxMarks',
+                            Math.min(allow, +e.target.value || 0)
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Obtained
+                      <input
+                        type="number"
+                        min="0"
+                        max={q.maxMarks}
+                        value={q.obtainedMarks}
+                        onChange={e =>
+                          updateField(
+                            qIndex,
+                            'obtainedMarks',
+                            Math.min(q.maxMarks, +e.target.value || 0)
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Remarks
+                      <textarea
+                        value={q.remarks}
+                        onChange={e =>
+                          updateField(qIndex, 'remarks', e.target.value)
+                        }
+                      />
+                    </label>
+                  </>
+                );
+              })()}
+            </div>
+
+            <textarea
+              className={styles.comment}
+              placeholder="Overall comment…"
+              value={comment}
+              onChange={e => setCmt(e.target.value)}
+            />
+
+            <footer className={styles.footer}>
+              {!current.reviewMode && (
+                <strong>
+                  Total {totalObtained()}/{current.testId.totalMarks}
+                </strong>
+              )}
+              <button
+                className={styles.save}
+                onClick={save}
+                disabled={busy}
+              >
+                {busy ? 'Saving…' : 'Save & approve'}
               </button>
             </footer>
-          </div>
+          </main>
         )}
       </div>
     </div>

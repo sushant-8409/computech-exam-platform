@@ -35,6 +35,8 @@ app.use('/api', require('./routes/analytics'));
 const adminReviewResults = require('./routes/adminReviewResults');
 app.use('/api/admin', adminReviewResults);
 app.use('/api/files', require('./routes/files'));
+app.use('/api/admin', require('./routes/adminReview'));
+
 // In Express middleware
 app.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', "frame-src 'self' drive.google.com docs.google.com");

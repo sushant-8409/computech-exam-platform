@@ -5,6 +5,7 @@ const Test = require('../models/Test');
 const Result = require('../models/Result');
 const Student = require('../models/Student');
 const multer = require('multer');
+const mongoose = require('mongoose');
 // ← add this
 const { uploadToGDrive } = require('../services/gdrive'); // Adjust path as needed
 const router = express.Router();
@@ -13,6 +14,7 @@ const upload = multer({ storage });
 const moment = require('moment-timezone');
 const nowIST = moment().tz('Asia/Kolkata').toDate();
 const QRCode = require('qrcode');
+const ReviewResult = require('../models/ReviewResult');
 // Apply student authentication middleware to all routes
 router.use(authenticateStudent); // This is line 11 - make sure authenticateStudent is properly exported
 
@@ -184,28 +186,61 @@ router.get('/result/:resultId/detailed', async (req, res, next) => {
 // 3) Submit a review request
 router.post('/results/:resultId/request-review', async (req, res, next) => {
   try {
-    const { questionNumbers, comments } = req.body;
-    const result = await Result.findOne({
-      _id: req.params.resultId,
-      studentId: req.user.id
-    });
-    if (!result) {
-      return res.status(404).json({ success: false, message: 'Not found' });
+    const { resultId } = req.params;
+    const { questionNumbers = [], comments = '' } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(resultId)) {
+      return res.status(400).json({ success:false, message:'Bad id' });
     }
 
-    // record review request
-    result.reviewRequests = result.reviewRequests || [];
+    /* 1. fetch original result (must belong to this student) */
+    const result = await Result.findOne({
+      _id: resultId,
+      studentId: req.user.id
+    })
+    .populate('testId', 'questionPaperURL startDate endDate')  // for URLs & vis.
+    .orFail(new Error('Result not found'));
+
+    /* 2. build ReviewResult document  ----------------------- */
+    const subset = result.questionWiseMarks.filter(q =>
+      questionNumbers.includes(q.questionNo)
+    );
+
+    const reviewDoc = new ReviewResult({
+      studentId:        result.studentId,
+      testId:           result.testId,
+      answerSheetUrl:   result.answerSheetUrl,
+      questionPaperUrl: result.testId?.questionPaperURL || null,
+      marksObtained:    result.marksObtained,
+      totalMarks:       result.totalMarks,
+      questionWiseMarks: subset,
+      testVisibility: {
+        startDate: result.testId?.startDate || new Date(),
+        endDate:   result.testId?.endDate   || new Date(),
+        active:    true
+      },
+      adminComments:    comments,
+      status:           'under review'
+    });
+
+    await reviewDoc.save();
+
+    /* 3. update original result ----------------------------- */
+    result.reviewRequests ??= [];               // audit trail
     result.reviewRequests.push({
       questionNumbers,
       comments,
       requestedAt: new Date()
     });
-    result.status = 'under review';  // flip status
+    result.status = 'under review';
+
     await result.save();
 
-    res.json({ success: true });
+    /* 4. respond */
+    return res.json({ success: true, reviewResultId: reviewDoc._id });
   } catch (err) {
-    next(err);
+    console.error('Review-request error:', err.message);
+    return next(err);
   }
 });
 

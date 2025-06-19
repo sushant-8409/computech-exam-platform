@@ -3,18 +3,23 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+import styles from './ReviewRequestPage.module.css';   // ⬅️  CSS-module
+
 export default function ReviewRequestPage() {
-  const { resultId } = useParams();
-  const navigate = useNavigate();
+  const { resultId }  = useParams();
+  const navigate      = useNavigate();
 
   const [count, setCount]       = useState(0);
   const [selected, setSelected] = useState(new Set());
   const [comments, setComments] = useState('');
 
+  /* ─── original logic (unchanged) ─────────────────────────── */
   useEffect(() => {
     async function loadTest() {
       try {
-        const { data } = await axios.get(`/api/student/result/${resultId}/detailed`);
+        const { data } = await axios.get(
+          `/api/student/result/${resultId}/detailed`
+        );
         setCount(data.test.questionsCount);
       } catch {
         toast.error('Failed to load test info');
@@ -23,15 +28,15 @@ export default function ReviewRequestPage() {
     loadTest();
   }, [resultId]);
 
-  const toggle = qNo => {
-    setSelected(s => {
+  const toggle = (qNo) => {
+    setSelected((s) => {
       const next = new Set(s);
       next.has(qNo) ? next.delete(qNo) : next.add(qNo);
       return next;
     });
   };
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (selected.size === 0) {
       toast.error('Select at least one question');
@@ -40,7 +45,7 @@ export default function ReviewRequestPage() {
     try {
       await axios.post(`/api/student/results/${resultId}/request-review`, {
         questionNumbers: [...selected],
-        comments
+        comments,
       });
       toast.success('Review requested');
       navigate('/student');
@@ -49,32 +54,43 @@ export default function ReviewRequestPage() {
     }
   };
 
+  /* ─── render ─────────────────────────────────────────────── */
   return (
-    <div className="request-review">
+    <div className={styles.requestReview}>
       <h2>Request a Review</h2>
+
       <form onSubmit={handleSubmit}>
-        <div>
-          <label>Comments</label><br/>
+
+        {/* comment textarea */}
+        <div className={styles.commentBlock}>
+          <label>Comments</label>
           <textarea
             value={comments}
-            onChange={e => setComments(e.target.value)}
+            onChange={(e) => setComments(e.target.value)}
             required
           />
         </div>
-        <div>
+
+        {/* question check-boxes */}
+        <div className={styles.qGrid}>
           <p>Select question(s):</p>
-          {[...Array(count)].map((_, i) => (
-            <label key={i+1}>
-              <input
-                type="checkbox"
-                checked={selected.has(i+1)}
-                onChange={() => toggle(i+1)}
-              />
-              Q{i+1}
-            </label>
-          ))}
+
+          {[...Array(count)].map((_, idx) => {
+            const qNo = idx + 1;
+            return (
+              <label key={qNo}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(qNo)}
+                  onChange={() => toggle(qNo)}
+                />
+                Q{qNo}
+              </label>
+            );
+          })}
         </div>
-        <button type="submit" className="btn btn-primary">
+
+        <button type="submit" className={styles.submitBtn}>
           Submit Review Request
         </button>
       </form>

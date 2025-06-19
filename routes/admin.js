@@ -10,6 +10,10 @@ const studentController = require('../controllers/StudentController');
 // Adjust path as needed
 const { uploadToGDrive } = require('../services/gdrive'); // Adjust path as neede
 const upload = multer({ storage: multer.memoryStorage() });
+const notificationService = require('../services/notificationService');
+const SYSTEM_ADMIN_ID = '000000000000000000000001';
+const ReviewResult   = require('../models/ReviewResult');
+const { authenticateAdmin } = require('../middleware/auth');
 
 // validation rules for creating a test
 const validators = [
@@ -40,7 +44,12 @@ try {
 
 // Simple authentication middleware (bypass for debugging)
 const authenticate = (req, res, next) => {
-  req.user = { id: 'admin', role: 'admin' };
+  req.user = {
+    _id: SYSTEM_ADMIN_ID,      // always supply _id
+    role: 'admin',
+    name: "CompuTech's Administrator",
+    email: 'computechmailer@gmail.com'
+  };
   next();
 };
 
@@ -487,66 +496,6 @@ router.get('/health', (req, res) => {
     }
   });
 });
-router.patch('/results/:id/marks', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { questionWiseMarks, marksObtained, adminComments } = req.body;
-
-    // 1. Find Result and Test with error handling
-    const result = await Result.findById(id)
-      .orFail(new Error('Result not found'));
-    const test = await Test.findById(result.testId)
-      .select('totalMarks questionsCount')
-      .orFail(new Error('Test not found'));
-
-    // 2. Validate total marks
-    if (test.totalMarks <= 0) {
-      throw new Error('Test total marks must be greater than zero');
-    }
-
-    // 3. Validate question-wise marks
-    const totalQuestions = test.questionsCount;
-    if (Object.keys(questionWiseMarks).length !== totalQuestions) {
-      throw new Error(`Marks for all ${totalQuestions} questions required`);
-    }
-
-    // 4. Calculate percentage safely
-    const percentage = ((marksObtained / test.totalMarks) * 100).toFixed(2);
-
-    // 5. Update and save with version checking
-    const updatedResult = await Result.findOneAndUpdate(
-      { _id: id, __v: result.__v },
-      {
-        questionWiseMarks: Object.entries(questionWiseMarks).map(([no, qm]) => ({
-          questionNo: +no,
-          maxMarks: qm.maxMarks,
-          obtainedMarks: qm.obtainedMarks,
-          remarks: qm.remarks
-        })),
-        marksObtained,
-        totalMarks: test.totalMarks,
-        percentage,
-        adminComments,
-        marksApproved: true,
-        markedBy: req.user.id,
-        markedAt: new Date(),
-        status: 'published'
-      },
-      { new: true, runValidators: true }
-    ).orFail(new Error('Update conflict or document not found'));
-
-    res.json({ success: true, result: updatedResult });
-
-  } catch (err) {
-    console.error('Mark update error:', err.message);
-    res.status(400).json({
-      success: false,
-      message: err.message,
-      errorType: err.name // e.g., 'ValidationError'
-    });
-  }
-});
-
 
 
 // Rest of the routes remain the same...
@@ -734,28 +683,79 @@ router.post('/bulk-action', async (req, res) => {
     return res.status(500).json({ success: false, message: 'Bulk action failed' });
   }
 });
-router.get('/results-for-review', async (req, res) => {
+// PATCH  /api/admin/review-results/:id/marks
+
+
+
+// Notification endpoints
+router.post('/notifications/send', async (req, res) => {
   try {
-    const pending = await Result.find({
-      $or: [
-        { status: 'pending' }
-      ]
-    })
+    // body sent by NotificationCenter.jsx
+    const { studentIds = [], testIds = [], notificationType = 'both',
+      emailTemplate = 'custom_message', customMessage = '' } = req.body;
 
-      .populate('studentId', 'name rollNo class board email')
-      .populate(
-        'testId',
-        'title subject class board duration totalMarks passingMarks questionsCount startDate endDate answerSheetUrl'
-      )
-      .lean();
+    // ────────── 1. validate adminId ──────────
+    if (!req.user || (!req.user._id && !req.user.id)) {
+      return res.status(401).json({ success: false, message: 'Unauthenticated' });
+    }
+    const adminId = req.user._id; // <-- an ObjectId string
 
-    res.json({ success: true, results: pending });
-  } catch (error) {
-    console.error('❌ Error fetching results-for-review:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    // ────────── 2. pull data to embed in email / push ──────────
+    const students = await Student.find({ _id: { $in: studentIds } });
+    const tests = await Test.find({ _id: { $in: testIds } });
+
+    // ────────── 3. call service (SINGULAR method name) ──────────
+    const result = await notificationService.sendNotification(
+      adminId,
+      emailTemplate,                 // type  (e.g. "result_published")
+      '📢 Notification',             // title
+      customMessage || 'See dashboard for details',
+      { students, tests, notificationType }
+    );
+
+    return res.json({ success: true, result });
+  } catch (err) {
+    console.error('Send notification error:', err);
+    res.status(500).json({ success: false, message: 'Failed to send notifications' });
   }
 });
 
+router.get('/notifications', async (req, res) => {
+  try {
+    const notifications = await Notification.find()
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    res.json({ success: true, notifications });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch notifications' });
+  }
+});
+
+router.get('/notification-settings', async (req, res) => {
+  try {
+    const settings = await NotificationSettings.findOne() || {};
+    res.json({ success: true, settings });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch settings' });
+  }
+});
+
+router.post('/notification-settings', async (req, res) => {
+  try {
+    const { settings } = req.body;
+
+    await NotificationSettings.findOneAndUpdate(
+      {},
+      { $set: settings },
+      { upsert: true, new: true }
+    );
+
+    res.json({ success: true, message: 'Settings saved successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to save settings' });
+  }
+});
 
 console.log('📝 Admin routes module loaded successfully');
 

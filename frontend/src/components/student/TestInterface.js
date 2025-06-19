@@ -954,7 +954,7 @@ const TestInterface = () => {
                 width: 60, // Adjust width/height to cover the button
                 height: 55,
                 zIndex: 2,
-                background: 'black',
+                background: 'rgba(145, 127, 127, 0.8)',
                 cursor: 'default'
               }}
             />

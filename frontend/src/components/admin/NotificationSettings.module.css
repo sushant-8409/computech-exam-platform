@@ -1,0 +1,213 @@
+.notificationSettings {
+  padding: 24px;
+  background: var(--surface, #ffffff);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.header h2 {
+  margin: 0 0 8px 0;
+  color: var(--primary, #8b5cf6);
+  font-size: 28px;
+}
+
+.header p {
+  margin: 0;
+  color: var(--text-secondary, #6b7280);
+  font-size: 16px;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.settingsSection {
+  background: var(--surface-secondary, #f9fafb);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.settingsSection h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary, #1f2937);
+  font-size: 18px;
+}
+
+.settingItem {
+  margin-bottom: 12px;
+}
+
+.settingLabel {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary, #1f2937);
+}
+
+.settingLabel input[type="checkbox"] {
+  margin-right: 8px;
+  transform: scale(1.1);
+}
+
+.templatesSection {
+  background: var(--surface-secondary, #f9fafb);
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  margin-bottom: 24px;
+}
+
+.templatesSection h3 {
+  margin: 0 0 20px 0;
+  color: var(--text-primary, #1f2937);
+  font-size: 20px;
+}
+
+.templateSelector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.templateSelector label {
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+}
+
+.templateSelect {
+  padding: 8px 12px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 200px;
+}
+
+.templateEditor {
+  background: var(--surface, #ffffff);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.formGroup {
+  margin-bottom: 20px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  font-size: 14px;
+}
+
+.subjectInput {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.bodyTextarea {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.templateVariables {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.templateVariables h4 {
+  margin: 0 0 12px 0;
+  color: var(--text-primary, #1f2937);
+  font-size: 14px;
+}
+
+.variablesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.variable {
+  background: var(--primary-light, #f3f4f6);
+  color: var(--primary, #8b5cf6);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.variable:hover {
+  background: var(--primary, #8b5cf6);
+  color: white;
+}
+
+.actionButtons {
+  text-align: center;
+}
+
+.saveButton {
+  background: var(--success, #10b981);
+  color: white;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.saveButton:hover:not(:disabled) {
+  background: var(--success-dark, #059669);
+}
+
+.saveButton:disabled {
+  background: var(--disabled, #9ca3af);
+  cursor: not-allowed;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .settingsGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .templateSelector {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .templateSelect {
+    width: 100%;
+  }
+  
+  .variablesList {
+    justify-content: center;
+  }
+}

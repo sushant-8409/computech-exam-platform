@@ -31,7 +31,17 @@ const StatusBadge = ({ status }) => {
     </span>
   );
 };
-
+const DrivePdf = ({ src, title }) => (
+  <div className={styles.driveWrapper}>
+    <iframe
+      sandbox="allow-same-origin allow-scripts"   /* no pop-ups */
+      src={`${src}#toolbar=0&navpanes=0`}         /* hide Drive toolbar */
+      title={title}
+      className={styles.driveIframe}
+    />
+    <div className={styles.driveOverlay} />
+  </div>
+);
 const getGrade = (percentage) => {
   if (percentage >= 90) return 'A+';
   if (percentage >= 80) return 'A';
@@ -288,32 +298,21 @@ const ResultDetail = () => {
       </nav>
 
       {/* Only one iframe visible */}
-      <section className={styles.iframeContainer} aria-live="polite">
+      <section className={styles.iframeSection} aria-live="polite">
         {showDoc === 'question' && questionPaperURL && (
-          <iframe
-            src={questionPaperURL}
-            title="Question Paper"
-            className={styles.iframe}
-            aria-label="Question Paper PDF"
-          />
+          <DrivePdf src={questionPaperURL} title="Question Paper" />
         )}
+
         {showDoc === 'answer' && answerSheetURL && (
-          <iframe
-            src={answerSheetURL}
-            title="Answer Sheet"
-            className={styles.iframe}
-            aria-label="Student Answer Sheet PDF"
-          />
+          <DrivePdf src={answerSheetURL} title="Answer Sheet" />
         )}
+
         {showDoc === 'key' && answerKeyURL && (
-          <iframe
-            src={answerKeyURL}
-            title="Answer Key"
-            className={styles.iframe}
-            aria-label="Official Answer Key PDF"
-          />
+          <DrivePdf src={answerKeyURL} title="Answer Key" />
         )}
       </section>
+
+
 
       {/* Question-wise breakdown */}
       {result.questionWiseMarks?.length > 0 && (

@@ -240,3 +240,96 @@
   height: 100%;
   border: none;
 }
+/* ResultDetail.module.css  (add these) */
+
+/* keep what you already have … */
+
+/* ─────────────────────────────────────────────────────────── */
+/*  Block Drive pop-out button                                */
+/* ─────────────────────────────────────────────────────────── */
+.iframeContainer {
+  position: relative;      /* anchor for ::after overlay */
+}
+
+/* Overlay 120 × 80 px; tweak if Google changes size */
+.iframeContainer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 120px;            /* enough to cover the pop-out + menu */
+  height: 80px;
+  background: var(--surface, #fff);  /* same colour as your page */
+  z-index: 2;              /* above the iframe */
+  pointer-events: auto;    /* eat clicks so user can’t reach button */
+}
+
+/* Optional: a soft shadow so it blends in on dark PDFs */
+[data-theme='dark'] .iframeContainer::after {
+  background: var(--surface, #1e293b);
+}
+
+/* If your iframe has its own shadow or border, keep it visible */
+.iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+/* ───── Pop-out blocker ───────────────────────────────────────── */
+.popoutBlockerContainer {
+  position: relative;      /* ① anchor overlay */
+  width: 100%;
+  height: 100%;
+}
+
+.popoutBlockerContainer iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* covers pop-out + 3-dot menu – adjust if Google changes size   */
+.popoutBlockerOverlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 140px;            /* bigger than icon */
+  height: 100px;
+  background: var(--surface, #ffffff);   /* same colour as page */
+  z-index: 999;            /* ② higher than iframe */
+  pointer-events: auto;    /* ③ eat clicks */
+}
+
+/* Dark theme:                                                     */
+[data-theme='dark'] .popoutBlockerOverlay {
+  background: var(--surface, #1e293b);
+}
+/* ResultDetail.module.css  ── Drive pop-out blocker */
+.driveWrapper {
+  position: relative;     /* anchor overlay */
+  width: 100%;
+  height: 80vh;           /* or whatever height you use */
+}
+
+.driveIframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* overlay that hides + blocks the pop-out & 3-dot menu */
+.driveOverlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 140px;           /* wide/tall enough for the icon area */
+  height: 100px;
+  background: transparent;       /* match page bg */
+  pointer-events: auto;   /* swallow clicks */
+  z-index: 999;
+}
+
+/* dark mode */
+[data-theme='dark'] .driveOverlay {
+  background: transparent;
+}

@@ -59,13 +59,7 @@ const StudentDashboard = () => {
       // 1) Fetch your normal test results
       const res1 = await axios.get('/api/student/results');
       if (!res1.data.success) throw new Error(res1.data.message);
-
-      // 2) Fetch any review‐sessions (ReviewResult) you’ve created
-      const res2 = await axios.get('/api/student/review-results');
-      if (!res2.data.success) throw new Error(res2.data.message);
-
       setResults(res1.data.results);
-      setReviews(Array.isArray(res2.data.reviewResults) ? res2.data.reviewResults : []);
     } catch (err) {
       setReviews([]);
       console.error(err);

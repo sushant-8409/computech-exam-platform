@@ -1,0 +1,271 @@
+.notificationCenter {
+  padding: 24px;
+  background: var(--surface, #ffffff);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.header h2 {
+  margin: 0 0 8px 0;
+  color: var(--primary, #8b5cf6);
+  font-size: 28px;
+}
+
+.header p {
+  margin: 0;
+  color: var(--text-secondary, #6b7280);
+  font-size: 16px;
+}
+
+.formSection {
+  margin-bottom: 32px;
+}
+
+.selectionGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.selectGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  font-size: 14px;
+}
+
+.selectedCount {
+  font-size: 12px;
+  color: var(--primary, #8b5cf6);
+  font-weight: 500;
+  background: var(--primary-light, #f3f4f6);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.notificationTypeGroup {
+  margin-bottom: 24px;
+}
+
+.radioGroup {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.radioOption {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.radioOption input[type="radio"] {
+  margin-right: 8px;
+}
+
+.radioLabel {
+  font-size: 14px;
+  color: var(--text-primary, #1f2937);
+}
+
+.templateGroup {
+  margin-bottom: 24px;
+}
+
+.templateSelect {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.messageGroup {
+  margin-bottom: 24px;
+}
+
+.messageTextarea {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  margin-top: 8px;
+}
+
+.previewSection {
+  background: var(--surface-secondary, #f9fafb);
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.previewSection h3 {
+  margin: 0 0 12px 0;
+  color: var(--text-primary, #1f2937);
+  font-size: 16px;
+}
+
+.previewContent p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: var(--text-primary, #1f2937);
+}
+
+.recipientList {
+  margin-top: 12px;
+}
+
+.recipientList ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.recipientList li {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  margin: 4px 0;
+}
+
+.actionGroup {
+  text-align: center;
+}
+
+.sendButton {
+  background: var(--primary, #8b5cf6);
+  color: white;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sendButton:hover:not(:disabled) {
+  background: var(--primary-dark, #7c3aed);
+}
+
+.sendButton:disabled {
+  background: var(--disabled, #9ca3af);
+  cursor: not-allowed;
+}
+
+.recentSection {
+  border-top: 1px solid var(--border, #e5e7eb);
+  padding-top: 24px;
+}
+
+.recentSection h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary, #1f2937);
+  font-size: 18px;
+}
+
+.notificationsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notificationItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--surface-secondary, #f9fafb);
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.notificationContent h4 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  color: var(--text-primary, #1f2937);
+}
+
+.notificationContent p {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.notificationMeta {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.statusBadge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.statusBadge.sent {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusBadge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusBadge.failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.emptyState {
+  text-align: center;
+  color: var(--text-secondary, #6b7280);
+  font-style: italic;
+  padding: 40px 20px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .selectionGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .radioGroup {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .notificationItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .notificationMeta {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

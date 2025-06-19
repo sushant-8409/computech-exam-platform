@@ -17,7 +17,8 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
-
+import NotificationCenter from './NotificationCenter';
+import NotificationSettings from './NotificationSettings';
 // Register Chart.js components
 ChartJS.register(
   CategoryScale,
@@ -1594,7 +1595,7 @@ const AdminDashboard = () => {
         <div className="sidebar-header">
           <div className="logo">
             <span className="logo-icon">🎓</span>
-            <span className="logo-text">ExamPortal</span>
+            <span className="logo-text">CompuTech</span>
           </div>
           <button
             className="sidebar-toggle"
@@ -1657,13 +1658,19 @@ const AdminDashboard = () => {
 
           <div className="nav-section">
             <span className="nav-section-title">System</span>
-            <button className="nav-item">
+            <button
+              className={`nav-item ${activeTab === 'notifications' ? 'active' : ''}`}
+              onClick={() => setActiveTab('notifications')}
+            >
+              <span className="nav-icon">📢</span>
+              <span className="nav-text">Notifications</span>
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
               <span className="nav-icon">⚙️</span>
               <span className="nav-text">Settings</span>
-            </button>
-            <button className="nav-item">
-              <span className="nav-icon">📧</span>
-              <span className="nav-text">Notifications</span>
             </button>
           </div>
         </nav>
@@ -1699,11 +1706,17 @@ const AdminDashboard = () => {
               {activeTab === 'students' && '👥 Student Management'}
               {activeTab === 'results' && '📊 Results Management'}
               {activeTab === 'analytics' && '📈 Analytics'}
+              {activeTab === 'notifications' && '📢 Notification Center'}
+              {activeTab === 'settings' && '⚙️ System Settings'}
             </h1>
           </div>
 
           <div className="header-right">
-            <button className="header-btn notification-btn">
+            <button
+              className={`header-btn notification-btn ${activeTab === 'notifications' ? 'active' : ''}`}
+              onClick={() => setActiveTab('notifications')}
+              title="View Notifications"
+            >
               🔔
               <span className="notification-badge">3</span>
             </button>
@@ -1743,10 +1756,13 @@ const AdminDashboard = () => {
           {activeTab === 'students' && renderStudents()}
           {activeTab === 'results' && renderResultsTable()}
           {activeTab === 'analytics' && renderAnalytics()}
+          {activeTab === 'notifications' && <NotificationCenter />}
+          {activeTab === 'settings' && <NotificationSettings />}
         </div>
       </main>
     </div>
   );
+
 };
 
 export default AdminDashboard;

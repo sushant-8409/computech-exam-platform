@@ -56,7 +56,7 @@ const PWAInstallPrompt = () => {
       if (outcome === 'accepted') {
         localStorage.setItem('pwa-installed', 'true');
       } else {
-        localStorage.setItem('install-prompt-dismissed', Date.now() + (7 * 24 * 60 * 60 * 1000));
+        localStorage.setItem('install-prompt-dismissed', Date.now() + (2 * 24 * 60 * 60 * 1000));
       }
       
       setDeferredPrompt(null);
@@ -64,9 +64,9 @@ const PWAInstallPrompt = () => {
     } else if (isIOS) {
       // Show iOS install instructions
       alert(`To install this app on your iOS device:
-1. Tap the Share button (⬆️) in Safari
-2. Scroll down and tap "Add to Home Screen"
-3. Tap "Add" in the top right corner`);
+      1. Tap the Share button (⬆️) in Safari
+      2. Scroll down and tap "Add to Home Screen"
+      3. Tap "Add" in the top right corner`);
       setShowInstallPrompt(false);
     }
   };
@@ -78,7 +78,7 @@ const PWAInstallPrompt = () => {
 
   const handleLater = () => {
     setShowInstallPrompt(false);
-    localStorage.setItem('install-prompt-dismissed', Date.now() + (7 * 24 * 60 * 60 * 1000));
+    localStorage.setItem('install-prompt-dismissed', Date.now() + (1 * 24 * 60 * 60 * 1000));
   };
 
   if (!showInstallPrompt) return null;
