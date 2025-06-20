@@ -4,10 +4,11 @@ import styles  from './AnswerSheetReview.module.css';
 
 export default function AnswerSheetReview() {
   const [list,      setList]      = useState([]);
-  const [active,    setActive]    = useState(null);  // current result object
+  const [active,    setActive]    = useState(null);
   const [qNums,     setQNums]     = useState([]);
-  const [qMax,      setQMax]      = useState([]);
+  const [maxMarks,  setMaxMarks]  = useState([]);
   const [marks,     setMarks]     = useState([]);
+  const [origMaxMarks, setOrigMaxMarks] = useState([]);
   const [origMarks, setOrigMarks] = useState([]);
   const [saving,    setSaving]    = useState(false);
   const [flash,     setFlash]     = useState('');
@@ -21,11 +22,15 @@ export default function AnswerSheetReview() {
 
   /* ───────── when user clicks a row ─────── */
   const open = async (resObj) => {
-    setActive(resObj); setFlash('');
+    setActive(resObj); 
+    setFlash('');
+    
     const { data } = await axios.get(`/api/admin/reviews/${resObj._id}/questions`);
     setQNums(data.questions);
-    setQMax(data.maxMarks);
-    /* fetch the CURRENT marks from the result object */
+    setMaxMarks(data.maxMarks);
+    setOrigMaxMarks(data.maxMarks);
+    
+    /* fetch current obtained marks from result object */
     const gridMarks = data.questions.map(q => {
       const row = (resObj.questionWiseMarks || []).find(x => x.questionNo === q);
       return row ? row.obtainedMarks : 0;
@@ -34,34 +39,50 @@ export default function AnswerSheetReview() {
     setOrigMarks(gridMarks);
   };
 
-  /* ───────── edit one cell ───────── */
-  const tweak = (idx, val) => {
+  /* ───────── edit maxMarks cell ───────── */
+  const tweakMaxMarks = (idx, val) => {
+    const clone = [...maxMarks];
+    clone[idx] = Math.max(0, +val || 0);
+    setMaxMarks(clone);
+  };
+
+  /* ───────── edit obtainedMarks cell ───────── */
+  const tweakMarks = (idx, val) => {
     const clone = [...marks];
-    clone[idx]  = Math.max(0, Math.min(qMax[idx], +val || 0));
+    clone[idx] = Math.max(0, Math.min(maxMarks[idx], +val || 0));
     setMarks(clone);
   };
 
-  const totalMax  = qMax.reduce((s, n) => s + n, 0);
-  const totalGot  = marks.reduce((s, n) => s + n, 0);
-  const changed   = marks.join('|') !== origMarks.join('|');
+  const totalMax = maxMarks.reduce((s, n) => s + n, 0);
+  const totalGot = marks.reduce((s, n) => s + n, 0);
+  
+  const maxChanged   = maxMarks.join('|') !== origMaxMarks.join('|');
+  const marksChanged = marks.join('|') !== origMarks.join('|');
+  const changed = maxChanged || marksChanged;
 
   /* ───────── save patches ───────── */
   const save = async () => {
     if (!changed) return;
     setSaving(true);
+    
     await axios.put(`/api/admin/reviews/${active._id}/grade`, {
-      marks: qNums.map((q, i) => ({ q, marks: marks[i] }))
+      marks: qNums.map((q, i) => ({ 
+        q, 
+        maxMarks: maxMarks[i], 
+        obtainedMarks: marks[i] 
+      }))
     });
+    
     setSaving(false);
     setFlash('✔ Saved');
-    await loadList();                         // refresh left pane
-    setActive(null);                          // close right pane
+    await loadList();
+    setActive(null);
   };
 
   /* ───────── UI ───────── */
   return (
     <div className={styles.page}>
-      {/* LEFT  */}
+      {/* LEFT PANEL */}
       <aside className={styles.left}>
         <h2>Pending / Under-review</h2>
         <ul className={styles.rows}>
@@ -79,36 +100,58 @@ export default function AnswerSheetReview() {
         </ul>
       </aside>
 
-      {/* RIGHT – only if a result is open */}
+      {/* RIGHT PANEL */}
       {active && (
         <section className={styles.right}>
           <header>
             <h3>{active.student.name} | {active.test.title}</h3>
-            <small>Status : {active.status}</small>
+            <small>Status: {active.status}</small>
           </header>
 
           <div className={styles.iframeBox}>
             {active.answerSheetUrl
-              ? <iframe title="Answer-sheet" src={active.answerSheetUrl} />
+              ? <iframe title="Answer-sheet" src={active.answerSheetUrl} frameBorder="0" />
               : <div className={styles.nosheet}>No answer-sheet URL</div>}
           </div>
 
           <table className={styles.grid}>
-            <thead><tr><th>Q #</th><th>Max</th><th>Obtained</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Q #</th>
+                <th>Max Marks</th>
+                <th>Obtained Marks</th>
+              </tr>
+            </thead>
             <tbody>
               {qNums.map((q, i) => (
                 <tr key={q}>
                   <td>{q}</td>
-                  <td>{qMax[i]}</td>
                   <td>
-                    <input type="number"
-                           value={marks[i]}
-                           onChange={e => tweak(i, e.target.value)}
-                           min="0" max={qMax[i]} />
+                    <input 
+                      type="number"
+                      value={maxMarks[i]}
+                      onChange={e => tweakMaxMarks(i, e.target.value)}
+                      min="0"
+                      className={styles.maxInput}
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      type="number"
+                      value={marks[i]}
+                      onChange={e => tweakMarks(i, e.target.value)}
+                      min="0" 
+                      max={maxMarks[i]}
+                      className={styles.marksInput}
+                    />
                   </td>
                 </tr>
               ))}
-              <tr className={styles.total}><td>Total</td><td>{totalMax}</td><td>{totalGot}</td></tr>
+              <tr className={styles.total}>
+                <td><strong>Total</strong></td>
+                <td><strong>{totalMax}</strong></td>
+                <td><strong>{totalGot}</strong></td>
+              </tr>
             </tbody>
           </table>
 

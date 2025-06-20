@@ -18,7 +18,9 @@
 
 .grid              { width:100%; border-collapse:collapse; margin-bottom:1rem; }
 .grid th, .grid td { border:1px solid #cbd5e1; padding:.45rem; text-align:center; }
-.grid input        { width:70px; padding:.22rem; border:1px solid #94a3b8; border-radius:4px; }
+.maxInput, .marksInput { width:80px; padding:.25rem; border:1px solid #94a3b8; border-radius:4px; text-align:center; }
+.maxInput          { background:#fef3c7; } /* Light yellow for max marks */
+.marksInput        { background:#ecfdf5; } /* Light green for obtained marks */
 .total             { font-weight:700; background:#f1f5f9; }
 
 button             { align-self:flex-start; background:#22c55e; color:#fff; padding:.6rem 1.2rem;
