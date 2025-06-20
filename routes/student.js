@@ -76,52 +76,113 @@ router.get('/dashboard', async (req, res) => {
     });
   }
 });
-router.post(
-  '/test/:testId/submit',
-  [
-    body('answers').notEmpty(),
-    body('timeTaken').isNumeric()
-  ],
-  async (req, res, next) => {
-    try {
-      // 1) Validate
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, errors: errors.array() });
-      }
+// In your student routes (backend)
 
-      const studentId = req.user.id;
-      const { testId } = req.params;
-      const { answers, timeTaken, violations = [], browserInfo = {} } = req.body;
+// Submit route
+router.post('/test/:testId/submit', authenticateStudent, async (req, res) => {
+  try {
+    const { 
+      answers, 
+      answerSheetUrl, 
+      violations = [], 
+      autoSubmit, 
+      autoSubmitReason,
+      timeTaken,
+      browserInfo 
+    } = req.body;
 
-      // 2) Load or create the Result doc
-      let result = await Result.findOne({ studentId, testId });
-      if (!result) {
-        return res.status(400).json({ success: false, message: 'Please upload or exit first' });
-      }
-      if (result.submittedAt) {
-        return res.status(400).json({ success: false, message: 'Test already submitted' });
-      }
+    const student = req.student;
+    const testId = req.params.testId;
 
-      // 3) Save answers & metadata
-      const test = await Test.findById(testId);
-      result.answers = Array.isArray(answers) ? answers : Object.entries(answers).map(([i, a]) => ({ questionIndex: +i, answer: a }));
-      result.timeTaken = timeTaken;
-      result.violations = violations;
-      result.browserInfo = browserInfo;
-      result.totalMarks = test.totalMarks;
-      result.testTitle = test.title;           // ensure title is set
-      result.submittedAt = new Date();
-      result.status = 'pending';
+    // Find or create result
+    let result = await Result.findOne({ 
+      studentId: student._id, 
+      testId: testId 
+    });
 
-      await result.save();
-
-      res.json({ success: true, message: 'Test submitted', resultId: result._id });
-    } catch (err) {
-      next(err);
+    if (!result) {
+      result = new Result({
+        studentId: student._id,
+        testId: testId,
+        startedAt: new Date(),
+        totalMarks: 0,
+        questionWiseMarks: []
+      });
     }
+
+    // Update result with submission data
+    result.submittedAt = new Date();
+    result.answerSheetUrl = answerSheetUrl;
+    result.violations = violations; // Record all violations
+    result.browserInfo = browserInfo;
+    result.status = autoSubmit ? 'auto_submitted' : 'submitted';
+    
+    // Add auto-submit details if applicable
+    if (autoSubmit) {
+      result.autoSubmitReason = autoSubmitReason;
+      result.adminComments = `Auto-submitted due to: ${autoSubmitReason}`;
+    }
+
+    await result.save();
+
+    res.json({ 
+      success: true, 
+      message: 'Test submitted successfully',
+      resultId: result._id 
+    });
+
+  } catch (error) {
+    console.error('Submit error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to submit test' 
+    });
   }
-);
+});
+
+// Exit route
+router.post('/test/:testId/exit', authenticateStudent, async (req, res) => {
+  try {
+    const { violations = [] } = req.body;
+    const student = req.student;
+    const testId = req.params.testId;
+
+    let result = await Result.findOne({ 
+      studentId: student._id, 
+      testId: testId 
+    });
+
+    if (!result) {
+      result = new Result({
+        studentId: student._id,
+        testId: testId,
+        startedAt: new Date(),
+        totalMarks: 0,
+        questionWiseMarks: []
+      });
+    }
+
+    result.submittedAt = new Date();
+    result.violations = violations; // Record violations on exit too
+    result.status = 'exited';
+    result.adminComments = 'Test exited by student';
+
+    await result.save();
+
+    res.json({ 
+      success: true, 
+      message: 'Test exited successfully' 
+    });
+
+  } catch (error) {
+    console.error('Exit error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to exit test' 
+    });
+  }
+});
+
 
 // ============================================
 // TEST ENDPOINTS
@@ -344,43 +405,6 @@ router.get('/test/:testId', async (req, res) => {
   }
 });
 // 3) Exit Test early: mark submittedAt so the test cannot be restarted
-router.post(
-  '/test/:testId/exit',
-  authenticateStudent,
-  async (req, res, next) => {
-    try {
-      const studentId = req.user.id;
-      const { testId } = req.params;
-      const test = await Test.findById(testId).select('totalMarks title');
-      // Upsert a Result record with submittedAt = now
-      const result = await Result.findOneAndUpdate(
-        { studentId, testId },
-        {
-          $setOnInsert: {
-            studentId,
-            testTitle: test.title,
-            testId,
-            startedAt: new Date(),
-            totalMarks: test.totalMarks,
-          },
-          $set: {
-            submittedAt: new Date(),
-            status: 'pending'
-          }
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-
-      return res.json({
-        success: true,
-        message: 'Test exited',
-        resultId: result._id
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
 // 4) Check submission/exit status
 router.get(
   '/test/:testId/status',
@@ -492,38 +516,6 @@ router.post(
 );
 
 
-router.post('/test/:testId/exit', async (req, res, next) => {
-  try {
-    const studentId = req.user.id;
-    const { testId } = req.params;
-
-    const result = await Result.findOneAndUpdate(
-      { studentId, testId },
-      {
-        $setOnInsert: {
-          studentId,
-          testId,
-          totalMarks: 0,
-          testTitle: '',
-          startedAt: new Date()
-        },
-        $set: { submittedAt: new Date() }
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-
-    // Backfill testTitle if missing
-    if (!result.testTitle) {
-      const test = await Test.findById(testId).select('title');
-      result.testTitle = test?.title || '';
-      await result.save();
-    }
-
-    res.json({ success: true, message: 'Test exited', resultId: result._id });
-  } catch (err) {
-    next(err);
-  }
-});
 
 // ============================================
 // RESULTS ENDPOINTS
@@ -683,38 +675,7 @@ router.post('/test/:testId/resume', async (req, res) => {
 });
 
 
-router.post('/test/:testId/exit', async (req, res, next) => {
-  try {
-    const studentId = req.user.id;
-    const { testId } = req.params;
 
-    const result = await Result.findOneAndUpdate(
-      { studentId, testId },
-      {
-        $setOnInsert: {
-          studentId,
-          testId,
-          totalMarks: 0,
-          testTitle: '',
-          startedAt: new Date()
-        },
-        $set: { submittedAt: new Date() }
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-
-    // Backfill testTitle if missing
-    if (!result.testTitle) {
-      const test = await Test.findById(testId).select('title');
-      result.testTitle = test?.title || '';
-      await result.save();
-    }
-
-    res.json({ success: true, message: 'Test exited', resultId: result._id });
-  } catch (err) {
-    next(err);
-  }
-});
 
 // ============================================
 // RESULTS ENDPOINTS

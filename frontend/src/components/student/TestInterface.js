@@ -4,7 +4,8 @@ import { useAuth } from '../../App';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../LoadingSpinner';
 import axios from 'axios';
-
+import Swal from 'sweetalert2';
+import { confirmDelete, confirmAction, successAlert, errorAlert } from '../../utils/SweetAlerts';
 const TestInterface = () => {
   const { testId } = useParams();
   const { user } = useAuth();
@@ -292,22 +293,67 @@ const TestInterface = () => {
 
   // Enhanced auto-submit with submission lock
   const handleAutoSubmit = useCallback(async (reason) => {
-    if (!test || isSubmitting || isSubmitted || submissionLockRef.current) return;
+  if (!test || isSubmitting || isSubmitted || submissionLockRef.current) return;
 
-    console.log(`🔒 Auto-submit triggered: ${reason}`);
-    submissionLockRef.current = true; // Lock submissions immediately
-    const reasons = {
-      time_limit: '⏰ Time limit reached',
-      violations: '⚠️ Maximum violations exceeded',
-      window_focus: '🪟 Window focus lost too many times'
-    };
+  console.log(`🔒 Auto-submit triggered: ${reason}`);
+  submissionLockRef.current = true;
 
-    toast.error(`${reasons[reason] || reason}! Test will be submitted automatically.`, {
-      toastId: 'auto-submit-notification'
-    });
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    await handleSubmit(true, reason);
-  }, [test, isSubmitting, isSubmitted]);
+  const reasons = {
+    time_limit: '⏰ Time limit reached',
+    violations: '⚠️ Maximum violations exceeded',
+    window_focus: '🪟 Window focus lost too many times',
+    tab_switch: '🔄 Too many tab switches detected',
+    fullscreen_exit: '📺 Exited fullscreen too many times'
+  };
+
+  const reasonText = reasons[reason] || reason;
+
+  // Show countdown with SweetAlert2
+  let timerInterval;
+  const { isConfirmed } = await Swal.fire({
+    title: 'Auto-Submit Warning!',
+    html: `
+      <div style="text-align: center;">
+        <p><strong>${reasonText}</strong></p>
+        <p>Test will be submitted automatically in:</p>
+        <p style="font-size: 2rem; color: #dc2626; margin: 1rem 0;">
+          <span id="countdown">5</span> seconds
+        </p>
+        <p style="font-size: 0.9rem; color: #6b7280;">
+          Click "Submit Now" to submit immediately
+        </p>
+      </div>
+    `,
+    icon: 'warning',
+    showCancelButton: false,
+    confirmButtonText: 'Submit Now',
+    confirmButtonColor: '#dc2626',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    timer: 5000,
+    timerProgressBar: true,
+    didOpen: () => {
+      const countdownElement = Swal.getHtmlContainer().querySelector('#countdown');
+      let countdown = 5;
+      
+      timerInterval = setInterval(() => {
+        countdown--;
+        if (countdownElement) {
+          countdownElement.textContent = countdown;
+        }
+        if (countdown <= 0) {
+          clearInterval(timerInterval);
+        }
+      }, 1000);
+    },
+    willClose: () => {
+      clearInterval(timerInterval);
+    }
+  });
+
+  // Submit the test (either manually clicked or timer expired)
+  await handleSubmit(true, reason);
+}, [test, isSubmitting, isSubmitted, handleSubmit]);
 
   // Better Viewer functions
   const enterBetterViewer = () => {
@@ -756,62 +802,109 @@ const TestInterface = () => {
   const handleExitTest = useCallback(async () => {
     if (isSubmitted) return;
 
-    // 1) Gentle warning if no answer sheet
-
-    if (!answerSheetUrl) {
-      const ok = window.confirm(
-        'No Answer Sheet Uploaded.\nAre you sure you want to exit without uploading?'
-      );
-      if (!ok) return;
-    }
-
-    // 2) Final exit confirmation
-    const proceed = window.confirm(
-      'Exit Test\nYour progress will be saved and you cannot restart.\nContinue?'
-    );
-    if (!proceed) return;
-
-
     try {
+      // 1) Gentle warning if no answer sheet
+      if (!answerSheetUrl) {
+        const result = await Swal.fire({
+          title: 'No Answer Sheet Uploaded',
+          text: 'Are you sure you want to exit without uploading your answer sheet?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#f59e0b',
+          cancelButtonColor: '#6b7280',
+          confirmButtonText: 'Exit Anyway',
+          cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) return;
+      }
+
+      // 2) Final exit confirmation
+      const finalConfirm = await Swal.fire({
+        title: 'Exit Test?',
+        html: `
+        <p>Your progress will be saved but you cannot restart this test.</p>
+        <p><strong>Are you sure you want to continue?</strong></p>
+      `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Yes, Exit Test',
+        cancelButtonText: 'Stay in Test'
+      });
+
+      if (!finalConfirm.isConfirmed) return;
+
       setIsSubmitting(true);
       submissionLockRef.current = true;
 
       const token = localStorage.getItem('token');
       const { data } = await axios.post(
         `/api/student/test/${testId}/exit`,
-        {}, // no body
+        { violations }, // Include violations in exit
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (data.success) {
-        toast.success('Test exited. You cannot restart.');
+        await Swal.fire({
+          title: 'Test Exited',
+          text: 'Your test has been exited successfully. You cannot restart.',
+          icon: 'success',
+          confirmButtonColor: '#10b981',
+          timer: 2000,
+          timerProgressBar: true
+        });
+
         cleanup();
-        // redirect after a short delay so user sees toast
         setTimeout(() => navigate('/student'), 1500);
       } else {
         throw new Error(data.message || 'Exit failed');
       }
     } catch (err) {
       console.error('Exit error:', err);
-      toast.error('Failed to exit test: ' + err.message);
+      await Swal.fire({
+        title: 'Exit Failed',
+        text: `Failed to exit test: ${err.message}`,
+        icon: 'error',
+        confirmButtonColor: '#dc2626'
+      });
       submissionLockRef.current = false;
       setIsSubmitting(false);
     }
-  }, [testId, cleanup, navigate]);
+  }, [testId, cleanup, navigate, answerSheetUrl, violations]);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (isAutoSubmit = false, autoSubmitReason = null) => {
     if (isSubmitting || isSubmitted || submissionLockRef.current) return;
+
+    // Skip confirmation for auto-submit
+    if (!isAutoSubmit) {
+      const result = await Swal.fire({
+        title: 'Submit Test?',
+        html: `
+        <p>Are you sure you want to submit your test?</p>
+        <p><strong>You cannot make changes after submission.</strong></p>
+      `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Yes, Submit',
+        cancelButtonText: 'Review Again'
+      });
+
+      if (!result.isConfirmed) return;
+    }
 
     submissionLockRef.current = true;
     setIsSubmitting(true);
 
     try {
-      // Build the payload; include URL if we have one
       const payload = {
         answers,
         answerSheetUrl,
-        violations,
-        autoSubmit,
+        violations, // Include violations array
+        autoSubmit: isAutoSubmit,
         autoSubmitReason,
         timeTaken,
         browserInfo
@@ -826,16 +919,31 @@ const TestInterface = () => {
 
       if (res.success) {
         setIsSubmitted(true);
-        toast.success('🎉 Test submitted!');
+
+        await Swal.fire({
+          title: 'Test Submitted!',
+          text: isAutoSubmit
+            ? `Test auto-submitted due to: ${autoSubmitReason}`
+            : 'Your test has been submitted successfully!',
+          icon: 'success',
+          confirmButtonColor: '#10b981',
+          timer: 3000,
+          timerProgressBar: true
+        });
+
         cleanup();
-        // clear localStorage keys…
         navigate('/student', { state: { resultId: res.resultId } });
       } else {
         throw new Error(res.message || 'Submission failed');
       }
     } catch (err) {
       console.error('Submit error:', err);
-      toast.error('❌ Submission error: ' + err.message);
+      await Swal.fire({
+        title: 'Submission Failed',
+        text: `Submission error: ${err.message}`,
+        icon: 'error',
+        confirmButtonColor: '#dc2626'
+      });
       submissionLockRef.current = false;
     } finally {
       setIsSubmitting(false);
@@ -847,14 +955,13 @@ const TestInterface = () => {
     answers,
     violations,
     answerSheetUrl,
-    autoSubmit,
-    autoSubmitReason,
     timeTaken,
     browserInfo,
     testId,
     cleanup,
     navigate
   ]);
+
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
