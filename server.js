@@ -35,7 +35,8 @@ app.use('/api', require('./routes/analytics'));
 const adminReviewResults = require('./routes/adminReviewResults');
 app.use('/api/admin', adminReviewResults);
 app.use('/api/files', require('./routes/files'));
-app.use('/api/admin', require('./routes/adminReview'));
+const reviewRoute = require('./routes/ReviewRoutes');
+app.use('/api/admin', reviewRoute);
 
 // In Express middleware
 app.use((req, res, next) => {

@@ -1,301 +1,123 @@
-// AnswerSheetReview.jsx
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { toast } from 'react-toastify';
-import styles from './AnswerSheetReview.module.css';
-
-const authHeader = () => ({
-  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-});
+import { useEffect, useState } from 'react';
+import axios   from 'axios';
+import styles  from './AnswerSheetReview.module.css';
 
 export default function AnswerSheetReview() {
-  /* ---------- state ---------- */
-  const [rows,     setRows]   = useState([]);
-  const [current,  setCurr]   = useState(null);     // selected row
-  const [qIndex,   setIdx]    = useState(1);        // pointer to question
-  const [marks,    setMarks]  = useState({});       // editable map
-  const [comment,  setCmt]    = useState('');
-  const [search,   setSrch]   = useState('');
-  const [busy,     setBusy]   = useState(false);
+  const [list,      setList]      = useState([]);
+  const [active,    setActive]    = useState(null);  // current result object
+  const [qNums,     setQNums]     = useState([]);
+  const [qMax,      setQMax]      = useState([]);
+  const [marks,     setMarks]     = useState([]);
+  const [origMarks, setOrigMarks] = useState([]);
+  const [saving,    setSaving]    = useState(false);
+  const [flash,     setFlash]     = useState('');
 
-  /* ---------- fetch list on mount ---------- */
-  useEffect(() => { fetchList(); }, []);
+  /* ───────── load left-pane list ───────── */
+  const loadList = async () => {
+    const { data } = await axios.get('/api/admin/reviews');
+    setList(data);
+  };
+  useEffect(() => { loadList(); }, []);
 
-  const fetchList = async () => {
-    try {
-      setBusy(true);
-      const { data } = await axios.get(
-        '/api/admin/results-for-review',
-        authHeader()
-      );
-      setRows(data.results || []);
-    } catch {
-      toast.error('Could not load list');
-    } finally { setBusy(false); }
+  /* ───────── when user clicks a row ─────── */
+  const open = async (resObj) => {
+    setActive(resObj); setFlash('');
+    const { data } = await axios.get(`/api/admin/reviews/${resObj._id}/questions`);
+    setQNums(data.questions);
+    setQMax(data.maxMarks);
+    /* fetch the CURRENT marks from the result object */
+    const gridMarks = data.questions.map(q => {
+      const row = (resObj.questionWiseMarks || []).find(x => x.questionNo === q);
+      return row ? row.obtainedMarks : 0;
+    });
+    setMarks(gridMarks);
+    setOrigMarks(gridMarks);
   };
 
-  /* ---------- select a row ---------- */
-  const choose = (row) => {
-    setCurr(row);
-    setCmt(row.adminComments || '');
-    setIdx(1);
-
-    const obj = {};
-    if (row.reviewMode) {
-      row.questionWiseMarks.forEach(q => (obj[q.questionNo] = { ...q }));
-    } else {
-      const perQ = row.testId.totalMarks / row.testId.questionsCount;
-      for (let i = 1; i <= row.testId.questionsCount; i++) {
-        const old = row.questionWiseMarks.find(q => q.questionNo === i);
-        obj[i] = old
-          ? { ...old }
-          : { maxMarks: perQ, obtainedMarks: 0, remarks: '' };
-      }
-    }
-    setMarks(obj);
+  /* ───────── edit one cell ───────── */
+  const tweak = (idx, val) => {
+    const clone = [...marks];
+    clone[idx]  = Math.max(0, Math.min(qMax[idx], +val || 0));
+    setMarks(clone);
   };
 
-  /* ---------- helpers ---------- */
-  const totalObtained = () =>
-    Object.values(marks).reduce((s, q) => s + Number(q.obtainedMarks), 0);
+  const totalMax  = qMax.reduce((s, n) => s + n, 0);
+  const totalGot  = marks.reduce((s, n) => s + n, 0);
+  const changed   = marks.join('|') !== origMarks.join('|');
 
-  const updateField = (qNo, field, value) =>
-    setMarks(p => ({ ...p, [qNo]: { ...p[qNo], [field]: value } }));
-
-  /* ---------- save handler ---------- */
+  /* ───────── save patches ───────── */
   const save = async () => {
-    if (!current) return;
-    setBusy(true);
-
-    try {
-      if (current.reviewMode) {
-        // only changed questions
-        const changed = Object.entries(marks)
-          .filter(([n, q]) => {
-            const old = current.questionWiseMarks.find(o => o.questionNo === +n);
-            return (
-              !old ||
-              old.maxMarks      !== q.maxMarks ||
-              old.obtainedMarks !== q.obtainedMarks ||
-              old.remarks       !== q.remarks
-            );
-          })
-          .map(([n, q]) => ({ ...q, questionNo: +n }));
-
-        await axios.patch(
-          `/api/admin/review-results/${current._id}/marks`,
-          { questionWiseMarks: changed, adminComments: comment },
-          authHeader()
-        );
-      } else {
-        // full marking for pending results
-        const list = Object.entries(marks).map(([n, q]) => ({
-          ...q, questionNo: +n
-        }));
-        const percent =
-          +((totalObtained() / current.testId.totalMarks) * 100).toFixed(2);
-
-        await axios.patch(
-          `/api/admin/results/${current._id}/marks`,
-          {
-            questionWiseMarks: list,
-            marksObtained: totalObtained(),
-            percentage: percent,
-            adminComments: comment
-          },
-          authHeader()
-        );
-      }
-
-      toast.success('Saved');
-      setCurr(null);
-      fetchList();
-    } catch {
-      toast.error('Save error');
-    } finally { setBusy(false); }
+    if (!changed) return;
+    setSaving(true);
+    await axios.put(`/api/admin/reviews/${active._id}/grade`, {
+      marks: qNums.map((q, i) => ({ q, marks: marks[i] }))
+    });
+    setSaving(false);
+    setFlash('✔ Saved');
+    await loadList();                         // refresh left pane
+    setActive(null);                          // close right pane
   };
 
-  /* ---------- filtered rows ---------- */
-  const filtered = rows.filter(r => {
-    const s = search.toLowerCase();
-    return (
-      (r.studentName || '').toLowerCase().includes(s) ||
-      (r.testTitle   || '').toLowerCase().includes(s)
-    );
-  });
-
-  /* ---------- render ---------- */
+  /* ───────── UI ───────── */
   return (
     <div className={styles.page}>
-      <h2>Answer-Sheet Review</h2>
+      {/* LEFT  */}
+      <aside className={styles.left}>
+        <h2>Pending / Under-review</h2>
+        <ul className={styles.rows}>
+          {list.map(r => (
+            <li key={r._id}
+                onClick={() => open(r)}
+                className={active && active._id === r._id ? styles.sel : ''}>
+              <span>{r.student.name} – {r.test.title}</span>
+              <span className={`${styles.tag} ${
+                   r.status === 'pending'      ? styles.pending :
+                   r.status === 'under review' ? styles.under :
+                   ''}`}>{r.status}</span>
+            </li>
+          ))}
+        </ul>
+      </aside>
 
-      <div className={styles.wrapper}>
-        {/* list pane */}
-        <aside className={styles.listPane}>
-          <input
-            className={styles.search}
-            placeholder="Search…"
-            value={search}
-            onChange={e => setSrch(e.target.value)}
-          />
+      {/* RIGHT – only if a result is open */}
+      {active && (
+        <section className={styles.right}>
+          <header>
+            <h3>{active.student.name} | {active.test.title}</h3>
+            <small>Status : {active.status}</small>
+          </header>
 
-          <div className={styles.list}>
-            {filtered.map(r => (
-              <div
-                key={r._id}
-                className={`${styles.row} ${
-                  current?._id === r._id ? styles.active : ''
-                }`}
-                onClick={() => choose(r)}
-              >
-                <strong>{r.testTitle}</strong>
-                <span>{r.studentName}</span>
-                <span
-                  className={
-                    r.reviewMode
-                      ? styles.under
-                      : r.status === 'pending'
-                      ? styles.pending
-                      : styles.done
-                  }
-                >
-                  {r.reviewMode ? 'under review' : r.status}
-                </span>
-              </div>
-            ))}
+          <div className={styles.iframeBox}>
+            {active.answerSheetUrl
+              ? <iframe title="Answer-sheet" src={active.answerSheetUrl} />
+              : <div className={styles.nosheet}>No answer-sheet URL</div>}
           </div>
-        </aside>
 
-        {/* editor pane */}
-        {current && (
-          <main className={styles.editor}>
-            <button className={styles.back} onClick={() => setCurr(null)}>
-              ← back
-            </button>
+          <table className={styles.grid}>
+            <thead><tr><th>Q #</th><th>Max</th><th>Obtained</th></tr></thead>
+            <tbody>
+              {qNums.map((q, i) => (
+                <tr key={q}>
+                  <td>{q}</td>
+                  <td>{qMax[i]}</td>
+                  <td>
+                    <input type="number"
+                           value={marks[i]}
+                           onChange={e => tweak(i, e.target.value)}
+                           min="0" max={qMax[i]} />
+                  </td>
+                </tr>
+              ))}
+              <tr className={styles.total}><td>Total</td><td>{totalMax}</td><td>{totalGot}</td></tr>
+            </tbody>
+          </table>
 
-            <h3>{current.testTitle}</h3>
-            <p>
-              {current.studentName} — {current.testId.class}/
-              {current.testId.board}
-            </p>
-
-            {current.answerSheetUrl ? (
-              <div className={styles.viewer}>
-                <iframe
-                  title="Answer-sheet PDF"
-                  sandbox="allow-same-origin allow-scripts"
-                  src={`${current.answerSheetUrl}#toolbar=0&navpanes=0`}
-                />
-                <div className={styles.cover} />
-              </div>
-            ) : (
-              <p className={styles.noPdf}>No answer-sheet uploaded.</p>
-            )}
-
-            {!current.reviewMode && (
-              <div className={styles.nav}>
-                <button
-                  onClick={() => setIdx(i => i - 1)}
-                  disabled={qIndex === 1}
-                >
-                  ‹
-                </button>
-                Q&nbsp;{qIndex}/{current.testId.questionsCount}
-                <button
-                  onClick={() => setIdx(i => i + 1)}
-                  disabled={qIndex === current.testId.questionsCount}
-                >
-                  ›
-                </button>
-              </div>
-            )}
-
-            {/* mark form */}
-            <div className={styles.form}>
-              {(() => {
-                const q   = marks[qIndex] || {};
-                const max = current.testId.totalMarks;
-
-                const others = Object.entries(marks)
-                  .filter(([n]) => +n !== qIndex)
-                  .reduce((s, [, v]) => s + Number(v.maxMarks), 0);
-
-                const allow = Math.max(0, max - others);
-
-                return (
-                  <>
-                    <label>
-                      Max
-                      <input
-                        type="number"
-                        min="0"
-                        max={allow}
-                        value={q.maxMarks}
-                        onChange={e =>
-                          updateField(
-                            qIndex,
-                            'maxMarks',
-                            Math.min(allow, +e.target.value || 0)
-                          )
-                        }
-                      />
-                    </label>
-
-                    <label>
-                      Obtained
-                      <input
-                        type="number"
-                        min="0"
-                        max={q.maxMarks}
-                        value={q.obtainedMarks}
-                        onChange={e =>
-                          updateField(
-                            qIndex,
-                            'obtainedMarks',
-                            Math.min(q.maxMarks, +e.target.value || 0)
-                          )
-                        }
-                      />
-                    </label>
-
-                    <label>
-                      Remarks
-                      <textarea
-                        value={q.remarks}
-                        onChange={e =>
-                          updateField(qIndex, 'remarks', e.target.value)
-                        }
-                      />
-                    </label>
-                  </>
-                );
-              })()}
-            </div>
-
-            <textarea
-              className={styles.comment}
-              placeholder="Overall comment…"
-              value={comment}
-              onChange={e => setCmt(e.target.value)}
-            />
-
-            <footer className={styles.footer}>
-              {!current.reviewMode && (
-                <strong>
-                  Total {totalObtained()}/{current.testId.totalMarks}
-                </strong>
-              )}
-              <button
-                className={styles.save}
-                onClick={save}
-                disabled={busy}
-              >
-                {busy ? 'Saving…' : 'Save & approve'}
-              </button>
-            </footer>
-          </main>
-        )}
-      </div>
+          <button onClick={save} disabled={!changed || saving}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+          {flash && <p className={styles.flash}>{flash}</p>}
+        </section>
+      )}
     </div>
   );
 }

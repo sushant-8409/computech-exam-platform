@@ -34,7 +34,12 @@ const resultSchema = new mongoose.Schema({
   toJSON:    { virtuals: true },
   toObject:  { virtuals: true }
 });
-
+resultSchema.virtual('student', {
+  ref:         'Student',
+  localField:  'studentId',
+  foreignField:'_id',
+  justOne:     true
+});
 // Virtual to fetch full Test document (including title, subject, etc.)
 resultSchema.virtual('test', {
   ref: 'Test',

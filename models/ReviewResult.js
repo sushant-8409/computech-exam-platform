@@ -28,5 +28,11 @@ testVisibility: {
 {
   timestamps: true
 });
+reviewResultSchema.virtual('student', {
+  ref: 'Student',
+  localField: 'studentId',
+  foreignField: '_id',
+  justOne: true
+});
 
 module.exports = mongoose.model('ReviewResult', reviewResultSchema);
