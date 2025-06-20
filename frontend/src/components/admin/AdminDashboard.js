@@ -32,6 +32,20 @@ ChartJS.register(
   Legend,
   Filler
 );
+// place near the top of AdminDashboard.jsx (above the component)
+const SUBJECT_OPTIONS = [
+  'Computer Science',
+  'Computer Application',
+  'Mathematics',
+  'Physics',
+  'English Literature',
+  'English Language',
+  'Biology',
+  'History',
+  'Geography',
+  'Economic Applications',
+  'Chemistry'
+];
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -699,13 +713,19 @@ const AdminDashboard = () => {
 
             <div className="form-group">
               <label>Subject *</label>
-              <input
-                type="text"
+              <select
+                name="subject"
                 value={testForm.subject}
-                onChange={(e) => setTestForm({ ...testForm, subject: e.target.value })}
-                placeholder="e.g., Mathematics"
+                onChange={handleChange}          
                 required
-              />
+              >
+                <option value="">Select Subject</option>
+                {SUBJECT_OPTIONS.map(sub => (
+                  <option key={sub} value={sub}>
+                    {sub}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group">
