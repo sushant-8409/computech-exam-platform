@@ -1,0 +1,860 @@
+/* ============================================
+   TEST INTERFACE - COMPLETE STYLES
+   ============================================ */
+
+.testInterface {
+  width: 100vw;
+  min-height: 100vh;
+  background: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ============================================
+   FULLSCREEN PROMPT
+   ============================================ */
+
+.fullscreenPromptOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.fullscreenPromptModal {
+  background: white;
+  padding: 3rem;
+  border-radius: 16px;
+  text-align: center;
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.fullscreenPromptModal h3 {
+  color: #dc2626;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.promptActions {
+  display: flex;
+  gap: 1rem;
+  margin: 2rem 0;
+  justify-content: center;
+}
+
+.promptNote {
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* ============================================
+   TEST HEADER
+   ============================================ */
+
+.testHeader {
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  color: white;
+  padding: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 20px rgba(30, 64, 175, 0.3);
+}
+
+.testInfo h1 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  font-weight: 700;
+}
+
+.testMeta {
+  display: flex;
+  gap: 1rem;
+  font-size: 1rem;
+  opacity: 0.9;
+}
+
+.testControls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.timerContainer {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.timer {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+.timer.warning {
+  color: #fbbf24;
+  animation: pulse 2s infinite;
+}
+
+.timer.caution {
+  color: #f59e0b;
+}
+
+.controlButtons {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* ============================================
+   STATUS BAR
+   ============================================ */
+
+.statusBar {
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1rem 2rem;
+  display: flex;
+  gap: 2rem;
+}
+
+.statusItem {
+  display: flex;
+  align-items: center;
+}
+
+.statusIndicator {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.statusIndicator.good {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.statusIndicator.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusIndicator.danger {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+/* ============================================
+   VIOLATIONS WARNING
+   ============================================ */
+
+.violationsWarning {
+  background: linear-gradient(135deg, #fef3c7, #fed7aa);
+  color: #92400e;
+  padding: 1rem 2rem;
+  text-align: center;
+  font-weight: 700;
+  border-bottom: 2px solid #f59e0b;
+}
+
+/* ============================================
+   TEST CONTENT
+   ============================================ */
+
+.testContent {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ============================================
+   PDF VIEWER
+   ============================================ */
+
+.questionPaper {
+  margin-bottom: 3rem;
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.questionPaperHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.questionPaperHeader h3 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1.5rem;
+}
+
+.pdfToolbar {
+  display: flex;
+  gap: 1rem;
+}
+
+.pdfContainer {
+  position: relative;
+  width: 100%;
+  height: 80vh;
+}
+
+.pdfViewer {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.popoutBlocker {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60px;
+  height: 55px;
+  z-index: 2;
+  background: rgba(145, 127, 127, 0.8);
+  cursor: default;
+}
+
+.pdfInfo {
+  padding: 1rem 2rem;
+  background: #f8fafc;
+}
+
+.textMuted {
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* ============================================
+   BETTER VIEWER
+   ============================================ */
+
+.betterViewerOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.betterViewerClose {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  cursor: pointer;
+  z-index: 10001;
+  transition: all 0.2s ease;
+}
+
+.betterViewerClose:hover {
+  background: #b91c1c;
+  transform: scale(1.1);
+}
+
+.betterViewerTimer {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 700;
+  z-index: 10001;
+  backdrop-filter: blur(10px);
+}
+
+.betterViewerZoom {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  padding: 1rem;
+  border-radius: 12px;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  z-index: 10001;
+  backdrop-filter: blur(10px);
+}
+
+.zoomBtn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.zoomBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.zoomBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zoomDisplay {
+  color: white;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: center;
+}
+
+.betterViewerContent {
+  width: 100%;
+  height: 100vh;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+}
+
+.pdfContainerBetter {
+  width: 100%;
+  max-width: 1000px;
+  transition: transform 0.3s ease;
+}
+
+.popoutBlockerContainer {
+  position: relative;
+  width: 100%;
+  height: 80vh;
+}
+
+.pdfViewerBetter {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: white;
+}
+
+.popoutBlockerOverlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60px;
+  height: 55px;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================
+   QUESTIONS SECTION
+   ============================================ */
+
+.questionsSection {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 3rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.questionsSection h3 {
+  margin: 0 0 2rem 0;
+  color: #1f2937;
+  font-size: 1.5rem;
+}
+
+.questionCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  background: #f8fafc;
+}
+
+.questionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.questionNumber {
+  font-weight: 700;
+  color: #1f2937;
+  font-size: 1.1rem;
+}
+
+.questionMarks {
+  background: #3b82f6;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.questionText {
+  font-size: 1.1rem;
+  color: #1f2937;
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+
+.questionAnswer {
+  margin-top: 1rem;
+}
+
+.mcqOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.mcqOption {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.mcqOption:hover {
+  background: #f3f4f6;
+  border-color: #3b82f6;
+}
+
+.mcqOption input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #3b82f6;
+}
+
+.optionText {
+  font-size: 1rem;
+  color: #374151;
+}
+
+.textAnswer {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.textAnswer:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.numericalAnswer {
+  width: 200px;
+  padding: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.numericalAnswer:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ============================================
+   ANSWER UPLOAD
+   ============================================ */
+
+.answerUpload {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 3rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.answerUpload h3 {
+  margin: 0 0 1rem 0;
+  color: #1f2937;
+  font-size: 1.5rem;
+}
+
+.uploadDescription {
+  color: #6b7280;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.fileUploadArea {
+  margin-bottom: 2rem;
+}
+
+.fileInput {
+  display: none;
+}
+
+.fileLabel {
+  display: block;
+  padding: 2rem;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #f8fafc;
+}
+
+.fileLabel:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.fileLabel.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fileSelected {
+  color: #059669;
+  font-weight: 600;
+}
+
+.filePlaceholder {
+  color: #6b7280;
+}
+
+.uploadProgress {
+  margin-top: 1rem;
+}
+
+.progressBar {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  transition: width 0.3s ease;
+}
+
+.progressText {
+  display: block;
+  text-align: center;
+  margin-top: 0.5rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+/* ============================================
+   TEST FOOTER
+   ============================================ */
+
+.testFooter {
+  background: white;
+  border-top: 2px solid #e5e7eb;
+  padding: 2rem;
+  position: sticky;
+  bottom: 0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.submitInfo {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.submitInfo p {
+  margin: 0;
+  color: #92400e;
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btnPrimary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.btnSecondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: #4b5563;
+}
+
+.btnWarning {
+  background: #f59e0b;
+  color: white;
+}
+
+.btnWarning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.btnOutlineDanger {
+  background: transparent;
+  color: #dc2626;
+  border: 2px solid #dc2626;
+}
+
+.btnOutlineDanger:hover:not(:disabled) {
+  background: #dc2626;
+  color: white;
+}
+
+.btnSm {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.btnLarge {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+}
+
+.btnOutline {
+  background: transparent;
+  border: 1px solid currentColor;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btnPulse {
+  animation: pulse 2s infinite;
+}
+
+/* ============================================
+   STATUS BADGES
+   ============================================ */
+
+.statusBadge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.statusBadge.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+/* ============================================
+   LOADING AND ERROR STATES
+   ============================================ */
+
+.testLoading,
+.testError,
+.testSubmitted {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  padding: 2rem;
+  background: #f8fafc;
+}
+
+.testError h2 {
+  color: #dc2626;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.testSubmitted h2 {
+  color: #059669;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.submittedContent {
+  background: white;
+  padding: 3rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
+}
+
+/* ============================================
+   SUBMISSION OVERLAY
+   ============================================ */
+
+.submissionOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.submissionModal {
+  background: white;
+  padding: 3rem;
+  border-radius: 16px;
+  text-align: center;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.submissionModal h3 {
+  margin: 1rem 0;
+  color: #1f2937;
+}
+
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+.loadingSpinner.large {
+  width: 60px;
+  height: 60px;
+  border-width: 6px;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 768px) {
+  .testHeader {
+    flex-direction: column;
+    gap: 1.5rem;
+    text-align: center;
+  }
+
+  .testMeta {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .testContent {
+    padding: 1rem;
+  }
+
+  .statusBar {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .pdfContainer {
+    height: 60vh;
+  }
+
+  .betterViewerZoom {
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    transform: none;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .questionCard {
+    padding: 1.5rem;
+  }
+
+  .testFooter {
+    padding: 1rem;
+  }
+}

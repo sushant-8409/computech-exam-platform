@@ -290,29 +290,133 @@ const TestInterface = () => {
       }
     }
   }, [testStarted, isSubmitting, warningShown, isBetterViewer, recordViolation, isSubmitted]);
+  const cleanup = () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange, true);
+    document.removeEventListener('contextmenu', handleRightClick, true);
+    document.removeEventListener('keydown', handleKeyDown, true);
+    document.removeEventListener('fullscreenchange', handleFullscreenChange, true);
+    window.removeEventListener('blur', handleWindowFocus, true);
+    document.removeEventListener('mouseleave', handleMouseLeave);
 
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (violationTimeoutRef.current) clearTimeout(violationTimeoutRef.current);
+    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+
+    document.body.style.overflow = 'auto';
+
+    if (document.exitFullscreen && document.fullscreenElement) {
+      document.exitFullscreen().catch(err => console.log('Exit fullscreen error:', err));
+    }
+  };
+  const handleSubmit = useCallback(async (isAutoSubmit = false, autoSubmitReason = null) => {
+    if (isSubmitting || isSubmitted || submissionLockRef.current) return;
+
+    // Skip confirmation for auto-submit
+    if (!isAutoSubmit) {
+      const result = await Swal.fire({
+        title: 'Submit Test?',
+        html: `
+        <p>Are you sure you want to submit your test?</p>
+        <p><strong>You cannot make changes after submission.</strong></p>
+      `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Yes, Submit',
+        cancelButtonText: 'Review Again'
+      });
+
+      if (!result.isConfirmed) return;
+    }
+
+    submissionLockRef.current = true;
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        answers,
+        answerSheetUrl,
+        violations, // Include violations array
+        autoSubmit: isAutoSubmit,
+        autoSubmitReason,
+        timeTaken,
+        browserInfo
+      };
+
+      const token = localStorage.getItem('token');
+      const { data: res } = await axios.post(
+        `/api/student/test/${testId}/submit`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.success) {
+        setIsSubmitted(true);
+
+        await Swal.fire({
+          title: 'Test Submitted!',
+          text: isAutoSubmit
+            ? `Test auto-submitted due to: ${autoSubmitReason}`
+            : 'Your test has been submitted successfully!',
+          icon: 'success',
+          confirmButtonColor: '#10b981',
+          timer: 3000,
+          timerProgressBar: true
+        });
+
+        cleanup();
+        navigate('/student', { state: { resultId: res.resultId } });
+      } else {
+        throw new Error(res.message || 'Submission failed');
+      }
+    } catch (err) {
+      console.error('Submit error:', err);
+      await Swal.fire({
+        title: 'Submission Failed',
+        text: `Submission error: ${err.message}`,
+        icon: 'error',
+        confirmButtonColor: '#dc2626'
+      });
+      submissionLockRef.current = false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    isSubmitting,
+    isSubmitted,
+    submissionLockRef,
+    answers,
+    violations,
+    answerSheetUrl,
+    timeTaken,
+    browserInfo,
+    testId,
+    cleanup,
+    navigate
+  ]);
   // Enhanced auto-submit with submission lock
   const handleAutoSubmit = useCallback(async (reason) => {
-  if (!test || isSubmitting || isSubmitted || submissionLockRef.current) return;
+    if (!test || isSubmitting || isSubmitted || submissionLockRef.current) return;
 
-  console.log(`🔒 Auto-submit triggered: ${reason}`);
-  submissionLockRef.current = true;
+    console.log(`🔒 Auto-submit triggered: ${reason}`);
+    submissionLockRef.current = true;
 
-  const reasons = {
-    time_limit: '⏰ Time limit reached',
-    violations: '⚠️ Maximum violations exceeded',
-    window_focus: '🪟 Window focus lost too many times',
-    tab_switch: '🔄 Too many tab switches detected',
-    fullscreen_exit: '📺 Exited fullscreen too many times'
-  };
+    const reasons = {
+      time_limit: '⏰ Time limit reached',
+      violations: '⚠️ Maximum violations exceeded',
+      window_focus: '🪟 Window focus lost too many times',
+      tab_switch: '🔄 Too many tab switches detected',
+      fullscreen_exit: '📺 Exited fullscreen too many times'
+    };
 
-  const reasonText = reasons[reason] || reason;
+    const reasonText = reasons[reason] || reason;
 
-  // Show countdown with SweetAlert2
-  let timerInterval;
-  const { isConfirmed } = await Swal.fire({
-    title: 'Auto-Submit Warning!',
-    html: `
+    // Show countdown with SweetAlert2
+    let timerInterval;
+    const { isConfirmed } = await Swal.fire({
+      title: 'Auto-Submit Warning!',
+      html: `
       <div style="text-align: center;">
         <p><strong>${reasonText}</strong></p>
         <p>Test will be submitted automatically in:</p>
@@ -324,36 +428,36 @@ const TestInterface = () => {
         </p>
       </div>
     `,
-    icon: 'warning',
-    showCancelButton: false,
-    confirmButtonText: 'Submit Now',
-    confirmButtonColor: '#dc2626',
-    allowOutsideClick: false,
-    allowEscapeKey: false,
-    timer: 5000,
-    timerProgressBar: true,
-    didOpen: () => {
-      const countdownElement = Swal.getHtmlContainer().querySelector('#countdown');
-      let countdown = 5;
-      
-      timerInterval = setInterval(() => {
-        countdown--;
-        if (countdownElement) {
-          countdownElement.textContent = countdown;
-        }
-        if (countdown <= 0) {
-          clearInterval(timerInterval);
-        }
-      }, 1000);
-    },
-    willClose: () => {
-      clearInterval(timerInterval);
-    }
-  });
+      icon: 'warning',
+      showCancelButton: false,
+      confirmButtonText: 'Submit Now',
+      confirmButtonColor: '#dc2626',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      timer: 5000,
+      timerProgressBar: true,
+      didOpen: () => {
+        const countdownElement = Swal.getHtmlContainer().querySelector('#countdown');
+        let countdown = 5;
 
-  // Submit the test (either manually clicked or timer expired)
-  await handleSubmit(true, reason);
-}, [test, isSubmitting, isSubmitted, handleSubmit]);
+        timerInterval = setInterval(() => {
+          countdown--;
+          if (countdownElement) {
+            countdownElement.textContent = countdown;
+          }
+          if (countdown <= 0) {
+            clearInterval(timerInterval);
+          }
+        }, 1000);
+      },
+      willClose: () => {
+        clearInterval(timerInterval);
+      }
+    });
+
+    // Submit the test (either manually clicked or timer expired)
+    await handleSubmit(true, reason);
+  }, [test, isSubmitting, isSubmitted, handleSubmit]);
 
   // Better Viewer functions
   const enterBetterViewer = () => {
@@ -612,24 +716,7 @@ const TestInterface = () => {
     }, 2000);
   };
 
-  const cleanup = () => {
-    document.removeEventListener('visibilitychange', handleVisibilityChange, true);
-    document.removeEventListener('contextmenu', handleRightClick, true);
-    document.removeEventListener('keydown', handleKeyDown, true);
-    document.removeEventListener('fullscreenchange', handleFullscreenChange, true);
-    window.removeEventListener('blur', handleWindowFocus, true);
-    document.removeEventListener('mouseleave', handleMouseLeave);
-
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (violationTimeoutRef.current) clearTimeout(violationTimeoutRef.current);
-    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
-
-    document.body.style.overflow = 'auto';
-
-    if (document.exitFullscreen && document.fullscreenElement) {
-      document.exitFullscreen().catch(err => console.log('Exit fullscreen error:', err));
-    }
-  };
+  
 
   const requestFullscreen = () => {
     if (isSubmitted) return;
@@ -873,94 +960,6 @@ const TestInterface = () => {
       setIsSubmitting(false);
     }
   }, [testId, cleanup, navigate, answerSheetUrl, violations]);
-
-  const handleSubmit = useCallback(async (isAutoSubmit = false, autoSubmitReason = null) => {
-    if (isSubmitting || isSubmitted || submissionLockRef.current) return;
-
-    // Skip confirmation for auto-submit
-    if (!isAutoSubmit) {
-      const result = await Swal.fire({
-        title: 'Submit Test?',
-        html: `
-        <p>Are you sure you want to submit your test?</p>
-        <p><strong>You cannot make changes after submission.</strong></p>
-      `,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#10b981',
-        cancelButtonColor: '#6b7280',
-        confirmButtonText: 'Yes, Submit',
-        cancelButtonText: 'Review Again'
-      });
-
-      if (!result.isConfirmed) return;
-    }
-
-    submissionLockRef.current = true;
-    setIsSubmitting(true);
-
-    try {
-      const payload = {
-        answers,
-        answerSheetUrl,
-        violations, // Include violations array
-        autoSubmit: isAutoSubmit,
-        autoSubmitReason,
-        timeTaken,
-        browserInfo
-      };
-
-      const token = localStorage.getItem('token');
-      const { data: res } = await axios.post(
-        `/api/student/test/${testId}/submit`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (res.success) {
-        setIsSubmitted(true);
-
-        await Swal.fire({
-          title: 'Test Submitted!',
-          text: isAutoSubmit
-            ? `Test auto-submitted due to: ${autoSubmitReason}`
-            : 'Your test has been submitted successfully!',
-          icon: 'success',
-          confirmButtonColor: '#10b981',
-          timer: 3000,
-          timerProgressBar: true
-        });
-
-        cleanup();
-        navigate('/student', { state: { resultId: res.resultId } });
-      } else {
-        throw new Error(res.message || 'Submission failed');
-      }
-    } catch (err) {
-      console.error('Submit error:', err);
-      await Swal.fire({
-        title: 'Submission Failed',
-        text: `Submission error: ${err.message}`,
-        icon: 'error',
-        confirmButtonColor: '#dc2626'
-      });
-      submissionLockRef.current = false;
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [
-    isSubmitting,
-    isSubmitted,
-    submissionLockRef,
-    answers,
-    violations,
-    answerSheetUrl,
-    timeTaken,
-    browserInfo,
-    testId,
-    cleanup,
-    navigate
-  ]);
 
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);

@@ -5101,3 +5101,26 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* ✅ Full-width layout for TestInterface */
+.main-content-full {
+  width: 100vw;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* ✅ Regular layout with header */
+.main-content {
+  width: 100%;
+  min-height: calc(100vh - 80px); /* Account for header height */
+  padding: 0;
+}
+
+/* ✅ Ensure test interface takes full space */
+.test-interface {
+  width: 100vw;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}

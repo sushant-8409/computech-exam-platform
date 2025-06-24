@@ -3,14 +3,17 @@ import axios   from 'axios';
 import styles  from './AnswerSheetReview.module.css';
 
 export default function AnswerSheetReview() {
-  const [list,      setList]      = useState([]);
-  const [active,    setActive]    = useState(null);  // current result object
-  const [qNums,     setQNums]     = useState([]);
-  const [qMax,      setQMax]      = useState([]);
-  const [marks,     setMarks]     = useState([]);
-  const [origMarks, setOrigMarks] = useState([]);
-  const [saving,    setSaving]    = useState(false);
-  const [flash,     setFlash]     = useState('');
+  const [list,        setList]        = useState([]);
+  const [active,      setActive]      = useState(null);
+  const [qNums,       setQNums]       = useState([]);
+  const [maxMarks,    setMaxMarks]    = useState([]);  // ← NEW: editable max marks
+  const [marks,       setMarks]       = useState([]);
+  const [remarks,     setRemarks]     = useState([]);  // ← NEW: remarks for each question
+  const [origMaxMarks, setOrigMaxMarks] = useState([]);
+  const [origMarks,   setOrigMarks]   = useState([]);
+  const [origRemarks, setOrigRemarks] = useState([]);
+  const [saving,      setSaving]      = useState(false);
+  const [flash,       setFlash]       = useState('');
 
   /* ───────── load left-pane list ───────── */
   const loadList = async () => {
@@ -21,47 +24,90 @@ export default function AnswerSheetReview() {
 
   /* ───────── when user clicks a row ─────── */
   const open = async (resObj) => {
-    setActive(resObj); setFlash('');
+    setActive(resObj); 
+    setFlash('');
+    
     const { data } = await axios.get(`/api/admin/reviews/${resObj._id}/questions`);
     setQNums(data.questions);
-    setQMax(data.maxMarks);
-    /* fetch the CURRENT marks from the result object */
+    setMaxMarks(data.maxMarks);
+    setOrigMaxMarks([...data.maxMarks]);
+    
+    /* fetch current marks AND remarks from the result object */
     const gridMarks = data.questions.map(q => {
       const row = (resObj.questionWiseMarks || []).find(x => x.questionNo === q);
       return row ? row.obtainedMarks : 0;
     });
+    
+    const gridRemarks = data.questions.map(q => {
+      const row = (resObj.questionWiseMarks || []).find(x => x.questionNo === q);
+      return row ? (row.remarks || '') : '';
+    });
+    
     setMarks(gridMarks);
-    setOrigMarks(gridMarks);
+    setRemarks(gridRemarks);
+    setOrigMarks([...gridMarks]);
+    setOrigRemarks([...gridRemarks]);
   };
 
-  /* ───────── edit one cell ───────── */
-  const tweak = (idx, val) => {
+  /* ───────── edit max marks ───────── */
+  const tweakMaxMarks = (idx, val) => {
+    const clone = [...maxMarks];
+    clone[idx] = Math.max(0, +val || 0);
+    setMaxMarks(clone);
+  };
+
+  /* ───────── edit obtained marks ───────── */
+  const tweakMarks = (idx, val) => {
     const clone = [...marks];
-    clone[idx]  = Math.max(0, Math.min(qMax[idx], +val || 0));
+    clone[idx] = Math.max(0, Math.min(maxMarks[idx], +val || 0)); // cap at maxMarks
     setMarks(clone);
   };
 
-  const totalMax  = qMax.reduce((s, n) => s + n, 0);
-  const totalGot  = marks.reduce((s, n) => s + n, 0);
-  const changed   = marks.join('|') !== origMarks.join('|');
+  /* ───────── edit remarks ───────── */
+  const tweakRemarks = (idx, val) => {
+    const clone = [...remarks];
+    clone[idx] = val;
+    setRemarks(clone);
+  };
+
+  const totalMax = maxMarks.reduce((s, n) => s + n, 0);
+  const totalGot = marks.reduce((s, n) => s + n, 0);
+  
+  const maxChanged = maxMarks.join('|') !== origMaxMarks.join('|');
+  const marksChanged = marks.join('|') !== origMarks.join('|');
+  const remarksChanged = remarks.join('|') !== origRemarks.join('|');
+  const changed = maxChanged || marksChanged || remarksChanged;
 
   /* ───────── save patches ───────── */
   const save = async () => {
     if (!changed) return;
     setSaving(true);
-    await axios.put(`/api/admin/reviews/${active._id}/grade`, {
-      marks: qNums.map((q, i) => ({ q, marks: marks[i] }))
-    });
-    setSaving(false);
-    setFlash('✔ Saved');
-    await loadList();                         // refresh left pane
-    setActive(null);                          // close right pane
+    
+    try {
+      await axios.put(`/api/admin/reviews/${active._id}/grade`, {
+        marks: qNums.map((q, i) => ({ 
+          q, 
+          maxMarks: maxMarks[i],
+          obtainedMarks: marks[i],
+          remarks: remarks[i] || ''
+        }))
+      });
+      
+      setSaving(false);
+      setFlash('✔ Saved');
+      await loadList();
+      setActive(null);
+    } catch (error) {
+      setSaving(false);
+      setFlash('❌ Save failed');
+      console.error('Save error:', error);
+    }
   };
 
   /* ───────── UI ───────── */
   return (
     <div className={styles.page}>
-      {/* LEFT  */}
+      {/* LEFT PANEL */}
       <aside className={styles.left}>
         <h2>Pending / Under-review</h2>
         <ul className={styles.rows}>
@@ -79,36 +125,69 @@ export default function AnswerSheetReview() {
         </ul>
       </aside>
 
-      {/* RIGHT – only if a result is open */}
+      {/* RIGHT PANEL */}
       {active && (
         <section className={styles.right}>
           <header>
             <h3>{active.student.name} | {active.test.title}</h3>
-            <small>Status : {active.status}</small>
+            <small>Status: {active.status}</small>
           </header>
 
           <div className={styles.iframeBox}>
             {active.answerSheetUrl
-              ? <iframe title="Answer-sheet" src={active.answerSheetUrl} />
+              ? <iframe title="Answer-sheet" src={active.answerSheetUrl} frameBorder="0" />
               : <div className={styles.nosheet}>No answer-sheet URL</div>}
           </div>
 
           <table className={styles.grid}>
-            <thead><tr><th>Q #</th><th>Max</th><th>Obtained</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Q #</th>
+                <th>Max Marks</th>
+                <th>Obtained</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
             <tbody>
               {qNums.map((q, i) => (
                 <tr key={q}>
                   <td>{q}</td>
-                  <td>{qMax[i]}</td>
                   <td>
-                    <input type="number"
-                           value={marks[i]}
-                           onChange={e => tweak(i, e.target.value)}
-                           min="0" max={qMax[i]} />
+                    <input 
+                      type="number"
+                      value={maxMarks[i]}
+                      onChange={e => tweakMaxMarks(i, e.target.value)}
+                      min="0"
+                      className={styles.maxInput}
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      type="number"
+                      value={marks[i]}
+                      onChange={e => tweakMarks(i, e.target.value)}
+                      min="0" 
+                      max={maxMarks[i]}
+                      className={styles.marksInput}
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      type="text"
+                      value={remarks[i]}
+                      onChange={e => tweakRemarks(i, e.target.value)}
+                      placeholder="Add remarks..."
+                      className={styles.remarksInput}
+                    />
                   </td>
                 </tr>
               ))}
-              <tr className={styles.total}><td>Total</td><td>{totalMax}</td><td>{totalGot}</td></tr>
+              <tr className={styles.total}>
+                <td><strong>Total</strong></td>
+                <td><strong>{totalMax}</strong></td>
+                <td><strong>{totalGot}</strong></td>
+                <td><strong>-</strong></td>
+              </tr>
             </tbody>
           </table>
 

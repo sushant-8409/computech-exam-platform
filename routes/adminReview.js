@@ -143,106 +143,103 @@ router.patch('/results/:id/marks', authenticateAdmin, async (req, res) => {
 /*   • recalculates totals                                          */
 /*   • sets status → reviewed, deletes ReviewResult row             */
 /* ──────────────────────────────────────────────────────────────── */
-router.patch(
-  '/review-results/:id/marks',
-  authenticateAdmin,
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { questionWiseMarks = [], adminComments = '' } = req.body;
+/* PATCH  /review-results/:id/marks  → UNDER → REVIEWED */
+router.patch('/review-results/:id/marks', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { questionWiseMarks = [], adminComments = '' } = req.body;
 
-      /* 1 ▸ fetch docs */
-      const rr = await ReviewResult.findById(id).orFail();
-      const result = await Result.findOne({
-        studentId: rr.studentId,
-        testId:    rr.testId
-      })
-        .populate('testId', 'totalMarks')
-        .orFail();
+    /* 1 ▸ fetch docs */
+    const rr = await ReviewResult.findById(id).orFail();
+    const result = await Result.findOne({
+      studentId: rr.studentId,
+      testId: rr.testId
+    })
+    .populate('testId', 'totalMarks')
+    .orFail();
 
-      if (result.status !== 'under review') {
-        return res
-          .status(409)
-          .json({ success: false, message: 'Not under review' });
-      }
-
-      /* 2 ▸ build a Set of question numbers under review            */
-      const reviewSet = new Set(rr.questionWiseMarks.map(q => q.questionNo));
-
-      /* 3 ▸ merge ONLY those questions                              */
-      const updatedMap = new Map();
-      result.questionWiseMarks.forEach(q => {
-        /* clone existing */
-        updatedMap.set(q.questionNo, { ...q });
-      });
-
-      /* apply incoming edits but only if that Q is in reviewSet     */
-      questionWiseMarks.forEach(q => {
-        if (reviewSet.has(q.questionNo)) {
-          const current = updatedMap.get(q.questionNo) || {};
-          updatedMap.set(q.questionNo, { ...current, ...q });
-        }
-      });
-
-      const merged = [...updatedMap.values()].sort(
-        (a, b) => a.questionNo - b.questionNo
-      );
-
-      /* 4 ▸ recalc totals                                            */
-      const marksObtained = merged.reduce(
-        (s, q) => s + (Number(q.obtainedMarks) || 0),
-        0
-      );
-      const totalMarks =
-        result.testId.totalMarks ||
-        merged.reduce((s, q) => s + (Number(q.maxMarks) || 0), 0);
-      const percentage = totalMarks
-        ? +((marksObtained / totalMarks) * 100).toFixed(2)
-        : 0;
-
-      /* 5 ▸ persist Result                                           */
-      Object.assign(result, {
-        questionWiseMarks: merged,
-        marksObtained,
-        totalMarks,
-        percentage,
-        adminComments,
-        status: 'reviewed',
-        markedBy: req.user._id,
-        markedAt: new Date()
-      });
-      await result.save();
-
-      /* 6 ▸ delete ReviewResult row                                  */
-      await ReviewResult.deleteOne({ _id: id });
-
-      /* 7 ▸ notify (unchanged)                                       */
-      await notificationService.sendNotification(
-        req.user._id,
-        'result_published',
-        `📊 Result Reviewed: ${result.testTitle}`,
-        `${percentage}% marks finalised.`,
-        {
-          resultData: {
-            _id: result._id,
-            studentName: result.studentId?.name,
-            studentEmail: result.studentId?.email,
-            testTitle: result.testTitle,
-            marksObtained,
-            totalMarks,
-            percentage,
-            status: 'reviewed'
-          }
-        }
-      );
-
-      return res.json({ success: true, result });
-    } catch (err) {
-      console.error('review-patch', err.message);
-      res.status(400).json({ success: false, message: err.message });
+    if (result.status !== 'under review') {
+      return res.status(409).json({ success: false, message: 'Not under review' });
     }
+
+    /* 2 ▸ build a Set of question numbers under review */
+    const reviewSet = new Set(rr.questionWiseMarks.map(q => q.questionNo));
+
+    /* 3 ▸ merge ONLY the questions under review */
+    const updatedMap = new Map();
+    
+    // Start with ALL existing questions
+    result.questionWiseMarks.forEach(q => {
+      updatedMap.set(q.questionNo, { ...q });
+    });
+
+    // Update ONLY the questions that are under review
+    questionWiseMarks.forEach(q => {
+      if (reviewSet.has(q.questionNo)) {
+        const current = updatedMap.get(q.questionNo) || {};
+        updatedMap.set(q.questionNo, { 
+          ...current, 
+          obtainedMarks: q.obtainedMarks,
+          remarks: q.remarks || current.remarks || '',
+          markedBy: req.user._id,
+          markedAt: new Date()
+        });
+      }
+    });
+
+    const merged = [...updatedMap.values()].sort((a, b) => a.questionNo - b.questionNo);
+
+    /* 4 ▸ recalc totals from ALL questions (not just reviewed ones) */
+    const marksObtained = merged.reduce((s, q) => s + (Number(q.obtainedMarks) || 0), 0);
+    
+    // Total marks should be sum of ALL maxMarks, not just reviewed questions
+    const totalMarks = merged.reduce((s, q) => s + (Number(q.maxMarks) || 0), 0);
+    
+    const percentage = totalMarks ? +((marksObtained / totalMarks) * 100).toFixed(2) : 0;
+
+    /* 5 ▸ persist Result with ALL questions */
+    Object.assign(result, {
+      questionWiseMarks: merged,  // Contains ALL questions
+      marksObtained,              // Sum of obtained marks from ALL questions
+      totalMarks,                 // Sum of max marks from ALL questions
+      percentage,
+      adminComments,
+      status: 'reviewed',
+      markedBy: req.user._id,
+      markedAt: new Date()
+    });
+    await result.save();
+
+    /* 6 ▸ delete ReviewResult row */
+    await ReviewResult.deleteOne({ _id: id });
+
+    /* 7 ▸ notify */
+    await notificationService.sendNotification(
+      req.user._id,
+      'result_published',
+      `📊 Result Reviewed: ${result.testTitle}`,
+      `${percentage}% marks finalised.`,
+      {
+        resultData: {
+          _id: result._id,
+          studentName: result.studentId?.name,
+          studentEmail: result.studentId?.email,
+          testTitle: result.testTitle,
+          marksObtained,
+          totalMarks,
+          percentage,
+          status: 'reviewed'
+        }
+      }
+    );
+
+    return res.json({ success: true, result });
+  } catch (err) {
+    console.error('review-patch', err.message);
+    res.status(400).json({ success: false, message: err.message });
   }
-);
+});
+
 
 
 

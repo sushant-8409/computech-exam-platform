@@ -1,0 +1,328 @@
+/* ============================================
+   BEAUTIFUL LOADING SPINNER - CSS MODULE (FIXED)
+   ============================================ */
+
+/* ✅ Define keyframes WITHIN the same module file */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    transform: scale(1); 
+    opacity: 1; 
+  }
+  50% { 
+    transform: scale(1.2); 
+    opacity: 0.8; 
+  }
+}
+
+@keyframes fade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+}
+
+.spinnerWrapper {
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.spinner {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.spinnerRing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 3px solid transparent;
+  border-radius: 50%;
+  /* ✅ Reference keyframes defined in same file */
+  animation: spin 2s linear infinite;
+}
+
+.ring1 {
+  border-top-color: #ef4444;
+  animation-delay: 0s;
+}
+
+.ring2 {
+  border-right-color: #f59e0b;
+  animation-delay: 0.2s;
+  animation-duration: 1.8s;
+}
+
+.ring3 {
+  border-bottom-color: #10b981;
+  animation-delay: 0.4s;
+  animation-duration: 2.2s;
+}
+
+.ring4 {
+  border-left-color: #3b82f6;
+  animation-delay: 0.6s;
+  animation-duration: 1.6s;
+}
+
+.spinnerInner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.spinnerDot {
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #ef4444, #f59e0b);
+  border-radius: 50%;
+  /* ✅ Reference keyframes defined in same file */
+  animation: pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+}
+
+.loadingText {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin: 0;
+  /* ✅ Reference keyframes defined in same file */
+  animation: fade 2s ease-in-out infinite;
+  letter-spacing: 0.5px;
+}
+
+/* ============================================
+   SIZE VARIANTS
+   ============================================ */
+
+.small .spinner {
+  width: 40px;
+  height: 40px;
+}
+
+.small .spinnerDot {
+  width: 8px;
+  height: 8px;
+}
+
+.small .loadingText {
+  font-size: 0.9rem;
+}
+
+.medium .spinner {
+  width: 80px;
+  height: 80px;
+}
+
+.medium .spinnerDot {
+  width: 16px;
+  height: 16px;
+}
+
+.medium .loadingText {
+  font-size: 1.1rem;
+}
+
+.large .spinner {
+  width: 120px;
+  height: 120px;
+}
+
+.large .spinnerRing {
+  border-width: 4px;
+}
+
+.large .spinnerDot {
+  width: 24px;
+  height: 24px;
+}
+
+.large .loadingText {
+  font-size: 1.3rem;
+}
+
+/* ============================================
+   THEME VARIANTS
+   ============================================ */
+
+.dark .loadingText {
+  color: #d1d5db;
+}
+
+.dark .spinnerDot {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+}
+
+.light .loadingText {
+  color: #6b7280;
+}
+
+.light .spinnerDot {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+}
+
+/* ============================================
+   COLOR VARIANTS
+   ============================================ */
+
+.primary .ring1 {
+  border-top-color: #3b82f6;
+}
+
+.primary .ring2 {
+  border-right-color: #1d4ed8;
+}
+
+.primary .ring3 {
+  border-bottom-color: #2563eb;
+}
+
+.primary .ring4 {
+  border-left-color: #1e40af;
+}
+
+.primary .spinnerDot {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+}
+
+.success .ring1 {
+  border-top-color: #10b981;
+}
+
+.success .ring2 {
+  border-right-color: #059669;
+}
+
+.success .ring3 {
+  border-bottom-color: #047857;
+}
+
+.success .ring4 {
+  border-left-color: #065f46;
+}
+
+.success .spinnerDot {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.6);
+}
+
+.warning .ring1 {
+  border-top-color: #f59e0b;
+}
+
+.warning .ring2 {
+  border-right-color: #d97706;
+}
+
+.warning .ring3 {
+  border-bottom-color: #b45309;
+}
+
+.warning .ring4 {
+  border-left-color: #92400e;
+}
+
+.warning .spinnerDot {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
+}
+
+/* ============================================
+   OVERLAY VARIANTS
+   ============================================ */
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay.dark {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 768px) {
+  .loadingContainer {
+    padding: 2rem;
+  }
+  
+  .small .spinner {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .medium .spinner {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .large .spinner {
+    width: 90px;
+    height: 90px;
+  }
+  
+  .small .spinnerDot {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .medium .spinnerDot {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .large .spinnerDot {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .small .loadingText {
+    font-size: 0.8rem;
+  }
+  
+  .medium .loadingText {
+    font-size: 1rem;
+  }
+  
+  .large .loadingText {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .loadingContainer {
+    padding: 1.5rem;
+  }
+  
+  .spinnerWrapper {
+    margin-bottom: 1.5rem;
+  }
+}

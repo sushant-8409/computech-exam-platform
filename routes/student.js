@@ -23,62 +23,95 @@ router.use(authenticateStudent); // This is line 11 - make sure authenticateStud
 // ============================================
 router.use(authenticateStudent);
 // Get student dashboard data
-router.get('/dashboard', async (req, res) => {
-  try {
-    const studentId = req.user.id;
-
-    // Get available tests
-    const now = new Date();
-    const availableTests = await Test.find({
-      active: true,
-      startDate: { $lte: nowIST },
-      endDate: { $gte: nowIST },
-      blockedStudents: { $nin: [studentId] }
-    }).select('title subject class board duration totalMarks startDate endDate');
-
-    // Get completed tests
-    const completedResults = await Result.find({ studentId })
-      .populate('testId', 'title subject')
-      .sort({ submittedAt: -1 })
-      .limit(10);
-
-    // Get upcoming tests
-    const upcomingTests = await Test.find({
-      active: true,
-      startDate: { $gt: now },
-      blockedStudents: { $nin: [studentId] }
-    }).select('title subject class board startDate endDate').limit(5);
-
-    // Calculate statistics
-    const totalTestsTaken = await Result.countDocuments({ studentId });
-    const averageScore = await Result.aggregate([
-      { $match: { studentId, marksApproved: true } },
-      { $group: { _id: null, avg: { $avg: '$percentage' } } }
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        availableTests,
-        completedResults,
-        upcomingTests,
-        statistics: {
-          totalTestsTaken,
-          averageScore: averageScore[0]?.avg || 0
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Student dashboard error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch dashboard data'
-    });
-  }
-});
 // In your student routes (backend)
 
 // Submit route
+// ✅ FIXED: Exit route with proper test information handling
+router.post('/test/:testId/exit', authenticateStudent, async (req, res) => {
+  try {
+    const { 
+      violations = [], 
+      autoExit = false, 
+      exitReason = '', 
+      timeTaken = 0,
+      browserInfo = {},
+      answerSheetUrl = null
+    } = req.body;
+    
+    const student = req.student;
+    const testId = req.params.testId;
+
+    // ✅ FIXED: Fetch test information first
+    const test = await Test.findById(testId).select('title subject totalMarks duration');
+    if (!test) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Test not found' 
+      });
+    }
+
+    let result = await Result.findOne({ 
+      studentId: student._id, 
+      testId: testId 
+    });
+
+    if (!result) {
+      // ✅ FIXED: Create result with complete test information
+      result = new Result({
+        studentId: student._id,
+        testId: testId,
+        testTitle: test.title, // ✅ Set test title
+        testSubject: test.subject, // ✅ Set test subject
+        totalMarks: test.totalMarks, // ✅ Set total marks
+        startedAt: new Date(),
+        questionWiseMarks: []
+      });
+    }
+
+    // ✅ Enhanced exit data recording
+    result.submittedAt = new Date();
+    result.violations = violations;
+    result.timeTaken = timeTaken;
+    result.browserInfo = browserInfo;
+    result.answerSheetUrl = answerSheetUrl;
+    result.status = autoExit ? 'auto_exited' : 'exited';
+    
+    // ✅ Ensure test information is set (for existing results too)
+    if (!result.testTitle) result.testTitle = test.title;
+    if (!result.testSubject) result.testSubject = test.subject;
+    if (!result.totalMarks) result.totalMarks = test.totalMarks;
+    
+    if (autoExit) {
+      result.autoExitReason = exitReason;
+      result.adminComments = `Auto-exited due to: ${exitReason}`;
+    } else {
+      result.adminComments = 'Test exited by student';
+    }
+
+    await result.save();
+
+    console.log(`✅ Test ${autoExit ? 'auto-exited' : 'exited'} successfully:`, {
+      resultId: result._id,
+      testId: testId,
+      testTitle: result.testTitle,
+      studentId: student._id
+    });
+
+    res.json({ 
+      success: true, 
+      message: autoExit ? 'Test auto-exited successfully' : 'Test exited successfully',
+      resultId: result._id
+    });
+
+  } catch (error) {
+    console.error('Exit error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to exit test' 
+    });
+  }
+});
+// ✅ FIXED: Submit route with proper test information
 router.post('/test/:testId/submit', authenticateStudent, async (req, res) => {
   try {
     const { 
@@ -94,6 +127,30 @@ router.post('/test/:testId/submit', authenticateStudent, async (req, res) => {
     const student = req.student;
     const testId = req.params.testId;
 
+    // ✅ FIXED: Fetch test information first
+    const test = await Test.findById(testId).select('title subject totalMarks duration');
+    if (!test) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Test not found' 
+      });
+    }
+
+    // Check for existing submission to prevent duplicates
+    const existingResult = await Result.findOne({ 
+      studentId: student._id, 
+      testId: testId,
+      submittedAt: { $exists: true }
+    });
+
+    if (existingResult) {
+      return res.json({ 
+        success: true, 
+        message: 'Test already submitted',
+        resultId: existingResult._id 
+      });
+    }
+
     // Find or create result
     let result = await Result.findOne({ 
       studentId: student._id, 
@@ -101,87 +158,62 @@ router.post('/test/:testId/submit', authenticateStudent, async (req, res) => {
     });
 
     if (!result) {
+      // ✅ FIXED: Create result with complete test information
       result = new Result({
         studentId: student._id,
         testId: testId,
+        testTitle: test.title, // ✅ Set test title
+        testSubject: test.subject, // ✅ Set test subject
+        totalMarks: test.totalMarks, // ✅ Set total marks
         startedAt: new Date(),
-        totalMarks: 0,
         questionWiseMarks: []
       });
     }
 
     // Update result with submission data
     result.submittedAt = new Date();
+    result.answers = answers;
     result.answerSheetUrl = answerSheetUrl;
-    result.violations = violations; // Record all violations
+    result.violations = violations;
     result.browserInfo = browserInfo;
+    result.timeTaken = timeTaken;
     result.status = autoSubmit ? 'auto_submitted' : 'submitted';
     
-    // Add auto-submit details if applicable
+    // ✅ Ensure test information is set
+    if (!result.testTitle) result.testTitle = test.title;
+    if (!result.testSubject) result.testSubject = test.subject;
+    if (!result.totalMarks) result.totalMarks = test.totalMarks;
+    
     if (autoSubmit) {
       result.autoSubmitReason = autoSubmitReason;
       result.adminComments = `Auto-submitted due to: ${autoSubmitReason}`;
     }
 
-    await result.save();
+    const savedResult = await result.save();
+
+    console.log(`✅ Test ${autoSubmit ? 'auto-submitted' : 'submitted'} successfully:`, {
+      resultId: savedResult._id,
+      testId: testId,
+      testTitle: savedResult.testTitle,
+      studentId: student._id
+    });
 
     res.json({ 
       success: true, 
       message: 'Test submitted successfully',
-      resultId: result._id 
+      resultId: savedResult._id 
     });
 
   } catch (error) {
     console.error('Submit error:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to submit test' 
+      message: error.message || 'Failed to submit test'
     });
   }
 });
 
-// Exit route
-router.post('/test/:testId/exit', authenticateStudent, async (req, res) => {
-  try {
-    const { violations = [] } = req.body;
-    const student = req.student;
-    const testId = req.params.testId;
 
-    let result = await Result.findOne({ 
-      studentId: student._id, 
-      testId: testId 
-    });
-
-    if (!result) {
-      result = new Result({
-        studentId: student._id,
-        testId: testId,
-        startedAt: new Date(),
-        totalMarks: 0,
-        questionWiseMarks: []
-      });
-    }
-
-    result.submittedAt = new Date();
-    result.violations = violations; // Record violations on exit too
-    result.status = 'exited';
-    result.adminComments = 'Test exited by student';
-
-    await result.save();
-
-    res.json({ 
-      success: true, 
-      message: 'Test exited successfully' 
-    });
-
-  } catch (error) {
-    console.error('Exit error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to exit test' 
-    });
-  }
-});
 
 
 // ============================================
@@ -191,26 +223,38 @@ router.post('/test/:testId/exit', authenticateStudent, async (req, res) => {
 // Get available tests
 // routes/student.js
 
+// ============================================
+// UPDATED: Get available tests (only unattempted)
+// ============================================
 router.get('/tests', async (req, res) => {
   try {
     const studentId = req.user.id;
     const student = await Student.findById(studentId);
     const now = new Date();
 
+    // ✅ 1. Get all attempted test IDs for this student
+    const attemptedTestIds = await Result.distinct('testId', { studentId: studentId });
+    console.log('Attempted test IDs:', attemptedTestIds);
+
     // Normalize class: remove "Class " prefix if present
     const rawClass = student.class || '';
-    const clsValue = rawClass.replace(/^Class\s*/i, '').trim();; // "11"
-    // Find tests that match either plain "11" or prefixed "Class 11"
+    const clsValue = rawClass.replace(/^Class\s*/i, '').trim();
+
+    // ✅ 2. Find tests that match criteria AND are not attempted
     const tests = await Test.find({
       active: true,
       board: student.board,
       startDate: { $lte: now },
       endDate: { $gte: now },
+      _id: { $nin: attemptedTestIds }, // ✅ Exclude attempted tests
+      blockedStudents: { $nin: [studentId] }, // ✅ Add blocked check
       $or: [
         { class: clsValue },
         { class: `Class ${clsValue}` }
       ]
     }).select('title subject class board duration totalMarks startDate endDate');
+
+    console.log(`Found ${tests.length} unattempted tests for student ${studentId}`);
 
     res.json({ success: true, tests });
   } catch (error) {
@@ -218,6 +262,213 @@ router.get('/tests', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch tests' });
   }
 });
+
+// ============================================
+// UPDATED: Student dashboard (only unattempted tests)
+// ============================================
+router.get('/dashboard', async (req, res) => {
+  try {
+    const studentId = req.user.id;
+    const student = await Student.findById(studentId);
+
+    // ✅ 1. Get all attempted test IDs for this student
+    const attemptedTestIds = await Result.distinct('testId', { studentId: studentId });
+
+    // Normalize class for proper matching
+    const rawClass = student?.class || '';
+    const clsValue = rawClass.replace(/^Class\s*/i, '').trim();
+
+    const now = new Date();
+
+    // ✅ 2. Get available tests (unattempted only)
+    const availableTests = await Test.find({
+      active: true,
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+      _id: { $nin: attemptedTestIds }, // ✅ Exclude attempted tests
+      blockedStudents: { $nin: [studentId] },
+      board: student.board,
+      $or: [
+        { class: clsValue },
+        { class: `Class ${clsValue}` }
+      ]
+    }).select('title subject class board duration totalMarks startDate endDate');
+
+    // ✅ 3. Get upcoming tests (unattempted only)
+    const upcomingTests = await Test.find({
+      active: true,
+      startDate: { $gt: now },
+      _id: { $nin: attemptedTestIds }, // ✅ Exclude attempted tests
+      blockedStudents: { $nin: [studentId] },
+      board: student.board,
+      $or: [
+        { class: clsValue },
+        { class: `Class ${clsValue}` }
+      ]
+    }).select('title subject class board startDate endDate').limit(5);
+
+    // ✅ 4. Get completed results (for statistics)
+    const completedResults = await Result.find({ studentId })
+      .populate('testId', 'title subject')
+      .sort({ submittedAt: -1 })
+      .limit(10);
+
+    // ✅ 5. Calculate statistics
+    const totalTestsTaken = await Result.countDocuments({ studentId });
+    const averageScore = await Result.aggregate([
+      { $match: { studentId, status: { $in: ['published', 'reviewed'] } } }, // ✅ Fixed condition
+      { $group: { _id: null, avg: { $avg: '$percentage' } } }
+    ]);
+
+    // ✅ 6. Additional analytics
+    const totalAvailableTests = await Test.countDocuments({
+      active: true,
+      board: student.board,
+      $or: [
+        { class: clsValue },
+        { class: `Class ${clsValue}` }
+      ]
+    });
+
+    const unattemptedCount = totalAvailableTests - totalTestsTaken;
+
+    res.json({
+      success: true,
+      data: {
+        availableTests,
+        completedResults,
+        upcomingTests,
+        statistics: {
+          totalTestsTaken,
+          totalAvailableTests,
+          unattemptedCount,
+          averageScore: averageScore[0]?.avg || 0
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Student dashboard error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dashboard data'
+    });
+  }
+});
+
+// ============================================
+// NEW: Get test attempt status
+// ============================================
+router.get('/test/:testId/attempt-status', async (req, res) => {
+  try {
+    const { testId } = req.params;
+    const studentId = req.user.id;
+
+    const result = await Result.findOne({ 
+      studentId, 
+      testId 
+    }).select('status submittedAt startedAt');
+
+    const isAttempted = !!result;
+    const isSubmitted = result && result.submittedAt;
+
+    res.json({
+      success: true,
+      isAttempted,
+      isSubmitted,
+      status: result?.status || null,
+      submittedAt: result?.submittedAt || null,
+      startedAt: result?.startedAt || null
+    });
+  } catch (error) {
+    console.error('Get attempt status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check attempt status'
+    });
+  }
+});
+
+// ============================================
+// ENHANCED: Get single test details (with attempt check)
+// ============================================
+router.get('/test/:testId', async (req, res) => {
+  try {
+    const { testId } = req.params;
+    const studentId = req.user.id;
+
+    // ✅ Check if test is already attempted
+    const existingResult = await Result.findOne({ studentId, testId });
+    if (existingResult) {
+      return res.status(400).json({
+        success: false,
+        message: 'Test already attempted',
+        attempted: true,
+        resultId: existingResult._id,
+        status: existingResult.status
+      });
+    }
+
+    // Fetch test without correct answers
+    const test = await Test.findById(testId)
+      .select('-questions.correctAnswer')
+      .lean();
+
+    if (!test) {
+      return res.status(404).json({
+        success: false,
+        message: 'Test not found'
+      });
+    }
+
+    // Validate test availability
+    const now = new Date();
+    if (!test.active || now < test.startDate || now > test.endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Test is not available'
+      });
+    }
+
+    // Check student block status
+    if (test.blockedStudents?.includes(studentId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are blocked from taking this test'
+      });
+    }
+
+    // Generate signed URL for question paper (if exists)
+    if (test.questionPaperURL) {
+      try {
+        let key = test.questionPaperURL;
+        try {
+          const urlObj = new URL(key);
+          key = urlObj.pathname.replace(`/${process.env.B2_BUCKET}/`, '');
+        } catch {
+          // Already a key, do nothing
+        }
+        test.questionPaperURL = test.questionPaperURL || null;
+      } catch (err) {
+        console.error('Signed URL error:', err);
+        test.questionPaperURL = null;
+      }
+    }
+
+    res.json({
+      success: true,
+      test,
+      attempted: false
+    });
+
+  } catch (error) {
+    console.error('Get test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch test'
+    });
+  }
+});
+
 
 router.get('/result/:resultId/detailed', async (req, res, next) => {
   try {
@@ -325,85 +576,7 @@ router.get('/submission-status/:testId', async (req, res, next) => {
   }
 });
 // Get single test details
-router.get('/test/:testId', async (req, res) => {
-  try {
-    const { testId } = req.params;
-    const studentId = req.user.id;
 
-    // Check existing submissions
-    const existingResult = await Result.findOne({ studentId, testId });
-    if (existingResult) {
-      return res.status(400).json({
-        success: false,
-        message: 'Test already submitted'
-      });
-    }
-
-    // Fetch test without correct answers
-    const test = await Test.findById(testId)
-      .select('-questions.correctAnswer')
-      .lean();
-
-    if (!test) {
-      return res.status(404).json({
-        success: false,
-        message: 'Test not found'
-      });
-    }
-
-    // Validate test availability
-    const now = new Date();
-    if (!test.active || now < test.startDate || now > test.endDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Test is not available'
-      });
-    }
-
-    // Check student block status
-    if (test.blockedStudents?.includes(studentId)) {
-      return res.status(403).json({
-        success: false,
-        message: 'You are blocked from taking this test'
-      });
-    }
-
-    // Generate signed URL for question paper
-    // In routes/student.js (test/:testId endpoint)
-    // In routes/student.js (test/:testId endpoint)
-    // Modify the test/:testId endpoint's signed URL generation
-    if (test.questionPaperURL) {
-      try {
-        // Handle both full URLs and raw keys
-        let key = test.questionPaperURL;
-        try {
-          const urlObj = new URL(key);
-          key = urlObj.pathname.replace(`/${process.env.B2_BUCKET}/`, '');
-        } catch {
-          // Already a key, do nothing
-        }
-        test.questionPaperURL = test.questionPaperURL || null;
-      } catch (err) {
-        console.error('Signed URL error:', err);
-        test.questionPaperURL = null;
-      }
-    }
-
-
-
-    res.json({
-      success: true,
-      test
-    });
-
-  } catch (error) {
-    console.error('Get test error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch test'
-    });
-  }
-});
 // 3) Exit Test early: mark submittedAt so the test cannot be restarted
 // 4) Check submission/exit status
 router.get(

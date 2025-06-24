@@ -1,0 +1,459 @@
+/* ============================================
+   HEADER - ENHANCED STYLING WITH MOBILE SUPPORT
+   ============================================ */
+
+.appHeader {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
+  color: white;
+  padding: 0;
+  box-shadow: 0 8px 32px rgba(30, 41, 59, 0.4);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ✅ Dark theme header */
+.appHeader.dark {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 100%;
+  width: 100%;
+  padding: 0 2rem;
+  position: relative;
+}
+
+/* ============================================
+   HEADER LEFT - LOGO SECTION
+   ============================================ */
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 0 0 auto;
+}
+
+.headerLeft h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  letter-spacing: -0.025em;
+  transition: transform 0.2s ease;
+}
+
+.headerLeft h1:hover {
+  transform: scale(1.02);
+}
+
+/* ============================================
+   HEADER CENTER - DESKTOP NAVIGATION
+   ============================================ */
+
+.headerCenter {
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex: 1;
+  justify-content: center;
+  max-width: 600px;
+}
+
+.desktopNav {
+  display: flex;
+}
+
+.navLink {
+  color: white;
+  text-decoration: none;
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  font-size: 0.925rem;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  min-width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navLink::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.navLink:hover::before {
+  left: 100%;
+}
+
+.navLink:hover {
+  background: rgba(255, 255, 255, 0.2);
+  text-decoration: none;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.navLink.active {
+  background: rgba(239, 68, 68, 0.8);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* ============================================
+   MOBILE NAVIGATION TOGGLE
+   ============================================ */
+
+.mobileNavToggle {
+  display: none;
+  align-items: center;
+}
+
+.hamburger {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.hamburger:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+/* ============================================
+   MOBILE NAVIGATION DROPDOWN
+   ============================================ */
+
+.mobileNavDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #1e293b, #334155);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 999;
+}
+
+.mobileNavLink {
+  color: white;
+  text-decoration: none;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid transparent;
+}
+
+.mobileNavLink:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateX(5px);
+}
+
+.mobileNavLink.active {
+  background: rgba(239, 68, 68, 0.8);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+/* ============================================
+   HEADER RIGHT - USER SECTION & CONTROLS
+   ============================================ */
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 0 0 auto;
+}
+
+.themeBtn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  font-size: 0.9rem;
+  backdrop-filter: blur(10px);
+}
+
+.themeBtn:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.15));
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.userSection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.userName {
+  font-weight: 700;
+  color: white;
+  font-size: 1rem;
+}
+
+.userRole {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+}
+
+.logoutBtn {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border: none;
+  color: white;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.logoutBtn:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 1200px) {
+  .headerContent {
+    padding: 0 1.5rem;
+  }
+  
+  .headerLeft h1 {
+    font-size: 1.5rem;
+  }
+  
+  .headerCenter {
+    max-width: 500px;
+  }
+  
+  .navLink {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 992px) {
+  .headerCenter {
+    max-width: 400px;
+  }
+  
+  .navLink {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.85rem;
+  }
+  
+  .userSection {
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+  }
+  
+  .userName {
+    font-size: 0.9rem;
+  }
+  
+  .userRole {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .appHeader {
+    height: 70px;
+  }
+  
+  .headerContent {
+    padding: 0 1rem;
+  }
+  
+  .headerLeft h1 {
+    font-size: 1.25rem;
+  }
+  
+  /* ✅ Hide desktop navigation on mobile */
+  .desktopNav {
+    display: none;
+  }
+  
+  /* ✅ Show mobile navigation toggle */
+  .mobileNavToggle {
+    display: flex;
+  }
+  
+  .themeBtn {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .logoutBtn {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .userName {
+    display: none; /* Hide username on very small screens */
+  }
+  
+  .userRole {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .headerContent {
+    padding: 0 0.75rem;
+  }
+  
+  .headerLeft h1 {
+    font-size: 1.1rem;
+  }
+  
+  .headerRight {
+    gap: 0.5rem;
+  }
+  
+  .userSection {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .themeBtn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .logoutBtn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .headerLeft h1 {
+    font-size: 1rem;
+  }
+  
+  .themeBtn {
+    display: none; /* Hide theme button on very small screens */
+  }
+  
+  .userRole {
+    display: none; /* Hide role on very small screens */
+  }
+  
+  .mobileNavDropdown {
+    padding: 0.75rem;
+  }
+  
+  .mobileNavLink {
+    padding: 0.875rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY & FOCUS STATES
+   ============================================ */
+
+.navLink:focus,
+.mobileNavLink:focus,
+.themeBtn:focus,
+.logoutBtn:focus,
+.hamburger:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.8);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobileNavDropdown {
+  animation: slideDown 0.3s ease-out;
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@media print {
+  .appHeader {
+    display: none;
+  }
+}
