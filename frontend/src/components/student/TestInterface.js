@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../LoadingSpinner';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'; // Add this import
+import './TestInterface.module.css';
+import offlineHandler from '../../utils/offlineHandler';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { confirmDelete, confirmAction, successAlert, errorAlert } from '../../utils/SweetAlerts';
@@ -10,7 +13,10 @@ const TestInterface = () => {
   const { testId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-
+   const [offlineAnswers, setOfflineAnswers] = useState({});
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [pendingSave, setPendingSave] = useState(false);
+  const { isOnline, queueRequest } = useOnlineStatus();
   const mountedRef = useRef(true);
   const [autoSubmit, setAutoSubmit] = useState(false);
   const [autoSubmitReason, setAutoSubmitReason] = useState('');
@@ -30,7 +36,20 @@ const TestInterface = () => {
     }, 1000);
     return () => clearInterval(iv);
   }, []);
-
+   useEffect(() => {
+    console.log('🌐 Initializing offline handler for test interface...');
+    const cleanup = offlineHandler.init();
+    
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, []);
+  useEffect(() => {
+    if (isOnline && pendingSave) {
+      console.log('🔄 Back online - syncing offline answers...');
+      syncOfflineAnswers();
+    }
+  }, [isOnline, pendingSave]);
   // Capture browser info once
   const [browserInfo] = useState({
     userAgent: navigator.userAgent,
@@ -308,8 +327,25 @@ const TestInterface = () => {
       document.exitFullscreen().catch(err => console.log('Exit fullscreen error:', err));
     }
   };
-  const handleSubmit = useCallback(async (isAutoSubmit = false, autoSubmitReason = null) => {
+  // Enhanced auto-submit with submission lock
+   const handleSubmit = useCallback(async (isAutoSubmit = false, autoSubmitReason = null) => {
     if (isSubmitting || isSubmitted || submissionLockRef.current) return;
+
+    // Check if offline
+    if (!isOnline && !isAutoSubmit) {
+      const result = await Swal.fire({
+        title: 'You are offline',
+        text: 'Your submission will be queued and sent when you reconnect to the internet.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Queue Submission',
+        cancelButtonText: 'Wait for Connection'
+      });
+
+      if (!result.isConfirmed) return;
+    }
 
     // Skip confirmation for auto-submit
     if (!isAutoSubmit) {
@@ -318,6 +354,7 @@ const TestInterface = () => {
         html: `
         <p>Are you sure you want to submit your test?</p>
         <p><strong>You cannot make changes after submission.</strong></p>
+        ${!isOnline ? '<p style="color: #f59e0b;">⚠️ You are offline - submission will be queued</p>' : ''}
       `,
         icon: 'question',
         showCancelButton: true,
@@ -334,25 +371,41 @@ const TestInterface = () => {
     setIsSubmitting(true);
 
     try {
+      // Merge any offline answers before submission
+      const finalAnswers = { ...answers, ...offlineAnswers };
+      
       const payload = {
-        answers,
+        answers: finalAnswers,
         answerSheetUrl,
-        violations, // Include violations array
+        violations,
         autoSubmit: isAutoSubmit,
         autoSubmitReason,
         timeTaken,
-        browserInfo
+        browserInfo,
+        offlineAnswers: Object.keys(offlineAnswers).length > 0 ? offlineAnswers : null
       };
 
-      const token = localStorage.getItem('token');
-      const { data: res } = await axios.post(
-        `/api/student/test/${testId}/submit`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const makeSubmitRequest = async () => {
+        const token = localStorage.getItem('token');
+        const response = await axios.post(
+          `/api/student/test/${testId}/submit`,
+          payload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        return response;
+      };
 
-      if (res.success) {
+      const response = await queueRequest(makeSubmitRequest, {
+        description: 'Submit test'
+      });
+
+      if (response.data.success) {
         setIsSubmitted(true);
+        
+        // Clear offline data
+        setOfflineAnswers({});
+        localStorage.removeItem(`test-answers-${testId}`);
+        localStorage.removeItem(`test-violations-${testId}`);
 
         await Swal.fire({
           title: 'Test Submitted!',
@@ -366,9 +419,9 @@ const TestInterface = () => {
         });
 
         cleanup();
-        navigate('/student', { state: { resultId: res.resultId } });
+        navigate('/student', { state: { resultId: response.data.resultId } });
       } else {
-        throw new Error(res.message || 'Submission failed');
+        throw new Error(response.data.message || 'Submission failed');
       }
     } catch (err) {
       console.error('Submit error:', err);
@@ -387,15 +440,18 @@ const TestInterface = () => {
     isSubmitted,
     submissionLockRef,
     answers,
+    offlineAnswers,
     violations,
     answerSheetUrl,
     timeTaken,
     browserInfo,
     testId,
     cleanup,
-    navigate
+    navigate,
+    isOnline,
+    queueRequest
   ]);
-  // Enhanced auto-submit with submission lock
+
   const handleAutoSubmit = useCallback(async (reason) => {
     if (!test || isSubmitting || isSubmitted || submissionLockRef.current) return;
 
@@ -664,27 +720,97 @@ const TestInterface = () => {
       window.removeEventListener('unload', handleUnload);
     };
   }, [testStarted, isSubmitting, timeRemaining, testId, isSubmitted]);
+  const syncOfflineAnswers = useCallback(async () => {
+    if (!isOnline || Object.keys(offlineAnswers).length === 0) return;
 
+    try {
+      setPendingSave(true);
+      
+      // Merge offline answers with current answers
+      const mergedAnswers = { ...answers, ...offlineAnswers };
+      setAnswers(mergedAnswers);
+      
+      // Save to localStorage
+      localStorage.setItem(`test-answers-${testId}`, JSON.stringify(mergedAnswers));
+      
+      // Clear offline answers
+      setOfflineAnswers({});
+      setLastSyncTime(Date.now());
+      
+      toast.success('📱 Offline answers synced successfully!');
+      console.log('✅ Offline answers synced');
+    } catch (error) {
+      console.error('❌ Failed to sync offline answers:', error);
+      toast.error('Failed to sync offline answers');
+    } finally {
+      setPendingSave(false);
+    }
+  }, [isOnline, offlineAnswers, answers, testId]);
+
+  // Enhanced answer change handler with offline support
+  const handleAnswerChange = (questionIndex, value) => {
+    if (isSubmitted) return;
+
+    if (isOnline) {
+      // Online: Update normally
+      setAnswers(prev => ({
+        ...prev,
+        [questionIndex]: value
+      }));
+      toast.success('💾 Answer saved', { autoClose: 1000, toastId: 'save-indicator' });
+    } else {
+      // Offline: Store in offline answers
+      setOfflineAnswers(prev => ({
+        ...prev,
+        [questionIndex]: value
+      }));
+      
+      // Also update local state for immediate UI feedback
+      setAnswers(prev => ({
+        ...prev,
+        [questionIndex]: value
+      }));
+      
+      setPendingSave(true);
+      toast.warning('📱 Answer saved offline - will sync when online', { 
+        autoClose: 2000, 
+        toastId: 'offline-save-indicator' 
+      });
+    }
+  };
   const fetchTest = async () => {
     try {
       setLoading(true);
       console.log('🔍 Fetching test details for:', testId);
 
-      const response = await axios.get(`/api/student/test/${testId}`);
+      const makeRequest = async () => {
+        const response = await axios.get(`/api/student/test/${testId}`);
+        return response;
+      };
+
+      const response = await queueRequest(makeRequest, {
+        description: 'Fetch test details'
+      });
+
       if (response.data.success) {
         setTest(response.data.test);
-        setPdfUrl(response.data.test.questionPaperURL); // Use MEGA URL directly
+        setPdfUrl(response.data.test.questionPaperURL);
       }
     } catch (error) {
       console.error('❌ Error fetching test:', error);
       setError(error.response?.data?.message || 'Failed to load test');
-      toast.error('Failed to load test. Redirecting to dashboard...');
-
-      setTimeout(() => navigate('/student'), 3000);
+      
+      if (!isOnline) {
+        toast.error('Failed to load test - you appear to be offline');
+      } else {
+        toast.error('Failed to load test. Redirecting to dashboard...');
+        setTimeout(() => navigate('/student'), 3000);
+      }
     } finally {
       setLoading(false);
     }
   };
+
   const getFileKeyFromUrl = (url) => {
     try {
       const urlObj = new URL(url);
@@ -772,17 +898,6 @@ const TestInterface = () => {
     }
   };
 
-  const handleAnswerChange = (questionIndex, value) => {
-    if (isSubmitted) return;
-
-    setAnswers(prev => ({
-      ...prev,
-      [questionIndex]: value
-    }));
-
-    toast.success('💾 Answer saved', { autoClose: 1000, toastId: 'save-indicator' });
-  };
-
   const handleFileSelect = (e) => {
     if (isSubmitted) return;
 
@@ -828,37 +943,67 @@ const TestInterface = () => {
 
   // Enhanced submit function with multiple submission prevention
   const handleFileUpload = useCallback(async (file) => {
-    const token = localStorage.getItem('token');
-    const formData = new FormData();
-    formData.append('answerSheet', file);
+    const makeUploadRequest = async () => {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('answerSheet', file);
 
-    const response = await axios.post(
-      `/api/student/test/${testId}/upload`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
-        },
-        onUploadProgress: e => {
-          const pct = Math.round((e.loaded / e.total) * 100);
-          setUploadProgress(pct);
+      const response = await axios.post(
+        `/api/student/test/${testId}/upload`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`
+          },
+          onUploadProgress: e => {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress(pct);
+          }
         }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Upload failed');
       }
-    );
 
-    if (!response.data.success) {
-      throw new Error(response.data.message || 'Upload failed');
+      return response.data.answerSheetUrl || response.data.url;
+    };
+
+    return await queueRequest(makeUploadRequest, {
+      description: 'Upload answer sheet'
+    });
+  }, [testId, queueRequest]);
+
+  // Enhanced submit with offline support
+ 
+  // Enhanced auto-save with offline support
+  useEffect(() => {
+    if (!testStarted || (Object.keys(answers).length === 0 && Object.keys(offlineAnswers).length === 0) || isSubmitted) return;
+
+    if (autoSaveRef.current) {
+      clearTimeout(autoSaveRef.current);
     }
 
-    // prefer answerSheetUrl, fallback to url
-    const sheetUrl = response.data.answerSheetUrl || response.data.url;
-    if (!sheetUrl) {
-      throw new Error('No URL returned from upload');
-    }
+    autoSaveRef.current = setTimeout(() => {
+      const allAnswers = { ...answers, ...offlineAnswers };
+      localStorage.setItem(`test-answers-${testId}`, JSON.stringify(allAnswers));
+      
+      if (isOnline) {
+        console.log('💾 Answers auto-saved (online)');
+      } else {
+        console.log('💾 Answers auto-saved (offline)');
+        setPendingSave(true);
+      }
+    }, 2000);
 
-    return sheetUrl;
-  }, [testId]);
+    return () => {
+      if (autoSaveRef.current) {
+        clearTimeout(autoSaveRef.current);
+      }
+    };
+  }, [answers, offlineAnswers, testStarted, testId, isSubmitted, isOnline]);
+
 
   // 1) Submit only the answer sheet
   const handleAnswerSheetSubmit = useCallback(async () => {
@@ -960,7 +1105,31 @@ const TestInterface = () => {
       setIsSubmitting(false);
     }
   }, [testId, cleanup, navigate, answerSheetUrl, violations]);
+   useEffect(() => {
+    if (!testStarted || (Object.keys(answers).length === 0 && Object.keys(offlineAnswers).length === 0) || isSubmitted) return;
 
+    if (autoSaveRef.current) {
+      clearTimeout(autoSaveRef.current);
+    }
+
+    autoSaveRef.current = setTimeout(() => {
+      const allAnswers = { ...answers, ...offlineAnswers };
+      localStorage.setItem(`test-answers-${testId}`, JSON.stringify(allAnswers));
+      
+      if (isOnline) {
+        console.log('💾 Answers auto-saved (online)');
+      } else {
+        console.log('💾 Answers auto-saved (offline)');
+        setPendingSave(true);
+      }
+    }, 2000);
+
+    return () => {
+      if (autoSaveRef.current) {
+        clearTimeout(autoSaveRef.current);
+      }
+    };
+  }, [answers, offlineAnswers, testStarted, testId, isSubmitted, isOnline]);
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -1273,162 +1442,249 @@ const TestInterface = () => {
   }
 
   return (
-    <div className="test-interface">
-      {renderFullscreenPrompt()}
-
-      {/* Test Header - Hidden in better viewer */}
-      <div className={`test-header ${isBetterViewer ? 'hidden' : ''}`}>
-        <div className="test-info">
-          <h1>{test.title}</h1>
-          <div className="test-meta">
-            <span>{test.subject}</span>
-            <span>•</span>
-            <span>Class {test.class}</span>
-            <span>•</span>
-            <span>{test.board}</span>
-            <span>•</span>
-            <span>{test.totalMarks} marks</span>
+  <div className="test-interface">
+    {renderFullscreenPrompt()}
+    
+    {/* Offline Warning Banner */}
+    {!isOnline && !isBetterViewer && (
+      <div className="offline-warning-banner">
+        <div className="offline-content">
+          <span className="offline-icon">📱</span>
+          <div className="offline-text">
+            <strong>You are currently offline</strong>
+            <small>Your answers are being saved locally and will sync when you reconnect</small>
           </div>
-        </div>
-
-        <div className="test-controls">
-          <div className="timer-container">
-            <span className={`timer ${timeRemaining < 300 ? 'warning' : timeRemaining < 600 ? 'caution' : ''}`}>
-              ⏰ {formatTime(timeRemaining)}
+          {pendingSave && (
+            <span className="pending-indicator">
+              {Object.keys(offlineAnswers).length} changes pending
             </span>
-          </div>
+          )}
+        </div>
+      </div>
+    )}
 
-          <div className="control-buttons">
-            {!isFullscreen && (
-              <div className="fullscreen-warning">
-                <button
-                  className="btn btn-warning btn-pulse"
-                  onClick={requestFullscreen}
-                  title="Enter fullscreen mode (Required)"
-                  disabled={isSubmitted}
-                >
-                  ⚠️ Enter Fullscreen (Required)
-                </button>
-              </div>
-            )}
-
-            {isFullscreen && (
-              <div className="fullscreen-status">
-                <span className="status-badge success">
-                  ✅ Fullscreen Active
-                </span>
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={exitFullscreen}
-                  title="Exit fullscreen"
-                  disabled={isSubmitted}
-                >
-                  🔄 Exit Fullscreen
-                </button>
-              </div>
-            )}
-          </div>
+    {/* Test Header - Hidden in better viewer */}
+    <div className={`test-header ${isBetterViewer ? 'hidden' : ''}`}>
+      <div className="test-info">
+        <h1>{test.title}</h1>
+        <div className="test-meta">
+          <span>{test.subject}</span>
+          <span>•</span>
+          <span>Class {test.class}</span>
+          <span>•</span>
+          <span>{test.board}</span>
+          <span>•</span>
+          <span>{test.totalMarks} marks</span>
+          {!isOnline && <span className="offline-badge">📱 OFFLINE</span>}
         </div>
       </div>
 
-      {/* Status Bar - Hidden in better viewer */}
-      <div className={`status-bar ${isBetterViewer ? 'hidden' : ''}`}>
-        <div className="status-item">
-          <span className={`status-indicator ${violations.length === 0 ? 'good' : violations.length < 3 ? 'warning' : 'danger'}`}>
-            🚨 Violations: {violations.length}/3
+      <div className="test-controls">
+        <div className="timer-container">
+          <span className={`timer ${timeRemaining < 300 ? 'warning' : timeRemaining < 600 ? 'caution' : ''}`}>
+            ⏰ {formatTime(timeRemaining)}
           </span>
         </div>
 
-        <div className="status-item">
-          <span className={`status-indicator ${isFullscreen ? 'good' : 'danger'}`}>
-            🖥️ Fullscreen: {isFullscreen ? 'Active ✅' : 'REQUIRED ⚠️'}
-          </span>
-        </div>
+        <div className="control-buttons">
+          {!isFullscreen && (
+            <div className="fullscreen-warning">
+              <button
+                className="btn btn-warning btn-pulse"
+                onClick={requestFullscreen}
+                title="Enter fullscreen mode (Required)"
+                disabled={isSubmitted}
+              >
+                ⚠️ Enter Fullscreen (Required)
+              </button>
+            </div>
+          )}
 
-        <div className="status-item">
-          <span className="status-indicator good">
-            📝 Answers: {Object.keys(answers).length}
-          </span>
-        </div>
-      </div>
-
-      {/* Violation Warning - Hidden in better viewer */}
-      {violations.length > 0 && !isBetterViewer && (
-        <div className="violations-warning">
-          ⚠️ SECURITY VIOLATION DETECTED! {violations.length}/3 warnings used.
-          {violations.length >= 2 && ' NEXT VIOLATION WILL AUTO-SUBMIT YOUR TEST!'}
-        </div>
-      )}
-
-      {/* Test Content - Hidden in better viewer */}
-      <div className={`test-content ${isBetterViewer ? 'hidden' : ''}`}>
-        {renderQuestionPaper()}
-        {renderQuestions()}
-
-        {/* Answer Sheet Upload */}
-        <div className="answer-upload">
-          <h3>📎 Upload Answer Sheet (Optional)</h3>
-          <p className="upload-description">
-            You can upload a scanned copy or photo of your handwritten answers as additional submission.
-          </p>
-
-          <div className="file-upload-area">
-            <input
-              type="file"
-              id="answerFile"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleFileSelect}
-              className="file-input"
-              disabled={isSubmitted}
-            />
-            <label htmlFor="answerFile" className={`file-label ${isSubmitted ? 'disabled' : ''}`}>
-              {answerFile ? (
-                <span className="file-selected">
-                  ✅ {answerFile.name} ({(answerFile.size / 1024 / 1024).toFixed(2)} MB)
-                </span>
-              ) : (
-                <span className="file-placeholder">
-                  📁 Choose file (PDF, JPG, PNG - Max 10MB)
-                </span>
-              )}
-            </label>
-          </div>
-
-          {uploadProgress > 0 && (
-            <div className="upload-progress">
-              <div className="progress-bar">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-              <span className="progress-text">{uploadProgress}% uploaded</span>
+          {isFullscreen && (
+            <div className="fullscreen-status">
+              <span className="status-badge success">
+                ✅ Fullscreen Active
+              </span>
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={exitFullscreen}
+                title="Exit fullscreen"
+                disabled={isSubmitted}
+              >
+                🔄 Exit Fullscreen
+              </button>
             </div>
           )}
         </div>
       </div>
+    </div>
 
-      {/* Submit Section - Hidden in better viewer */}
-      <div className={`test-footer ${isBetterViewer ? 'hidden' : ''}`}>
-        <div className="submit-info">
-          <p>
-            <strong>⚠️ Important:</strong> Once you submit, you cannot make any changes.
-            Please review your answers before submitting.
-          </p>
+    {/* Enhanced Status Bar with Offline Status - Hidden in better viewer */}
+    <div className={`status-bar ${isBetterViewer ? 'hidden' : ''}`}>
+      <div className="status-item">
+        <span className={`status-indicator ${violations.length === 0 ? 'good' : violations.length < 3 ? 'warning' : 'danger'}`}>
+          🚨 Violations: {violations.length}/3
+        </span>
+      </div>
+
+      <div className="status-item">
+        <span className={`status-indicator ${isFullscreen ? 'good' : 'danger'}`}>
+          🖥️ Fullscreen: {isFullscreen ? 'Active ✅' : 'REQUIRED ⚠️'}
+        </span>
+      </div>
+
+      <div className="status-item">
+        <span className="status-indicator good">
+          📝 Answers: {Object.keys(answers).length + Object.keys(offlineAnswers).length}
+        </span>
+      </div>
+
+      {/* Online/Offline Status Indicator */}
+      <div className="status-item">
+        <span className={`status-indicator ${isOnline ? 'good' : 'warning'}`}>
+          🌐 {isOnline ? 'Online ✅' : 'Offline 📱'}
+        </span>
+      </div>
+
+      {/* Pending Sync Indicator */}
+      {pendingSave && (
+        <div className="status-item">
+          <span className="status-indicator warning">
+            ⏳ Pending Sync ({Object.keys(offlineAnswers).length})
+          </span>
+        </div>
+      )}
+
+      {/* Last Sync Time */}
+      {lastSyncTime && !isOnline && (
+        <div className="status-item">
+          <span className="status-indicator info">
+            🕒 Last Sync: {new Date(lastSyncTime).toLocaleTimeString()}
+          </span>
+        </div>
+      )}
+    </div>
+
+    {/* Violation Warning - Hidden in better viewer */}
+    {violations.length > 0 && !isBetterViewer && (
+      <div className="violations-warning">
+        ⚠️ SECURITY VIOLATION DETECTED! {violations.length}/3 warnings used.
+        {violations.length >= 2 && ' NEXT VIOLATION WILL AUTO-SUBMIT YOUR TEST!'}
+        {!isOnline && (
+          <span className="offline-violation-note">
+            📱 Violations are being tracked offline
+          </span>
+        )}
+      </div>
+    )}
+
+    {/* Test Content - Hidden in better viewer */}
+    <div className={`test-content ${isBetterViewer ? 'hidden' : ''}`}>
+      {renderQuestionPaper()}
+      {renderQuestions()}
+
+      {/* Answer Sheet Upload with Offline Handling */}
+      <div className="answer-upload">
+        <h3>📎 Upload Answer Sheet (Optional)</h3>
+        <p className="upload-description">
+          You can upload a scanned copy or photo of your handwritten answers as additional submission.
+          {!isOnline && (
+            <span className="offline-upload-note">
+              📱 <strong>Note:</strong> File upload requires internet connection. Upload will be available when you're back online.
+            </span>
+          )}
+        </p>
+
+        <div className="file-upload-area">
+          <input
+            type="file"
+            id="answerFile"
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={handleFileSelect}
+            className="file-input"
+            disabled={isSubmitted || !isOnline}
+          />
+          <label htmlFor="answerFile" className={`file-label ${isSubmitted || !isOnline ? 'disabled' : ''}`}>
+            {answerFile ? (
+              <span className="file-selected">
+                ✅ {answerFile.name} ({(answerFile.size / 1024 / 1024).toFixed(2)} MB)
+                {!isOnline && <span className="offline-file-note"> - Upload when online</span>}
+              </span>
+            ) : (
+              <span className="file-placeholder">
+                {!isOnline 
+                  ? '📁 File upload unavailable (Offline)' 
+                  : '📁 Choose file (PDF, JPG, PNG - Max 10MB)'
+                }
+              </span>
+            )}
+          </label>
         </div>
 
+        {uploadProgress > 0 && (
+          <div className="upload-progress">
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+            <span className="progress-text">{uploadProgress}% uploaded</span>
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* Enhanced Submit Section with Offline Support - Hidden in better viewer */}
+    <div className={`test-footer ${isBetterViewer ? 'hidden' : ''}`}>
+      <div className="submit-info">
+        <p>
+          <strong>⚠️ Important:</strong> Once you submit, you cannot make any changes.
+          Please review your answers before submitting.
+        </p>
+        {!isOnline && (
+          <p className="offline-submit-info">
+            📱 <strong>Offline Mode:</strong> Your submission will be queued and sent when you reconnect to the internet.
+          </p>
+        )}
+        {pendingSave && (
+          <p className="pending-sync-info">
+            ⏳ <strong>Pending Changes:</strong> {Object.keys(offlineAnswers).length} answer(s) waiting to sync.
+          </p>
+        )}
+      </div>
+
+      <div className="footer-buttons">
         <button
           onClick={handleAnswerSheetSubmit}
-          disabled={isUploading || !!answerSheetUrl || isSubmitted}
+          disabled={isUploading || !!answerSheetUrl || isSubmitted || !isOnline}
           className="btn btn-secondary"
+          title={!isOnline ? 'File upload requires internet connection' : ''}
         >
           {isUploading
             ? `Uploading… (${uploadProgress}%)`
             : answerSheetUrl
-              ? 'Answer Sheet Uploaded'
-              : 'Submit Answer Sheet'
+              ? 'Answer Sheet Uploaded ✅'
+              : !isOnline
+                ? 'Upload Unavailable (Offline) 📱'
+                : 'Submit Answer Sheet'
           }
         </button>
+
+        <button
+          className="btn btn-primary"
+          onClick={() => handleSubmit(false)}
+          disabled={isSubmitting || isSubmitted}
+          style={{ marginLeft: '1rem' }}
+        >
+          {isSubmitting
+            ? (!isOnline ? 'Queuing Submission...' : 'Submitting...')
+            : !isOnline
+              ? 'Submit Test (Will Queue) 📱'
+              : 'Submit Test'
+          }
+        </button>
+
         <button
           className="btn btn-outline-danger"
           onClick={handleExitTest}
@@ -1437,21 +1693,68 @@ const TestInterface = () => {
         >
           Exit Test
         </button>
-
       </div>
 
-      {/* Submission Modal Overlay */}
-      {isSubmitting && (
-        <div className="submission-overlay">
-          <div className="submission-modal">
-            <div className="loading-spinner large"></div>
-            <h3>Submitting Your Test...</h3>
-            <p>Please do not close this window or navigate away.</p>
+      {/* Offline Status Summary */}
+      {!isOnline && (
+        <div className="offline-status-summary">
+          <div className="offline-summary-content">
+            <h4>📱 Offline Mode Active</h4>
+            <div className="offline-stats">
+              <span>✅ {Object.keys(answers).length} Answers Saved</span>
+              {Object.keys(offlineAnswers).length > 0 && (
+                <span>⏳ {Object.keys(offlineAnswers).length} Pending Sync</span>
+              )}
+              <span>🚨 {violations.length} Violations Recorded</span>
+            </div>
+            <small className="offline-disclaimer">
+              All your progress is being saved locally. When you reconnect, everything will sync automatically.
+            </small>
           </div>
         </div>
       )}
     </div>
-  );
+
+    {/* Enhanced Submission Modal with Offline Support */}
+    {isSubmitting && (
+      <div className="submission-overlay">
+        <div className="submission-modal">
+          <div className="loading-spinner large"></div>
+          <h3>
+            {!isOnline ? 'Queuing Your Test Submission...' : 'Submitting Your Test...'}
+          </h3>
+          <p>Please do not close this window or navigate away.</p>
+          {!isOnline && (
+            <div className="offline-submission-details">
+              <p className="offline-submission-note">
+                📱 Your submission will be sent automatically when you reconnect to the internet.
+              </p>
+              <div className="queued-data-summary">
+                <small>Queued for submission:</small>
+                <ul>
+                  <li>✅ {Object.keys(answers).length + Object.keys(offlineAnswers).length} Answers</li>
+                  <li>🚨 {violations.length} Security Events</li>
+                  <li>⏱️ {Math.floor(timeTaken / 60)}:{(timeTaken % 60).toString().padStart(2, '0')} Time Taken</li>
+                  {answerSheetUrl && <li>📎 Answer Sheet File</li>}
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* Connection Status Toast for Better Viewer */}
+    {isBetterViewer && !isOnline && (
+      <div className="better-viewer-offline-indicator">
+        <span className="offline-indicator-badge">
+          📱 OFFLINE - Answers saving locally
+        </span>
+      </div>
+    )}
+  </div>
+);
+
 };
 
 export default TestInterface;

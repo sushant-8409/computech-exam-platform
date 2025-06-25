@@ -46,7 +46,7 @@ app.use((req, res, next) => {
 
 
 // Load auth and student routes
-let authRoutes, studentRoutes;
+let adminRoutes,authRoutes, studentRoutes;
 try {
   authRoutes = require('./routes/auth');
   console.log('✅ Auth routes loaded successfully');
@@ -54,6 +54,14 @@ try {
   console.error('❌ Failed to load auth routes:', error.message);
 }
 
+try {
+  adminRoutes = require('./routes/admin');
+  console.log('✅ Admin routes loaded');
+} catch (error) {
+  console.error('❌ Admin routes not found:', error.message);
+  console.log('🔧 Creating minimal admin routes...');
+  adminRoutes = require('./routes/admin-minimal'); // We'll create this
+}
 try {
   studentRoutes = require('./routes/student');
   console.log('✅ Student routes loaded successfully');

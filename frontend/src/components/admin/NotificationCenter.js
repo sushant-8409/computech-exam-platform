@@ -49,36 +49,45 @@ const NotificationCenter = () => {
   };
 
   const handleSendNotification = async () => {
-    if (selectedStudents.length === 0 || selectedTests.length === 0) {
-      toast.error('Please select at least one student and one test');
-      return;
-    }
+  if (selectedStudents.length === 0 || selectedTests.length === 0) {
+    toast.error('Please select at least one student and one test');
+    return;
+  }
 
-    setLoading(true);
-    try {
-      const payload = {
-        studentIds: selectedStudents.map(s => s.value),
-        testIds: selectedTests.map(t => t.value),
-        notificationType,
-        emailTemplate,
-        customMessage
-      };
+  setLoading(true);
+  try {
+    const payload = {
+      studentIds: selectedStudents.map(s => s.value),
+      testIds: selectedTests.map(t => t.value),
+      notificationType,
+      emailTemplate, // ✅ This becomes the 'type' parameter
+      customMessage,
+      // ✅ Add explicit context to help with type detection
+      context: {
+        isResultNotification: emailTemplate === 'result_published',
+        isTestNotification: ['test_created', 'test_assignment'].includes(emailTemplate),
+        fromNotificationCenter: true
+      }
+    };
 
-      await axios.post('/api/admin/notifications/send', payload);
-      toast.success(`Notifications sent to ${selectedStudents.length} students`);
-      
-      // Reset form
-      setSelectedStudents([]);
-      setSelectedTests([]);
-      setCustomMessage('');
-      fetchNotifications();
-    } catch (error) {
-      toast.error('Failed to send notifications');
-      console.error('Send notification error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log('📤 Sending notification with payload:', payload);
+
+    await axios.post('/api/admin/notifications/send', payload);
+    toast.success(`Notifications sent to ${selectedStudents.length} students`);
+    
+    // Reset form
+    setSelectedStudents([]);
+    setSelectedTests([]);
+    setCustomMessage('');
+    fetchNotifications();
+  } catch (error) {
+    toast.error('Failed to send notifications');
+    console.error('Send notification error:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const studentOptions = students.map(student => ({
     value: student._id,

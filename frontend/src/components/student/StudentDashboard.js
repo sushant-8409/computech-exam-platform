@@ -4,6 +4,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import Header from '../Header';
+import PushNotificationSettings from '../PushNotificationSettings';  // ✅ Import Push Notification Settings
 import styles from './StudentDashboard.module.css';
 
 const StudentDashboard = () => {
@@ -319,6 +320,9 @@ const StudentDashboard = () => {
             </div>
           </div>
         )}
+      </div>
+      <div className={styles.dashboardSection}>
+        <PushNotificationSettings />
       </div>
     </div>
   );

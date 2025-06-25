@@ -8,6 +8,8 @@ const nowIST = moment().tz('Asia/Kolkata').toDate();
 const testController = require('../controllers/testController'); // Adjust path as neede
 const studentController = require('../controllers/StudentController');
 // Adjust path as needed
+const Notification = require('../models/Notification');
+const NotificationSettings = require('../models/NotificationSettings');
 const { uploadToGDrive } = require('../services/gdrive'); // Adjust path as neede
 const upload = multer({ storage: multer.memoryStorage() });
 const notificationService = require('../services/notificationService');
@@ -688,47 +690,390 @@ router.post('/bulk-action', async (req, res) => {
 
 
 // Notification endpoints
-router.post('/notifications/send', async (req, res) => {
+// ✅ FIXED: Get notifications with proper error handling
+router.get('/notifications', async (req, res) => {
   try {
-    // body sent by NotificationCenter.jsx
-    const { studentIds = [], testIds = [], notificationType = 'both',
-      emailTemplate = 'custom_message', customMessage = '' } = req.body;
+    console.log('📋 Admin notifications request received');
+    console.log('User:', req.user ? `${req.user.name} (${req.user.role})` : 'No user');
 
-    // ────────── 1. validate adminId ──────────
-    if (!req.user || (!req.user._id && !req.user.id)) {
-      return res.status(401).json({ success: false, message: 'Unauthenticated' });
+    // Validate admin access
+    if (!req.user) {
+      console.error('❌ No user in request');
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Authentication required' 
+      });
     }
-    const adminId = req.user._id; // <-- an ObjectId string
 
-    // ────────── 2. pull data to embed in email / push ──────────
-    const students = await Student.find({ _id: { $in: studentIds } });
-    const tests = await Test.find({ _id: { $in: testIds } });
+    if (req.user.role !== 'admin') {
+      console.error('❌ User is not admin:', req.user.role);
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Admin access required' 
+      });
+    }
 
-    // ────────── 3. call service (SINGULAR method name) ──────────
-    const result = await notificationService.sendNotification(
-      adminId,
-      emailTemplate,                 // type  (e.g. "result_published")
-      '📢 Notification',             // title
-      customMessage || 'See dashboard for details',
-      { students, tests, notificationType }
-    );
+    // Check if Notification model exists
+    if (!Notification) {
+      console.error('❌ Notification model not found');
+      return res.status(500).json({
+        success: false,
+        message: 'Notification model not available'
+      });
+    }
 
-    return res.json({ success: true, result });
-  } catch (err) {
-    console.error('Send notification error:', err);
-    res.status(500).json({ success: false, message: 'Failed to send notifications' });
+    console.log('📋 Fetching notifications from database...');
+
+    // Fetch notifications with error handling
+    const notifications = await Notification.find({})
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean()
+      .catch(err => {
+        console.error('❌ Database query error:', err);
+        throw new Error(`Database error: ${err.message}`);
+      });
+
+    console.log(`📋 Found ${notifications ? notifications.length : 0} notifications`);
+
+    // Transform notifications for frontend
+    const transformedNotifications = (notifications || []).map(notification => ({
+      _id: notification._id,
+      title: notification.title || 'No title',
+      message: notification.message || 'No message',
+      type: notification.type || 'unknown',
+      read: notification.read || false,
+      emailSent: notification.emailSent || false,
+      appNotificationSent: notification.appNotificationSent || false,
+      createdAt: notification.createdAt,
+      updatedAt: notification.updatedAt,
+      data: notification.data || {},
+      status: (notification.emailSent || notification.appNotificationSent) ? 'sent' : 'pending'
+    }));
+
+    console.log('✅ Notifications transformed successfully');
+
+    res.json({ 
+      success: true, 
+      notifications: transformedNotifications,
+      count: transformedNotifications.length
+    });
+
+  } catch (error) {
+    console.error('❌ Error in /notifications route:', error);
+    console.error('Error stack:', error.stack);
+
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch notifications',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? {
+        stack: error.stack,
+        name: error.name
+      } : undefined
+    });
   }
 });
 
-router.get('/notifications', async (req, res) => {
+// ✅ FIXED: Send notifications with better error handling
+router.post('/notifications/send', async (req, res) => {
   try {
-    const notifications = await Notification.find()
-      .sort({ createdAt: -1 })
-      .limit(20);
+    console.log('Processing notification send request...');
+    
+    const { 
+      studentIds = [], 
+      testIds = [], 
+      notificationType = 'both',
+      emailTemplate = 'custom_message', 
+      customMessage = '',
+      context = {}
+    } = req.body;
 
-    res.json({ success: true, notifications });
+    console.log('Request payload:', {
+      studentCount: studentIds.length,
+      testCount: testIds.length,
+      emailTemplate,
+      notificationType
+    });
+
+    // Validate admin authentication
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Admin access required' 
+      });
+    }
+
+    const adminId = req.user._id || req.user.id;
+
+    // Validate input
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one student must be selected'
+      });
+    }
+
+    if (!Array.isArray(testIds) || testIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one test must be selected'
+      });
+    }
+
+    console.log(`Fetching ${studentIds.length} students and ${testIds.length} tests...`);
+
+    // Fetch students and tests with error handling
+    let students, tests;
+    
+    try {
+      students = await Student.find({ _id: { $in: studentIds } }).lean();
+      console.log(`Found ${students.length} students`);
+    } catch (err) {
+      console.error('Error fetching students:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Error fetching students'
+      });
+    }
+
+    try {
+      tests = await Test.find({ _id: { $in: testIds } }).lean();
+      console.log(`Found ${tests.length} tests`);
+    } catch (err) {
+      console.error('Error fetching tests:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'Error fetching tests'
+      });
+    }
+
+    if (students.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No valid students found'
+      });
+    }
+
+    if (tests.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No valid tests found'
+      });
+    }
+
+    const results = [];
+    
+    // Process each test
+    for (const test of tests) {
+      try {
+        console.log(`Processing notification for test: ${test.title} (type: ${emailTemplate})`);
+
+        // Handle result_published notifications differently
+        if (emailTemplate === 'result_published') {
+          console.log('Processing result_published notifications...');
+          
+          // Process each student individually for result notifications
+          for (const student of students) {
+            try {
+              // Try to find actual result first
+              let actualResult = null;
+              try {
+                actualResult = await Result.findOne({
+                  studentId: student._id,
+                  testId: test._id,
+                  status: { $in: ['published', 'reviewed'] }
+                }).lean();
+              } catch (resultError) {
+                console.warn('Could not fetch actual result:', resultError.message);
+              }
+
+              // Create result data (use actual if available, otherwise mock)
+              const resultData = actualResult ? {
+                studentId: student._id,
+                studentName: student.name,
+                studentEmail: student.email,
+                testTitle: test.title,
+                testSubject: test.subject,
+                status: actualResult.status,
+                marksObtained: actualResult.marksObtained || 0,
+                totalMarks: actualResult.totalMarks || test.totalMarks,
+                percentage: actualResult.percentage || 0,
+                submittedAt: actualResult.submittedAt
+              } : {
+                studentId: student._id,
+                studentName: student.name,
+                studentEmail: student.email,
+                testTitle: test.title,
+                testSubject: test.subject,
+                status: 'published',
+                marksObtained: 0,
+                totalMarks: test.totalMarks,
+                percentage: 0
+              };
+
+              const notificationData = {
+                resultData,
+                context: { 
+                  ...context, 
+                  isResultNotification: true,
+                  fromNotificationCenter: true
+                }
+              };
+
+              // Send individual result notification
+              const result = await notificationService.sendNotification(
+                adminId,
+                'result_published', // Always use result_published type
+                `Results Published: ${test.title}`,
+                customMessage || `Your results for "${test.title}" have been published. Please check your dashboard to view your scores.`,
+                notificationData
+              );
+              
+              results.push({
+                testId: test._id,
+                studentId: student._id,
+                testTitle: test.title,
+                studentName: student.name,
+                notificationType: 'result_published',
+                success: true,
+                result
+              });
+
+              console.log(`Result notification sent to ${student.name}`);
+            } catch (studentError) {
+              console.error(`Failed to send result notification to ${student.name}:`, studentError);
+              results.push({
+                testId: test._id,
+                studentId: student._id,
+                testTitle: test.title,
+                studentName: student.name,
+                notificationType: 'result_published',
+                success: false,
+                error: studentError.message
+              });
+            }
+          }
+        } else {
+          // Handle test assignment notifications (all other types)
+          console.log('Processing test assignment notification...');
+          
+          const notificationData = {
+            students, 
+            tests: [test], 
+            testData: test,
+            notificationType,
+            context: {
+              ...context,
+              isTestNotification: true,
+              fromNotificationCenter: true
+            }
+          };
+
+          // Determine the actual notification type
+          let actualType = emailTemplate;
+          if (emailTemplate === 'test_assignment' || emailTemplate === 'custom_message') {
+            actualType = 'test_created';
+          }
+
+          // Send notification to all students at once
+          const result = await notificationService.sendNotification(
+            adminId,
+            actualType,
+            `New Test: ${test.title} - ${test.subject}`,
+            customMessage || `A new test "${test.title}" has been assigned to you. Please check your dashboard for details.`,
+            notificationData
+          );
+          
+          results.push({
+            testId: test._id,
+            testTitle: test.title,
+            notificationType: actualType,
+            studentsCount: students.length,
+            success: true,
+            result
+          });
+
+          console.log(`Test assignment notification sent for: ${test.title}`);
+        }
+        
+      } catch (testError) {
+        console.error(`Failed to send notification for test ${test.title}:`, testError);
+        results.push({
+          testId: test._id,
+          testTitle: test.title,
+          notificationType: emailTemplate,
+          success: false,
+          error: testError.message
+        });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success).length;
+
+    console.log(`Notification processing complete: ${successCount} successful, ${failCount} failed`);
+
+    return res.json({ 
+      success: true, 
+      message: `Notifications processed: ${successCount} successful, ${failCount} failed`,
+      results,
+      notificationType: emailTemplate,
+      summary: {
+        studentsNotified: students.length,
+        testsProcessed: tests.length,
+        successCount,
+        failCount,
+        totalNotifications: results.length
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (err) {
+    console.error('Send notification error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send notifications',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// ✅ Test route to verify everything is working
+router.get('/test-notifications', async (req, res) => {
+  try {
+    console.log('🧪 Testing notifications setup...');
+
+    const checks = {
+      user: !!req.user,
+      userRole: req.user?.role,
+      notificationModel: !!Notification,
+      notificationService: !!notificationService,
+      database: false
+    };
+
+    // Test database connection
+    try {
+      const count = await Notification.countDocuments();
+      checks.database = true;
+      checks.notificationCount = count;
+    } catch (dbError) {
+      checks.databaseError = dbError.message;
+    }
+
+    res.json({
+      success: true,
+      message: 'Notification system status',
+      checks
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch notifications' });
+    res.status(500).json({
+      success: false,
+      message: 'Test failed',
+      error: error.message
+    });
   }
 });
 

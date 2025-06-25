@@ -93,30 +93,48 @@ function AuthProvider({ children }) {
 
     initializeAuth();
 
-    const reqI = axios.interceptors.request.use(cfg => {
-      const t = localStorage.getItem('token');
-      if (t) cfg.headers.Authorization = `Bearer ${t}`;
-      return cfg;
-    });
-
-    const resI = axios.interceptors.response.use(
-      r => r,
-      err => {
-        if (err.response?.status === 401) {
-          console.log('🔒 Unauthorized request detected, logging out');
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setUser(null);
-          toast.error('Session expired. Please login again.');
-        }
-        return Promise.reject(err);
+    // ✅ Add offline request handling
+  const reqI = axios.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem('token');
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+      
+      // ✅ Check if offline and handle accordingly
+      if (!offlineHandler.getOnlineStatus()) {
+        console.log('📡 Request attempted while offline:', config.url);
+        // You can modify this behavior based on your needs
       }
-    );
+      
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
 
-    return () => {
-      axios.interceptors.request.eject(reqI);
-      axios.interceptors.response.eject(resI);
-    };
+  const resI = axios.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      // ✅ Handle network errors when offline
+      if (!navigator.onLine) {
+        console.log('🔴 Network request failed - app is offline');
+        toast.error('Unable to connect. Please check your internet connection.');
+      } else if (error.response?.status === 401) {
+        console.log('🔒 Unauthorized request detected, logging out');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+        toast.error('Session expired. Please login again.');
+      }
+      return Promise.reject(error);
+    }
+  );
+
+  return () => {
+    axios.interceptors.request.eject(reqI);
+    axios.interceptors.response.eject(resI);
+  };
+
   }, [verifyToken]);
 
   const login = async (email, password) => {
@@ -306,7 +324,12 @@ function SmartRedirect() {
 
 export default function App() {
   useEffect(() => {
-    console.log('Offline handler initialized');
+    // ✅ Actually initialize the offline handler
+    const cleanup = offlineHandler.init();
+    console.log('✅ Offline handler initialized');
+    
+    // ✅ Return cleanup function
+    return cleanup;
   }, []);
 
   return (

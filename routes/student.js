@@ -6,6 +6,8 @@ const Result = require('../models/Result');
 const Student = require('../models/Student');
 const multer = require('multer');
 const mongoose = require('mongoose');
+const PushSubscription=require('../models/PushSubscription');
+const notificationService = require('../services/notificationService');
 // ← add this
 const { uploadToGDrive } = require('../services/gdrive'); // Adjust path as needed
 const router = express.Router();
@@ -75,7 +77,6 @@ router.post('/test/:testId/exit', authenticateStudent, async (req, res) => {
     result.browserInfo = browserInfo;
     result.answerSheetUrl = answerSheetUrl;
     result.status = autoExit ? 'auto_exited' : 'exited';
-    
     // ✅ Ensure test information is set (for existing results too)
     if (!result.testTitle) result.testTitle = test.title;
     if (!result.testSubject) result.testSubject = test.subject;
@@ -108,6 +109,44 @@ router.post('/test/:testId/exit', authenticateStudent, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Failed to exit test' 
+    });
+  }
+});
+router.post('/test-notification', async (req, res) => {
+  try {
+    console.log('🧪 Test notification request for:', req.student.name);
+
+    const student = req.student;
+
+    // Send test notification
+    const result = await notificationService.sendNotification(
+      '507f1f77bcf86cd799439011', // Dummy admin ID
+      'system_alert',
+      '🧪 Test Notification',
+      `Hello ${student.name}! This is a test notification to verify your push subscription is working correctly.`,
+      {
+        students: [student],
+        type: 'test',
+        timestamp: new Date().toISOString()
+      }
+    );
+
+    console.log('✅ Test notification result:', result);
+
+    res.json({
+      success: true,
+      message: 'Test notification processed',
+      result,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Test notification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send test notification',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -214,7 +253,152 @@ router.post('/test/:testId/submit', authenticateStudent, async (req, res) => {
 });
 
 
+router.post('/push/subscribe', async (req, res) => {
+  try {
+    console.log('📱 Push subscription request received');
+    console.log('Student ID:', req.student._id);
+    console.log('Subscription data:', req.body.subscription ? 'Present' : 'Missing');
 
+    const { subscription } = req.body;
+    const userId = req.student._id;
+    const userAgent = req.headers['user-agent'] || '';
+
+    if (!subscription || !subscription.endpoint) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid subscription data',
+        required: 'subscription.endpoint is required'
+      });
+    }
+
+    console.log('📱 Creating push subscription for student:', req.student.name);
+
+    const result = await notificationService.subscribeToPush(userId, subscription, userAgent);
+
+    console.log('✅ Push subscription created:', result._id);
+
+    res.json({
+      success: true,
+      message: 'Successfully subscribed to push notifications',
+      subscriptionId: result._id
+    });
+
+  } catch (error) {
+    console.error('❌ Push subscribe error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to subscribe to push notifications',
+      error: error.message
+    });
+  }
+});
+
+// Unsubscribe from push notifications
+router.post('/push/unsubscribe', async (req, res) => {
+  try {
+    console.log('📱 Push unsubscribe request received');
+
+    const { endpoint } = req.body;
+    const userId = req.student._id;
+
+    const result = await notificationService.unsubscribeFromPush(userId, endpoint);
+
+    console.log('✅ Push unsubscription completed');
+
+    res.json({
+      success: true,
+      message: 'Successfully unsubscribed from push notifications',
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Push unsubscribe error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unsubscribe from push notifications',
+      error: error.message
+    });
+  }
+});
+
+// Get push subscription status
+router.get('/push/status', async (req, res) => {
+  try {
+    console.log('📱 Push status request received');
+    console.log('Student ID:', req.student?._id);
+
+    // Check if user exists
+    if (!req.student || !req.student._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        error: 'No student found in request'
+      });
+    }
+
+    const userId = req.student._id;
+    
+    // Handle missing PushSubscription model
+    if (!PushSubscription) {
+      console.warn('⚠️ PushSubscription model not available');
+      return res.json({
+        success: true,
+        subscribed: false,
+        subscriptionCount: 0,
+        subscriptions: [],
+        message: 'PushSubscription model not available - please check server setup'
+      });
+    }
+
+    // Query subscriptions with error handling
+    let subscriptions = [];
+    try {
+      subscriptions = await PushSubscription.find({ 
+        userId: userId, 
+        active: true 
+      }).lean();
+      console.log(`📱 Found ${subscriptions.length} active subscriptions for user ${userId}`);
+    } catch (dbError) {
+      console.error('❌ Database query error:', dbError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database error while fetching subscriptions',
+        error: process.env.NODE_ENV === 'development' ? dbError.message : 'Database error'
+      });
+    }
+
+    // Success response
+    res.json({
+      success: true,
+      subscribed: subscriptions.length > 0,
+      subscriptionCount: subscriptions.length,
+      subscriptions: subscriptions.map(sub => ({
+        id: sub._id,
+        endpoint: sub.subscription?.endpoint ? 
+          sub.subscription.endpoint.substring(0, 50) + '...' : 
+          'Unknown endpoint',
+        createdAt: sub.createdAt,
+        lastUsed: sub.lastUsed
+      })),
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Push status route error:', error);
+    console.error('Error stack:', error.stack);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      } : 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // ============================================
 // TEST ENDPOINTS
