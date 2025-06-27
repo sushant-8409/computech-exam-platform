@@ -83,7 +83,7 @@ const resultSchema = new mongoose.Schema({
   },
   status: { 
     type: String, 
-    enum: ['pending', 'reviewed', 'published', 'under review', 'submitted', 'exited', 'auto_submitted', 'auto_exited'], 
+    enum: ['pending', 'reviewed', 'published', 'under review'], 
     default: 'pending' 
   }
 }, {

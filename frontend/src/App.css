@@ -5125,3 +5125,233 @@ textarea:focus-visible {
   margin: 0;
   padding: 0;
 }
+.analytics-dashboard {
+  padding: 1rem;
+}
+
+.analytics-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.analytics-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.search-input-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.analytics-search-input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.search-result-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.score-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: bold;
+  color: white;
+}
+
+.score-badge.excellent { background: #10b981; }
+.score-badge.good { background: #3b82f6; }
+.score-badge.average { background: #f59e0b; }
+.score-badge.below-average { background: #ef4444; }
+
+.performance-level {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.performance-level.excellent { background: #d1fae5; color: #065f46; }
+.performance-level.good { background: #dbeafe; color: #1e40af; }
+.performance-level.average { background: #fef3c7; color: #92400e; }
+.performance-level.below-average { background: #fee2e2; color: #991b1b; }
+
+.analytics-charts {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .analytics-charts {
+    grid-template-columns: 1fr;
+  }
+}
+.dashboard-content-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.dashboard-card {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.grade-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.grade-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: #f8fafc;
+  border-radius: 6px;
+}
+
+.grade-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: bold;
+  color: white;
+  margin-bottom: 0.25rem;
+}
+
+.grade-badge.grade-aplus { background: #10b981; }
+.grade-badge.grade-a { background: #3b82f6; }
+.grade-badge.grade-bplus { background: #8b5cf6; }
+.grade-badge.grade-b { background: #f59e0b; }
+.grade-badge.grade-c { background: #ef4444; }
+.grade-badge.grade-f { background: #6b7280; }
+
+.subject-details {
+  margin-top: 1rem;
+}
+
+.subject-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.subject-item:last-child {
+  border-bottom: none;
+}
+
+.performance-score {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: bold;
+  color: white;
+}
+
+.performance-score.excellent { background: #10b981; }
+.performance-score.good { background: #3b82f6; }
+.performance-score.needs-improvement { background: #ef4444; }
+
+.activity-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-message {
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.activity-time {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #6b7280;
+}
+
+.no-activity {
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .dashboard-content-grid {
+    grid-template-columns: 1fr;
+  }
+}

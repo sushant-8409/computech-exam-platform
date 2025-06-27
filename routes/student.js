@@ -76,7 +76,8 @@ router.post('/test/:testId/exit', authenticateStudent, async (req, res) => {
     result.timeTaken = timeTaken;
     result.browserInfo = browserInfo;
     result.answerSheetUrl = answerSheetUrl;
-    result.status = autoExit ? 'auto_exited' : 'exited';
+    result.status = 'pending';
+    result.submissionType = autoExit ? 'auto_exit' : 'manual_exit';
     // ✅ Ensure test information is set (for existing results too)
     if (!result.testTitle) result.testTitle = test.title;
     if (!result.testSubject) result.testSubject = test.subject;
@@ -216,8 +217,8 @@ router.post('/test/:testId/submit', authenticateStudent, async (req, res) => {
     result.violations = violations;
     result.browserInfo = browserInfo;
     result.timeTaken = timeTaken;
-    result.status = autoSubmit ? 'auto_submitted' : 'submitted';
-    
+    result.status = 'pending'; // Always pending after submission
+    result.submissionType = autoSubmit ? 'auto_submit' : 'manual_submit';
     // ✅ Ensure test information is set
     if (!result.testTitle) result.testTitle = test.title;
     if (!result.testSubject) result.testSubject = test.subject;

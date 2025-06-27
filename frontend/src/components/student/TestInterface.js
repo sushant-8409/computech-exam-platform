@@ -452,27 +452,27 @@ const TestInterface = () => {
     queueRequest
   ]);
 
-  const handleAutoSubmit = useCallback(async (reason) => {
-    if (!test || isSubmitting || isSubmitted || submissionLockRef.current) return;
+ const handleAutoSubmit = useCallback(async (reason) => {
+  if (!test || isSubmitting || isSubmitted || submissionLockRef.current) return;
 
-    console.log(`🔒 Auto-submit triggered: ${reason}`);
-    submissionLockRef.current = true;
+  console.log(`🔒 Auto-submit triggered: ${reason}`);
+  submissionLockRef.current = true;
 
-    const reasons = {
-      time_limit: '⏰ Time limit reached',
-      violations: '⚠️ Maximum violations exceeded',
-      window_focus: '🪟 Window focus lost too many times',
-      tab_switch: '🔄 Too many tab switches detected',
-      fullscreen_exit: '📺 Exited fullscreen too many times'
-    };
+  const reasons = {
+    time_limit: '⏰ Time limit reached',
+    violations: '⚠️ Maximum violations exceeded',
+    window_focus: '🪟 Window focus lost too many times',
+    tab_switch: '🔄 Too many tab switches detected',
+    fullscreen_exit: '📺 Exited fullscreen too many times'
+  };
 
-    const reasonText = reasons[reason] || reason;
+  const reasonText = reasons[reason] || reason;
 
-    // Show countdown with SweetAlert2
-    let timerInterval;
-    const { isConfirmed } = await Swal.fire({
-      title: 'Auto-Submit Warning!',
-      html: `
+  // Show countdown with SweetAlert2
+  let timerInterval;
+  const { isConfirmed } = await Swal.fire({
+    title: 'Auto-Submit Warning!',
+    html: `
       <div style="text-align: center;">
         <p><strong>${reasonText}</strong></p>
         <p>Test will be submitted automatically in:</p>
@@ -482,38 +482,41 @@ const TestInterface = () => {
         <p style="font-size: 0.9rem; color: #6b7280;">
           Click "Submit Now" to submit immediately
         </p>
+        <p style="font-size: 0.8rem; color: #6b7280; margin-top: 1rem;">
+          Note: Test will be submitted with or without answer sheet upload
+        </p>
       </div>
     `,
-      icon: 'warning',
-      showCancelButton: false,
-      confirmButtonText: 'Submit Now',
-      confirmButtonColor: '#dc2626',
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-      timer: 5000,
-      timerProgressBar: true,
-      didOpen: () => {
-        const countdownElement = Swal.getHtmlContainer().querySelector('#countdown');
-        let countdown = 5;
+    icon: 'warning',
+    showCancelButton: false,
+    confirmButtonText: 'Submit Now',
+    confirmButtonColor: '#dc2626',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    timer: 5000,
+    timerProgressBar: true,
+    didOpen: () => {
+      const countdownElement = Swal.getHtmlContainer().querySelector('#countdown');
+      let countdown = 5;
+      timerInterval = setInterval(() => {
+        countdown--;
+        if (countdownElement) {
+          countdownElement.textContent = countdown;
+        }
+        if (countdown <= 0) {
+          clearInterval(timerInterval);
+        }
+      }, 1000);
+    },
+    willClose: () => {
+      clearInterval(timerInterval);
+    }
+  });
 
-        timerInterval = setInterval(() => {
-          countdown--;
-          if (countdownElement) {
-            countdownElement.textContent = countdown;
-          }
-          if (countdown <= 0) {
-            clearInterval(timerInterval);
-          }
-        }, 1000);
-      },
-      willClose: () => {
-        clearInterval(timerInterval);
-      }
-    });
+  // Submit the test (works with or without answer sheet upload)
+  await handleSubmit(true, reason);
+}, [test, isSubmitting, isSubmitted, handleSubmit]);
 
-    // Submit the test (either manually clicked or timer expired)
-    await handleSubmit(true, reason);
-  }, [test, isSubmitting, isSubmitted, handleSubmit]);
 
   // Better Viewer functions
   const enterBetterViewer = () => {
@@ -1668,20 +1671,6 @@ const TestInterface = () => {
               : !isOnline
                 ? 'Upload Unavailable (Offline) 📱'
                 : 'Submit Answer Sheet'
-          }
-        </button>
-
-        <button
-          className="btn btn-primary"
-          onClick={() => handleSubmit(false)}
-          disabled={isSubmitting || isSubmitted}
-          style={{ marginLeft: '1rem' }}
-        >
-          {isSubmitting
-            ? (!isOnline ? 'Queuing Submission...' : 'Submitting...')
-            : !isOnline
-              ? 'Submit Test (Will Queue) 📱'
-              : 'Submit Test'
           }
         </button>
 

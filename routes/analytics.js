@@ -136,5 +136,84 @@ router.get('/students/search', async (req, res) => {
     res.status(500).json({ success:false, message:'Student search failed' });
   }
 });
+// In your analytics.js router file
+
+// Grade distribution endpoint
+router.get('/admin/analytics/grade-distribution', async (req, res) => {
+  try {
+    const gradeDistribution = await Result.aggregate([
+      { $match: { totalMarks: { $gt: 0 }, marksObtained: { $gte: 0 } } },
+      {
+        $addFields: {
+          percentage: { $multiply: [{ $divide: ['$marksObtained', '$totalMarks'] }, 100] }
+        }
+      },
+      {
+        $addFields: {
+          grade: {
+            $switch: {
+              branches: [
+                { case: { $gte: ['$percentage', 90] }, then: 'A+' },
+                { case: { $gte: ['$percentage', 80] }, then: 'A' },
+                { case: { $gte: ['$percentage', 70] }, then: 'B+' },
+                { case: { $gte: ['$percentage', 60] }, then: 'B' },
+                { case: { $gte: ['$percentage', 50] }, then: 'C' }
+              ],
+              default: 'F'
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$grade',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          grade: '$_id',
+          count: 1,
+          _id: 0
+        }
+      }
+    ]);
+
+    const totalStudents = gradeDistribution.reduce((sum, item) => sum + item.count, 0);
+    const result = gradeDistribution.map(item => ({
+      ...item,
+      percentage: totalStudents > 0 ? Math.round((item.count / totalStudents) * 100) : 0
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error('Grade distribution error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch grade distribution' });
+  }
+});
+
+// Recent activity endpoint
+router.get('/admin/recent-activity', async (req, res) => {
+  try {
+    const recentResults = await Result.find()
+      .populate('studentId', 'name')
+      .populate('testId', 'title')
+      .sort({ submittedAt: -1 })
+      .limit(10);
+
+    const activities = recentResults.map(result => ({
+      type: 'test_submitted',
+      studentName: result.studentId?.name || 'Unknown Student',
+      testTitle: result.testTitle || result.testId?.title || 'Unknown Test',
+      timestamp: result.submittedAt || result.createdAt,
+      status: result.status
+    }));
+
+    res.json(activities);
+  } catch (error) {
+    console.error('Recent activity error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch recent activity' });
+  }
+});
 
 module.exports = router;

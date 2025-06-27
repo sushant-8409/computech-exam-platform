@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -69,7 +70,11 @@ const AdminDashboard = () => {
     passRate: 0,
     totalViolations: 0
   });
-
+  // Add these state variables with your existing ones
+  const [gradeDistribution, setGradeDistribution] = useState([]);
+  const [subjectPerformance, setSubjectPerformance] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
   const [chartData, setChartData] = useState({
     testSubmissions: { labels: [], data: [] },
     studentGrades: { labels: [], data: [] },
@@ -138,6 +143,52 @@ const AdminDashboard = () => {
       blockKeyboardShortcuts: true
     }
   });
+
+  // Add these state variables with your existing ones
+  const [analyticsData, setAnalyticsData] = useState({
+    overall: {
+      totalStudents: 0,
+      averageScore: 0,
+      passRate: 0
+    },
+    subjectPerformance: []
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Add this function to fetch analytics data
+  const fetchAnalyticsData = async () => {
+    try {
+      console.log('📊 Fetching analytics data...');
+      const response = await axios.get('/api/admin/analytics');
+      setAnalyticsData(response.data);
+      console.log('✅ Analytics data loaded:', response.data);
+    } catch (error) {
+      console.error('❌ Failed to fetch analytics:', error);
+      toast.error('Failed to load analytics data');
+    }
+  };
+
+  // Add student search function
+  const handleStudentSearch = async (query) => {
+    if (!query.trim()) {
+      setSearchResult(null);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      const response = await axios.get(`/api/students/search?query=${encodeURIComponent(query)}`);
+      setSearchResult(response.data);
+    } catch (error) {
+      console.error('❌ Student search failed:', error);
+      toast.error('Student search failed');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
   const [files, setFiles] = useState({ questionPaper: null, answerKey: null });
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
@@ -147,6 +198,61 @@ const AdminDashboard = () => {
     questionPaper: { key: '', previewUrl: '' },
     answerKey: { key: '', previewUrl: '' }
   });
+  // Fetch grade distribution data
+  const fetchGradeDistribution = async () => {
+    try {
+      const response = await axios.get('/api/admin/analytics/grade-distribution');
+      setGradeDistribution(response.data);
+    } catch (error) {
+      console.error('❌ Failed to fetch grade distribution:', error);
+      // Fallback data
+      setGradeDistribution([
+        { grade: 'A+', count: 0, percentage: 0 },
+        { grade: 'A', count: 0, percentage: 0 },
+        { grade: 'B+', count: 0, percentage: 0 },
+        { grade: 'B', count: 0, percentage: 0 },
+        { grade: 'C', count: 0, percentage: 0 },
+        { grade: 'F', count: 0, percentage: 0 }
+      ]);
+    }
+  };
+
+  // Fetch subject performance data
+  const fetchSubjectPerformance = async () => {
+    try {
+      const response = await axios.get('/api/admin/analytics/subject-performance');
+      console.log('Subject performance response:', response.data); // Debug log
+
+      // Ensure we always set an array
+      const data = response.data;
+      if (Array.isArray(data)) {
+        setSubjectPerformance(data);
+      } else if (data && Array.isArray(data.subjects)) {
+        // If data is wrapped in an object
+        setSubjectPerformance(data.subjects);
+      } else {
+        console.warn('Subject performance data is not an array:', data);
+        setSubjectPerformance([]);
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch subject performance:', error);
+      setSubjectPerformance([]); // Always set to empty array on error
+    }
+  };
+
+
+  // Fetch recent activity data
+  const fetchRecentActivity = async () => {
+    try {
+      const response = await axios.get('/api/admin/recent-activity');
+      setRecentActivity(response.data);
+    } catch (error) {
+      console.error('❌ Failed to fetch recent activity:', error);
+      setRecentActivity([]);
+    }
+  };
+
+  // Combined dashboard data fetch
 
   const [bulkActionMode, setBulkActionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]);
@@ -233,7 +339,16 @@ const AdminDashboard = () => {
   // in component scope
   const handleDeleteTest = async testId => {
 
-    if (!window.confirm('Delete this test permanently?')) return;
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: 'Delete this test permanently?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) return;
     try {
       await axios.delete(`/api/admin/tests/${testId}`);
       console.log('Deleting testId:', testId);
@@ -249,7 +364,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchDashboardData();
     fetchChartData();
-
+    fetchAnalyticsData();
     // Load theme preference
     const savedTheme = localStorage.getItem('admin-theme');
     if (savedTheme === 'dark') {
@@ -272,25 +387,87 @@ const AdminDashboard = () => {
   // Fetch dashboard statistics
   const fetchDashboardData = async () => {
     setLoading(true);
+    setDashboardLoading(true);
+
     try {
-      const [statsRes, testsRes, studentsRes, resultsRes] = await Promise.all([
+      const [
+        statsRes,
+        testsRes,
+        studentsRes,
+        resultsRes,
+        gradeDistRes,
+        subjectPerfRes,
+        recentActivityRes,
+        analyticsRes
+      ] = await Promise.all([
         axios.get('/api/admin/dashboard/stats'),
         axios.get('/api/admin/tests'),
         axios.get('/api/admin/students'),
-        axios.get('/api/admin/results')
+        axios.get('/api/admin/results'),
+        axios.get('/api/admin/analytics/grade-distribution').catch(err => {
+          console.warn('Grade distribution API not available:', err.message);
+          return { data: [] };
+        }),
+        axios.get('/api/admin/analytics/subject-performance').catch(err => {
+          console.warn('Subject performance API not available:', err.message);
+          return { data: [] };
+        }),
+        axios.get('/api/admin/recent-activity').catch(err => {
+          console.warn('Recent activity API not available:', err.message);
+          return { data: [] };
+        }),
+        axios.get('/api/admin/analytics').catch(err => {
+          console.warn('Analytics API not available:', err.message);
+          return {
+            data: {
+              overall: { totalStudents: 0, averageScore: 0, passRate: 0 },
+              subjectPerformance: []
+            }
+          };
+        })
       ]);
 
+      // Set main dashboard data
       setDashboardStats(statsRes.data.stats || {});
       setTests(testsRes.data.tests || []);
       setStudents(studentsRes.data.students || []);
       setResults(resultsRes.data.results || []);
+
+      // Safely set analytics data with array checks
+      setGradeDistribution(Array.isArray(gradeDistRes.data) ? gradeDistRes.data : []);
+      setSubjectPerformance(Array.isArray(subjectPerfRes.data) ? subjectPerfRes.data : []);
+      setRecentActivity(Array.isArray(recentActivityRes.data) ? recentActivityRes.data : []);
+
+      setAnalyticsData(analyticsRes.data || {
+        overall: { totalStudents: 0, averageScore: 0, passRate: 0 },
+        subjectPerformance: []
+      });
+
+      console.log('✅ Dashboard data loaded successfully');
+
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to fetch dashboard data');
+      console.error('❌ Error fetching dashboard data:', error);
+
+      // Set safe fallback data
+      setDashboardStats({});
+      setTests([]);
+      setStudents([]);
+      setResults([]);
+      setGradeDistribution([]);
+      setSubjectPerformance([]); // Ensure this is always an array
+      setRecentActivity([]);
+      setAnalyticsData({
+        overall: { totalStudents: 0, averageScore: 0, passRate: 0 },
+        subjectPerformance: []
+      });
+
     } finally {
       setLoading(false);
+      setDashboardLoading(false);
     }
   };
+
+
 
   // Fetch chart data
   const fetchChartData = async () => {
@@ -313,8 +490,18 @@ const AdminDashboard = () => {
       return;
     }
 
-    const confirmAction = window.confirm(`Are you sure you want to ${action} ${selectedItems.length} items?`);
-    if (!confirmAction) return;
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `Are you sure you want to ${action} ${selectedItems.length} items?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#aaa',
+      confirmButtonText: `Yes, ${action}`,
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) return;
+
 
     try {
       await axios.post(`/api/admin/bulk-action`, {
@@ -490,200 +677,680 @@ const AdminDashboard = () => {
       }
     }
   };
-
-  // Render Dashboard Overview
-  const renderDashboard = () => (
-    <div className="dashboard-overview">
-      <div className="dashboard-header">
-        <h1>📊 Admin Dashboard</h1>
-        <div className="dashboard-actions">
-          <button className="btn btn-primary" onClick={() => setActiveTab('create-test')}>
-            ➕ Create Test
-          </button>
-          <button className="btn btn-outline" onClick={fetchDashboardData}>
-            🔄 Refresh
-          </button>
-        </div>
+  // Grade Distribution Component
+  const renderGradeDistribution = () => (
+    <div className="dashboard-card">
+      <div className="card-header">
+        <h3>📊 Grade Distribution</h3>
+        <button className="btn btn-sm btn-outline" onClick={fetchGradeDistribution}>
+          🔄
+        </button>
       </div>
-
-      {/* Statistics Cards */}
-      <div className="stats-grid">
-        <div className="stat-card primary">
-          <div className="stat-icon">👥</div>
-          <div className="stat-content">
-            <h3>{dashboardStats.totalStudents}</h3>
-            <p>Total Students</p>
-          </div>
-          <div className="stat-trend">+12% this month</div>
-        </div>
-
-        <div className="stat-card success">
-          <div className="stat-icon">📝</div>
-          <div className="stat-content">
-            <h3>{dashboardStats.activeTests}</h3>
-            <p>Active Tests</p>
-          </div>
-          <div className="stat-trend">+5 new this week</div>
-        </div>
-
-        <div className="stat-card warning">
-          <div className="stat-icon">⏳</div>
-          <div className="stat-content">
-            <h3>{dashboardStats.pendingResults}</h3>
-            <p>Pending Results</p>
-          </div>
-          <div className="stat-trend">Review required</div>
-        </div>
-
-        <div className="stat-card info">
-          <div className="stat-icon">📈</div>
-          <div className="stat-content">
-            <h3>{dashboardStats.averageScore}%</h3>
-            <p>Average Score</p>
-          </div>
-          <div className="stat-trend">+3% improvement</div>
-        </div>
-
-        <div className="stat-card secondary">
-          <div className="stat-icon">📊</div>
-          <div className="stat-content">
-            <h3>{dashboardStats.totalTests}</h3>
-            <p>Total Tests</p>
-          </div>
-          <div className="stat-trend">All time</div>
-        </div>
-
-        <div className="stat-card danger">
-          <div className="stat-icon">⚠️</div>
-          <div className="stat-content">
-            <h3>{dashboardStats.totalViolations}</h3>
-            <p>Total Violations</p>
-          </div>
-          <div className="stat-trend">Security alerts</div>
-        </div>
-      </div>
-
-      {/* Charts Section */}
-      <div className="charts-section">
-        <div className="chart-container">
-          <h3>📈 Test Submissions Over Time</h3>
-          <div className="chart-wrapper">
-            <Line
-              data={{
-                labels: chartData.testSubmissions.labels,
-                datasets: [{
-                  label: 'Submissions',
-                  data: chartData.testSubmissions.data,
-                  borderColor: 'rgb(99, 102, 241)',
-                  backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                  fill: true,
-                  tension: 0.4
-                }]
-              }}
-              options={chartOptions}
-            />
-          </div>
-        </div>
-
-        <div className="chart-container">
-          <h3>📊 Grade Distribution</h3>
-          <div className="chart-wrapper">
-            <Doughnut
-              data={{
-                labels: ['A+', 'A', 'B+', 'B', 'C', 'F'],
-                datasets: [{
-                  data: chartData.studentGrades.data,
-                  backgroundColor: [
-                    '#10b981', '#059669', '#0891b2', '#0284c7', '#ea580c', '#dc2626'
-                  ],
-                  borderWidth: 2
-                }]
-              }}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    position: 'bottom'
+      <div className="chart-container">
+        {dashboardLoading ? (
+          <div className="loading-spinner">Loading...</div>
+        ) : (
+          <Bar
+            data={{
+              labels: gradeDistribution.map(item => item.grade),
+              datasets: [{
+                label: 'Number of Students',
+                data: gradeDistribution.map(item => item.count),
+                backgroundColor: [
+                  '#10b981', // A+ - Emerald
+                  '#3b82f6', // A - Blue
+                  '#8b5cf6', // B+ - Violet
+                  '#f59e0b', // B - Amber
+                  '#ef4444', // C - Red
+                  '#6b7280'  // F - Gray
+                ],
+                borderColor: [
+                  '#059669',
+                  '#2563eb',
+                  '#7c3aed',
+                  '#d97706',
+                  '#dc2626',
+                  '#4b5563'
+                ],
+                borderWidth: 2
+              }]
+            }}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  display: false
+                },
+                title: {
+                  display: true,
+                  text: 'Student Grade Distribution'
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    stepSize: 1
                   }
                 }
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="chart-container full-width">
-          <h3>📚 Subject Performance</h3>
-          <div className="chart-wrapper">
-            <Bar
-              data={{
-                labels: chartData.subjectPerformance.labels,
-                datasets: [{
-                  label: 'Average Score',
-                  data: chartData.subjectPerformance.data,
-                  backgroundColor: 'rgba(139, 92, 246, 0.6)',
-                  borderColor: 'rgb(139, 92, 246)',
-                  borderWidth: 2
-                }]
-              }}
-              options={chartOptions}
-            />
-          </div>
-        </div>
+              }
+            }}
+          />
+        )}
       </div>
-
-      {/* Recent Activity */}
-      <div className="recent-activity">
-        <h3>🕒 Recent Activity</h3>
-        <div className="activity-list">
-          <div className="activity-item">
-            <div className="activity-icon success">✅</div>
-            <div className="activity-content">
-              <p><strong>Mathematics Test</strong> completed by 25 students</p>
-              <small>2 hours ago</small>
-            </div>
+      <div className="grade-stats">
+        {gradeDistribution.map((grade, index) => (
+          <div key={index} className="grade-stat-item">
+            <span className={`grade-badge grade-${grade.grade.toLowerCase().replace('+', 'plus')}`}>
+              {grade.grade}
+            </span>
+            <span className="grade-count">{grade.count} students</span>
+            <span className="grade-percentage">({grade.percentage}%)</span>
           </div>
-          <div className="activity-item">
-            <div className="activity-icon info">📝</div>
-            <div className="activity-content">
-              <p><strong>Physics Test</strong> created and activated</p>
-              <small>4 hours ago</small>
-            </div>
-          </div>
-          <div className="activity-item">
-            <div className="activity-icon warning">⚠️</div>
-            <div className="activity-content">
-              <p><strong>3 violations</strong> detected in Chemistry Test</p>
-              <small>6 hours ago</small>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="quick-actions">
-        <h3>⚡ Quick Actions</h3>
-        <div className="action-grid">
-          <button className="action-btn" onClick={() => setActiveTab('create-test')}>
-            <span className="action-icon">➕</span>
-            <span>Create Test</span>
-          </button>
-          <button className="action-btn" onClick={() => setActiveTab('results')}>
-            <span className="action-icon">📊</span>
-            <span>Review Results</span>
-          </button>
-          <button className="action-btn" onClick={() => setActiveTab('students')}>
-            <span className="action-icon">👥</span>
-            <span>Manage Students</span>
-          </button>
-          <button className="action-btn" onClick={() => setActiveTab('analytics')}>
-            <span className="action-icon">📈</span>
-            <span>View Analytics</span>
-          </button>
-        </div>
+        ))}
       </div>
     </div>
   );
+
+  // Subject Performance Component
+  const renderSubjectPerformance = () => (
+    <div className="dashboard-card">
+      <div className="card-header">
+        <h3>📚 Subject Performance</h3>
+        <button className="btn btn-sm btn-outline" onClick={fetchSubjectPerformance}>
+          🔄
+        </button>
+      </div>
+      <div className="chart-container">
+        {dashboardLoading ? (
+          <div className="loading-spinner">Loading...</div>
+        ) : (
+          <Line
+            data={{
+              labels: subjectPerformance.map(item => item.subject),
+              datasets: [{
+                label: 'Average Score (%)',
+                data: subjectPerformance.map(item => item.averageScore),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+              }]
+            }}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  display: false
+                },
+                title: {
+                  display: true,
+                  text: 'Average Performance by Subject'
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 100,
+                  ticks: {
+                    callback: function (value) {
+                      return value + '%';
+                    }
+                  }
+                }
+              }
+            }}
+          />
+        )}
+      </div>
+      <div className="subject-details">
+        {subjectPerformance.map((subject, index) => (
+          <div key={index} className="subject-item">
+            <div className="subject-info">
+              <span className="subject-name">{subject.subject}</span>
+              <span className="test-count">{subject.totalTests} tests</span>
+            </div>
+            <div className="subject-stats">
+              <span className={`performance-score ${subject.averageScore >= 80 ? 'excellent' :
+                subject.averageScore >= 60 ? 'good' : 'needs-improvement'
+                }`}>
+                {subject.averageScore}%
+              </span>
+              <span className="participation-rate">
+                {subject.participationRate}% participation
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Recent Activity Component
+  const renderRecentActivity = () => (
+    <div className="dashboard-card">
+      <div className="card-header">
+        <h3>🕒 Recent Activity</h3>
+        <button className="btn btn-sm btn-outline" onClick={fetchRecentActivity}>
+          🔄
+        </button>
+      </div>
+      <div className="activity-list">
+        {dashboardLoading ? (
+          <div className="loading-spinner">Loading...</div>
+        ) : recentActivity.length > 0 ? (
+          recentActivity.map((activity, index) => (
+            <div key={index} className="activity-item">
+              <div className="activity-icon">
+                {activity.type === 'test_submitted' ? '📝' :
+                  activity.type === 'student_registered' ? '👤' :
+                    activity.type === 'test_created' ? '➕' :
+                      activity.type === 'result_published' ? '📊' : '🔔'}
+              </div>
+              <div className="activity-content">
+                <div className="activity-message">
+                  {activity.type === 'test_submitted' && (
+                    <>
+                      <strong>{activity.studentName}</strong> submitted test
+                      <strong> {activity.testTitle}</strong>
+                    </>
+                  )}
+                  {activity.type === 'student_registered' && (
+                    <>
+                      New student <strong>{activity.studentName}</strong> registered
+                    </>
+                  )}
+                  {activity.type === 'test_created' && (
+                    <>
+                      New test <strong>{activity.testTitle}</strong> created
+                    </>
+                  )}
+                  {activity.type === 'result_published' && (
+                    <>
+                      Results published for <strong>{activity.testTitle}</strong>
+                    </>
+                  )}
+                </div>
+                <div className="activity-time">
+                  {new Date(activity.timestamp).toLocaleString()}
+                </div>
+              </div>
+              <div className="activity-status">
+                {activity.type === 'test_submitted' && (
+                  <span className={`status-badge ${activity.status}`}>
+                    {activity.status}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="no-activity">
+            <p>No recent activity found</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Render Dashboard Overview
+  const renderDashboard = () => (
+    <div className="dashboard-main">
+      <div className="dashboard-header">
+        <h1>Admin Dashboard</h1>
+        <div className="dashboard-actions">
+          <button
+            className="btn btn-primary"
+            onClick={fetchDashboardData}
+            disabled={loading}
+          >
+            {loading ? 'Loading...' : 'Refresh All Data'}
+          </button>
+          <div className="last-updated">
+            Last updated: {new Date().toLocaleTimeString()}
+          </div>
+        </div>
+      </div>
+
+      {/* Loading State */}
+      {loading ? (
+        <div className="dashboard-loading">
+          <div className="loading-spinner">
+            <div className="spinner"></div>
+            <p>Loading dashboard data...</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Statistics Cards */}
+          <div className="stats-grid">
+            <div className="stat-card primary">
+              <div className="stat-icon">
+                <i className="fas fa-users"></i>
+              </div>
+              <div className="stat-content">
+                <h3>{dashboardStats.totalStudents || students.length || 0}</h3>
+                <p>Total Students</p>
+              </div>
+              <div className="stat-trend positive">
+                +{dashboardStats.newStudentsThisMonth || 0} this month
+              </div>
+            </div>
+
+            <div className="stat-card success">
+              <div className="stat-icon">
+                <i className="fas fa-clipboard-list"></i>
+              </div>
+              <div className="stat-content">
+                <h3>{dashboardStats.totalTests || tests.length || 0}</h3>
+                <p>Total Tests</p>
+              </div>
+              <div className="stat-trend positive">
+                +{dashboardStats.activeTests || 0} active
+              </div>
+            </div>
+
+            <div className="stat-card warning">
+              <div className="stat-icon">
+                <i className="fas fa-file-alt"></i>
+              </div>
+              <div className="stat-content">
+                <h3>{dashboardStats.totalSubmissions || results.length || 0}</h3>
+                <p>Submissions</p>
+              </div>
+              <div className="stat-trend positive">
+                +{dashboardStats.submissionsToday || 0} today
+              </div>
+            </div>
+
+            <div className="stat-card info">
+              <div className="stat-icon">
+                <i className="fas fa-chart-line"></i>
+              </div>
+              <div className="stat-content">
+                <h3>{dashboardStats.averageScore || analyticsData.overall?.averageScore || 0}%</h3>
+                <p>Average Score</p>
+              </div>
+              <div className="stat-trend neutral">
+                Overall performance
+              </div>
+            </div>
+
+            <div className="stat-card danger">
+              <div className="stat-icon">
+                <i className="fas fa-exclamation-triangle"></i>
+              </div>
+              <div className="stat-content">
+                <h3>{dashboardStats.pendingReviews || results.filter(r => r.status === 'pending').length || 0}</h3>
+                <p>Pending Reviews</p>
+              </div>
+              <div className="stat-trend negative">
+                Needs attention
+              </div>
+            </div>
+
+            <div className="stat-card secondary">
+              <div className="stat-icon">
+                <i className="fas fa-check-circle"></i>
+              </div>
+              <div className="stat-content">
+                <h3>{dashboardStats.passRate || analyticsData.overall?.passRate || 0}%</h3>
+                <p>Pass Rate</p>
+              </div>
+              <div className="stat-trend positive">
+                Students passing
+              </div>
+            </div>
+          </div>
+
+          {/* Dashboard Charts and Data */}
+          <div className="dashboard-content-grid">
+            <div className="dashboard-left">
+              {/* Grade Distribution Chart */}
+              <div className="dashboard-card">
+                <div className="card-header">
+                  <h3>Grade Distribution</h3>
+                  <button className="btn btn-sm btn-outline" onClick={fetchGradeDistribution}>
+                    <i className="fas fa-sync-alt"></i>
+                  </button>
+                </div>
+                <div className="chart-container">
+                  {dashboardLoading ? (
+                    <div className="loading-spinner">Loading chart...</div>
+                  ) : (
+                    <Bar
+                      data={{
+                        labels: gradeDistribution.map(item => item.grade),
+                        datasets: [{
+                          label: 'Number of Students',
+                          data: gradeDistribution.map(item => item.count),
+                          backgroundColor: [
+                            '#10b981', // A+ - Emerald
+                            '#3b82f6', // A - Blue
+                            '#8b5cf6', // B+ - Violet
+                            '#f59e0b', // B - Amber
+                            '#ef4444', // C - Red
+                            '#6b7280'  // F - Gray
+                          ],
+                          borderColor: [
+                            '#059669',
+                            '#2563eb',
+                            '#7c3aed',
+                            '#d97706',
+                            '#dc2626',
+                            '#4b5563'
+                          ],
+                          borderWidth: 2
+                        }]
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            display: false
+                          },
+                          title: {
+                            display: true,
+                            text: 'Student Grade Distribution'
+                          }
+                        },
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            ticks: {
+                              stepSize: 1
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="grade-stats">
+                  {gradeDistribution.map((grade, index) => (
+                    <div key={index} className="grade-stat-item">
+                      <span className={`grade-badge grade-${grade.grade.toLowerCase().replace('+', 'plus')}`}>
+                        {grade.grade}
+                      </span>
+                      <span className="grade-count">{grade.count} students</span>
+                      <span className="grade-percentage">({grade.percentage}%)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Subject Performance Chart */}
+              <div className="dashboard-card">
+                <div className="card-header">
+                  <h3>Subject Performance</h3>
+                  <button className="btn btn-sm btn-outline" onClick={fetchSubjectPerformance}>
+                    <i className="fas fa-sync-alt"></i>
+                  </button>
+                </div>
+                <div className="chart-container">
+                  {dashboardLoading ? (
+                    <div className="loading-spinner">Loading chart...</div>
+                  ) : (
+                    <Line
+                      data={{
+                        labels: subjectPerformance.map(item => item.subject),
+                        datasets: [{
+                          label: 'Average Score (%)',
+                          data: subjectPerformance.map(item => item.averageScore || item.average),
+                          borderColor: '#3b82f6',
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                          borderWidth: 3,
+                          fill: true,
+                          tension: 0.4
+                        }]
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            display: false
+                          },
+                          title: {
+                            display: true,
+                            text: 'Average Performance by Subject'
+                          }
+                        },
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                              callback: function (value) {
+                                return value + '%';
+                              }
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="subject-details">
+                  {subjectPerformance.map((subject, index) => (
+                    <div key={index} className="subject-item">
+                      <div className="subject-info">
+                        <span className="subject-name">{subject.subject}</span>
+                        <span className="test-count">{subject.totalTests || 0} tests</span>
+                      </div>
+                      <div className="subject-stats">
+                        <span className={`performance-score ${(subject.averageScore || subject.average) >= 80 ? 'excellent' :
+                          (subject.averageScore || subject.average) >= 60 ? 'good' : 'needs-improvement'
+                          }`}>
+                          {subject.averageScore || subject.average || 0}%
+                        </span>
+                        <span className="participation-rate">
+                          {subject.participationRate || 0}% participation
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {subjectPerformance.length === 0 && (
+                    <div className="no-data">
+                      <p>No subject performance data available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="dashboard-right">
+              {/* Recent Activity */}
+              <div className="dashboard-card">
+                <div className="card-header">
+                  <h3>Recent Activity</h3>
+                  <button className="btn btn-sm btn-outline" onClick={fetchRecentActivity}>
+                    <i className="fas fa-sync-alt"></i>
+                  </button>
+                </div>
+                <div className="activity-list">
+                  {dashboardLoading ? (
+                    <div className="loading-spinner">Loading activities...</div>
+                  ) : recentActivity.length > 0 ? (
+                    recentActivity.map((activity, index) => (
+                      <div key={index} className="activity-item">
+                        <div className="activity-icon">
+                          {activity.type === 'test_submitted' ? (
+                            <i className="fas fa-file-alt text-blue"></i>
+                          ) : activity.type === 'student_registered' ? (
+                            <i className="fas fa-user-plus text-green"></i>
+                          ) : activity.type === 'test_created' ? (
+                            <i className="fas fa-plus-circle text-purple"></i>
+                          ) : activity.type === 'result_published' ? (
+                            <i className="fas fa-chart-bar text-orange"></i>
+                          ) : (
+                            <i className="fas fa-bell text-gray"></i>
+                          )}
+                        </div>
+                        <div className="activity-content">
+                          <div className="activity-message">
+                            {activity.type === 'test_submitted' && (
+                              <>
+                                <strong>{activity.studentName}</strong> submitted test
+                                <strong> {activity.testTitle}</strong>
+                              </>
+                            )}
+                            {activity.type === 'student_registered' && (
+                              <>
+                                New student <strong>{activity.studentName}</strong> registered
+                              </>
+                            )}
+                            {activity.type === 'test_created' && (
+                              <>
+                                New test <strong>{activity.testTitle}</strong> created
+                              </>
+                            )}
+                            {activity.type === 'result_published' && (
+                              <>
+                                Results published for <strong>{activity.testTitle}</strong>
+                              </>
+                            )}
+                          </div>
+                          <div className="activity-time">
+                            {new Date(activity.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="activity-status">
+                          {activity.type === 'test_submitted' && (
+                            <span className={`status-badge ${activity.status}`}>
+                              {activity.status}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-activity">
+                      <i className="fas fa-info-circle"></i>
+                      <p>No recent activity found</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="dashboard-card">
+                <div className="card-header">
+                  <h3>Quick Actions</h3>
+                </div>
+                <div className="quick-actions">
+                  <button
+                    className="btn btn-primary btn-block"
+                    onClick={() => setActiveTab('tests')}
+                  >
+                    <i className="fas fa-plus"></i>
+                    Create New Test
+                  </button>
+                  <button
+                    className="btn btn-success btn-block"
+                    onClick={() => setActiveTab('students')}
+                  >
+                    <i className="fas fa-user-plus"></i>
+                    Add Student
+                  </button>
+                  <button
+                    className="btn btn-warning btn-block"
+                    onClick={() => setActiveTab('results')}
+                  >
+                    <i className="fas fa-clipboard-check"></i>
+                    Review Results
+                  </button>
+                  <button
+                    className="btn btn-info btn-block"
+                    onClick={() => setActiveTab('analytics')}
+                  >
+                    <i className="fas fa-chart-line"></i>
+                    View Analytics
+                  </button>
+                </div>
+              </div>
+
+              {/* System Status */}
+              <div className="dashboard-card">
+                <div className="card-header">
+                  <h3>System Status</h3>
+                </div>
+                <div className="system-status">
+                  <div className="status-item">
+                    <span className="status-indicator online"></span>
+                    <span>Database Connection</span>
+                    <span className="status-text">Online</span>
+                  </div>
+                  <div className="status-item">
+                    <span className="status-indicator online"></span>
+                    <span>API Services</span>
+                    <span className="status-text">Running</span>
+                  </div>
+                  <div className="status-item">
+                    <span className="status-indicator online"></span>
+                    <span>File Storage</span>
+                    <span className="status-text">Available</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Performance Overview Charts */}
+          <div className="performance-charts">
+            <div className="chart-row">
+              <div className="chart-container half-width">
+                <h3>Monthly Test Submissions</h3>
+                <Line
+                  data={{
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                      label: 'Submissions',
+                      data: chartData.monthly || [0, 0, 0, 0, 0, 0],
+                      borderColor: '#3b82f6',
+                      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                      fill: true
+                    }]
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false
+                  }}
+                />
+              </div>
+              <div className="chart-container half-width">
+                <h3>Score Distribution</h3>
+                <Doughnut
+                  data={{
+                    labels: ['90-100%', '80-89%', '70-79%', '60-69%', '<60%'],
+                    datasets: [{
+                      data: chartData.distribution || [0, 0, 0, 0, 0],
+                      backgroundColor: [
+                        '#10b981',
+                        '#3b82f6',
+                        '#f59e0b',
+                        '#ef4444',
+                        '#6b7280'
+                      ]
+                    }]
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
 
   // Render Test Creation Form
   const renderCreateTest = () => (
@@ -716,7 +1383,7 @@ const AdminDashboard = () => {
               <select
                 name="subject"
                 value={testForm.subject}
-                onChange={handleChange}          
+                onChange={handleChange}
                 required
               >
                 <option value="">Select Subject</option>
@@ -1571,27 +2238,265 @@ const AdminDashboard = () => {
     <div className="analytics-dashboard">
       <div className="section-header">
         <h2>📈 Advanced Analytics</h2>
-        <div className="date-range-selector">
-          <select>
-            <option>Last 7 days</option>
-            <option>Last 30 days</option>
-            <option>Last 3 months</option>
-            <option>Custom range</option>
-          </select>
+        <div className="header-actions">
+          <button className="btn btn-outline" onClick={fetchAnalyticsData}>
+            🔄 Refresh Analytics
+          </button>
+          <div className="date-range-selector">
+            <select>
+              <option>Last 7 days</option>
+              <option>Last 30 days</option>
+              <option>Last 3 months</option>
+              <option>Custom range</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Analytics content would go here */}
-      <div className="analytics-content">
-        <div className="chart-grid">
-          <div className="chart-card">
-            <h3>Test Performance Trends</h3>
-            {/* Chart component */}
+      {/* Overall Performance Stats */}
+      <div className="analytics-stats-grid">
+        <div className="stat-card analytics-primary">
+          <div className="stat-icon">👥</div>
+          <div className="stat-content">
+            <h3>{analyticsData.overall.totalStudents}</h3>
+            <p>Total Students</p>
           </div>
-          <div className="chart-card">
-            <h3>Student Engagement</h3>
-            {/* Chart component */}
+          <div className="stat-trend">Enrolled students</div>
+        </div>
+
+        <div className="stat-card analytics-success">
+          <div className="stat-icon">📊</div>
+          <div className="stat-content">
+            <h3>{analyticsData.overall.averageScore}%</h3>
+            <p>Average Score</p>
           </div>
+          <div className="stat-trend">Overall performance</div>
+        </div>
+
+        <div className="stat-card analytics-info">
+          <div className="stat-icon">✅</div>
+          <div className="stat-content">
+            <h3>{analyticsData.overall.passRate}%</h3>
+            <p>Pass Rate</p>
+          </div>
+          <div className="stat-trend">Students passing</div>
+        </div>
+
+        <div className="stat-card analytics-warning">
+          <div className="stat-icon">📈</div>
+          <div className="stat-content">
+            <h3>{analyticsData.subjectPerformance.length}</h3>
+            <p>Active Subjects</p>
+          </div>
+          <div className="stat-trend">Subjects analyzed</div>
+        </div>
+      </div>
+
+      {/* Student Search */}
+      <div className="analytics-section">
+        <h3>🔍 Student Performance Search</h3>
+        <div className="search-container">
+          <div className="search-input-group">
+            <input
+              type="text"
+              placeholder="Search by name, email, or roll number..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (e.target.value.length > 2) {
+                  handleStudentSearch(e.target.value);
+                } else {
+                  setSearchResult(null);
+                }
+              }}
+              className="analytics-search-input"
+            />
+            <button
+              className="btn btn-primary search-btn"
+              onClick={() => handleStudentSearch(searchQuery)}
+              disabled={searchLoading}
+            >
+              {searchLoading ? '🔄' : '🔍'}
+            </button>
+          </div>
+
+          {searchResult && (
+            <div className="search-result-card">
+              <div className="student-info">
+                <h4>{searchResult.name}</h4>
+                <p>{searchResult.email}</p>
+                <small>Roll: {searchResult.rollNo || 'Not assigned'}</small>
+              </div>
+              <div className="student-stats">
+                <span className="test-count">📝 {searchResult.results?.length || 0} tests taken</span>
+              </div>
+
+              {searchResult.results && searchResult.results.length > 0 && (
+                <div className="recent-results">
+                  <h5>Recent Test Results:</h5>
+                  <div className="results-list">
+                    {searchResult.results.slice(0, 3).map((result, index) => (
+                      <div key={index} className="result-item">
+                        <span className="test-name">{result.testTitle}</span>
+                        <span className="score">
+                          {result.marksObtained}/{result.totalMarks}
+                        </span>
+                        <span className={`status-badge ${result.status}`}>
+                          {result.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Subject Performance Chart */}
+      <div className="analytics-charts">
+        <div className="chart-container full-width">
+          <h3>📚 Subject-wise Performance Analysis</h3>
+          <div className="chart-wrapper">
+            <Bar
+              data={{
+                labels: analyticsData.subjectPerformance.map(item => item.subject),
+                datasets: [{
+                  label: 'Average Score (%)',
+                  data: analyticsData.subjectPerformance.map(item => item.average),
+                  backgroundColor: [
+                    'rgba(99, 102, 241, 0.6)',
+                    'rgba(16, 185, 129, 0.6)',
+                    'rgba(245, 158, 11, 0.6)',
+                    'rgba(239, 68, 68, 0.6)',
+                    'rgba(139, 92, 246, 0.6)',
+                    'rgba(6, 182, 212, 0.6)',
+                    'rgba(217, 119, 6, 0.6)'
+                  ],
+                  borderColor: [
+                    'rgb(99, 102, 241)',
+                    'rgb(16, 185, 129)',
+                    'rgb(245, 158, 11)',
+                    'rgb(239, 68, 68)',
+                    'rgb(139, 92, 246)',
+                    'rgb(6, 182, 212)',
+                    'rgb(217, 119, 6)'
+                  ],
+                  borderWidth: 2
+                }]
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: false
+                  },
+                  title: {
+                    display: true,
+                    text: 'Performance by Subject'
+                  }
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                      callback: function (value) {
+                        return value + '%';
+                      }
+                    }
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Performance Distribution */}
+        <div className="chart-container">
+          <h3>📊 Performance Distribution</h3>
+          <div className="chart-wrapper">
+            <Doughnut
+              data={{
+                labels: ['Excellent (90-100%)', 'Good (80-89%)', 'Average (70-79%)', 'Below Average (<70%)'],
+                datasets: [{
+                  data: [
+                    analyticsData.subjectPerformance.filter(s => s.average >= 90).length,
+                    analyticsData.subjectPerformance.filter(s => s.average >= 80 && s.average < 90).length,
+                    analyticsData.subjectPerformance.filter(s => s.average >= 70 && s.average < 80).length,
+                    analyticsData.subjectPerformance.filter(s => s.average < 70).length
+                  ],
+                  backgroundColor: [
+                    '#10b981', // Excellent - Green
+                    '#3b82f6', // Good - Blue  
+                    '#f59e0b', // Average - Yellow
+                    '#ef4444'  // Below Average - Red
+                  ],
+                  borderWidth: 2
+                }]
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'bottom'
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Detailed Analytics Table */}
+      <div className="analytics-section">
+        <h3>📋 Subject Performance Details</h3>
+        <div className="data-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Average Score</th>
+                <th>Performance Level</th>
+                <th>Trend</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analyticsData.subjectPerformance.map((subject, index) => (
+                <tr key={index}>
+                  <td>
+                    <strong>{subject.subject}</strong>
+                  </td>
+                  <td>
+                    <span className={`score-badge ${subject.average >= 90 ? 'excellent' :
+                      subject.average >= 80 ? 'good' :
+                        subject.average >= 70 ? 'average' : 'below-average'
+                      }`}>
+                      {subject.average}%
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`performance-level ${subject.average >= 90 ? 'excellent' :
+                      subject.average >= 80 ? 'good' :
+                        subject.average >= 70 ? 'average' : 'below-average'
+                      }`}>
+                      {subject.average >= 90 ? '🌟 Excellent' :
+                        subject.average >= 80 ? '👍 Good' :
+                          subject.average >= 70 ? '📊 Average' : '⚠️ Needs Attention'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="trend-indicator">
+                      {index < analyticsData.subjectPerformance.length / 2 ? '📈 Above Average' : '📉 Below Average'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
