@@ -23,22 +23,29 @@ export default function AnswerSheetReview() {
   useEffect(() => { loadList(); }, []);
 
   /* ───────── when user clicks a row ─────── */
+  /* ───────── when user clicks a row ─────── */
   const open = async (resObj) => {
     setActive(resObj); 
     setFlash('');
     
     const { data } = await axios.get(`/api/admin/reviews/${resObj._id}/questions`);
-    setQNums(data.questions);
-    setMaxMarks(data.maxMarks);
-    setOrigMaxMarks([...data.maxMarks]);
+    
+    // Use `|| []` to ensure we always have an array, even if API data is missing.
+    const questions = data.questions || [];
+    const maxMarksData = data.maxMarks || [];
+
+    setQNums(questions);
+    setMaxMarks(maxMarksData);
+    setOrigMaxMarks([...maxMarksData]);
     
     /* fetch current marks AND remarks from the result object */
-    const gridMarks = data.questions.map(q => {
+    // Now we can safely map over `questions` because it's guaranteed to be an array.
+    const gridMarks = questions.map(q => {
       const row = (resObj.questionWiseMarks || []).find(x => x.questionNo === q);
       return row ? row.obtainedMarks : 0;
     });
     
-    const gridRemarks = data.questions.map(q => {
+    const gridRemarks = questions.map(q => {
       const row = (resObj.questionWiseMarks || []).find(x => x.questionNo === q);
       return row ? (row.remarks || '') : '';
     });
