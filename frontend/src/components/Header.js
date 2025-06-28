@@ -42,12 +42,20 @@ const Header = () => {
           </Link>
           
           {user?.role === 'student' && (
-            <Link 
-              to="/student/results" 
-              className={`${styles.navLink} ${location.pathname.includes('/results') ? styles.active : ''}`}
-            >
-              📋 My Results
-            </Link>
+            <>
+              <Link 
+                to="/student/mock-test" 
+                className={`${styles.navLink} ${location.pathname.includes('/mock-test') ? styles.active : ''}`}
+              >
+                🧪 Mock Tests
+              </Link>
+              <Link 
+                to="/student/results" 
+                className={`${styles.navLink} ${location.pathname.includes('/results') ? styles.active : ''}`}
+              >
+                📋 My Results
+              </Link>
+            </>
           )}
 
           {user?.role === 'admin' && (
@@ -106,13 +114,22 @@ const Header = () => {
           </Link>
           
           {user?.role === 'student' && (
-            <Link 
-              to="/student/results" 
-              className={`${styles.mobileNavLink} ${location.pathname.includes('/results') ? styles.active : ''}`}
-              onClick={() => setShowMobileNav(false)}
-            >
-              📋 My Results
-            </Link>
+            <>
+              <Link 
+                to="/student/mock-test" 
+                className={`${styles.mobileNavLink} ${location.pathname.includes('/mock-test') ? styles.active : ''}`}
+                onClick={() => setShowMobileNav(false)}
+              >
+                🧪 Mock Tests
+              </Link>
+              <Link 
+                to="/student/results" 
+                className={`${styles.mobileNavLink} ${location.pathname.includes('/results') ? styles.active : ''}`}
+                onClick={() => setShowMobileNav(false)}
+              >
+                📋 My Results
+              </Link>
+            </>
           )}
 
           {user?.role === 'admin' && (

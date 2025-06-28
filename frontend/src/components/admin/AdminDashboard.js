@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+// ✅ FIXED: Add useReducer to your React imports
+import React, { useEffect, useState, useRef, useCallback, useMemo, useReducer } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import axios from 'axios';
@@ -47,6 +48,7 @@ const SUBJECT_OPTIONS = [
   'Economic Applications',
   'Chemistry'
 ];
+// ✅ FIXED: Define dashboardReducer function before the component
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -76,10 +78,12 @@ const AdminDashboard = () => {
   const [recentActivity, setRecentActivity] = useState([]);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [chartData, setChartData] = useState({
-    testSubmissions: { labels: [], data: [] },
-    studentGrades: { labels: [], data: [] },
-    subjectPerformance: { labels: [], data: [] }
-  });
+  monthly: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 12 months
+  distribution: [0, 0, 0, 0, 0],
+  monthlyLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  distributionLabels: ['90-100%', '80-89%', '70-79%', '60-69%', '<60%']
+});
+
 
   // Data Management
   const [tests, setTests] = useState([]);
@@ -240,6 +244,39 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchDashboardData = useCallback(async () => {
+    setDashboardLoading(true);
+    try {
+      // Fetch dashboard statistics
+      const dashboardResponse = await axios.get('/api/admin/dashboard/stats');
+      setDashboardStats(dashboardResponse.data);
+
+      // Fetch tests
+      const testsResponse = await axios.get('/api/admin/tests');
+      setTests(testsResponse.data.tests || []);
+
+      // Fetch students  
+      const studentsResponse = await axios.get('/api/admin/students');
+      setStudents(studentsResponse.data.students || []);
+
+      // Fetch results
+      const resultsResponse = await axios.get('/api/admin/results');
+      setResults(resultsResponse.data.results || []);
+
+      // Fetch additional dashboard data
+      await Promise.all([
+        fetchGradeDistribution(),
+        fetchSubjectPerformance(),
+        fetchRecentActivity()
+      ]);
+
+    } catch (error) {
+      console.error('❌ Failed to fetch dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, []);
 
   // Fetch recent activity data
   const fetchRecentActivity = async () => {
@@ -385,99 +422,37 @@ const AdminDashboard = () => {
   }, [darkMode]);
 
   // Fetch dashboard statistics
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    setDashboardLoading(true);
 
-    try {
-      const [
-        statsRes,
-        testsRes,
-        studentsRes,
-        resultsRes,
-        gradeDistRes,
-        subjectPerfRes,
-        recentActivityRes,
-        analyticsRes
-      ] = await Promise.all([
-        axios.get('/api/admin/dashboard/stats'),
-        axios.get('/api/admin/tests'),
-        axios.get('/api/admin/students'),
-        axios.get('/api/admin/results'),
-        axios.get('/api/admin/analytics/grade-distribution').catch(err => {
-          console.warn('Grade distribution API not available:', err.message);
-          return { data: [] };
-        }),
-        axios.get('/api/admin/analytics/subject-performance').catch(err => {
-          console.warn('Subject performance API not available:', err.message);
-          return { data: [] };
-        }),
-        axios.get('/api/admin/recent-activity').catch(err => {
-          console.warn('Recent activity API not available:', err.message);
-          return { data: [] };
-        }),
-        axios.get('/api/admin/analytics').catch(err => {
-          console.warn('Analytics API not available:', err.message);
-          return {
-            data: {
-              overall: { totalStudents: 0, averageScore: 0, passRate: 0 },
-              subjectPerformance: []
-            }
-          };
-        })
-      ]);
-
-      // Set main dashboard data
-      setDashboardStats(statsRes.data.stats || {});
-      setTests(testsRes.data.tests || []);
-      setStudents(studentsRes.data.students || []);
-      setResults(resultsRes.data.results || []);
-
-      // Safely set analytics data with array checks
-      setGradeDistribution(Array.isArray(gradeDistRes.data) ? gradeDistRes.data : []);
-      setSubjectPerformance(Array.isArray(subjectPerfRes.data) ? subjectPerfRes.data : []);
-      setRecentActivity(Array.isArray(recentActivityRes.data) ? recentActivityRes.data : []);
-
-      setAnalyticsData(analyticsRes.data || {
-        overall: { totalStudents: 0, averageScore: 0, passRate: 0 },
-        subjectPerformance: []
-      });
-
-      console.log('✅ Dashboard data loaded successfully');
-
-    } catch (error) {
-      console.error('❌ Error fetching dashboard data:', error);
-
-      // Set safe fallback data
-      setDashboardStats({});
-      setTests([]);
-      setStudents([]);
-      setResults([]);
-      setGradeDistribution([]);
-      setSubjectPerformance([]); // Ensure this is always an array
-      setRecentActivity([]);
-      setAnalyticsData({
-        overall: { totalStudents: 0, averageScore: 0, passRate: 0 },
-        subjectPerformance: []
-      });
-
-    } finally {
-      setLoading(false);
-      setDashboardLoading(false);
-    }
-  };
 
 
 
   // Fetch chart data
-  const fetchChartData = async () => {
+  const fetchChartData = useCallback(async () => {
     try {
+      console.log('📊 Fetching chart data...');
       const response = await axios.get('/api/admin/dashboard/charts');
-      setChartData(response.data.charts || {});
+      console.log('Chart data response:', response.data);
+      const { monthly, distribution, labels } = response.data.charts;
+      // Replace dispatch calls with setChartData
+      setChartData({
+        monthly: monthly || [0, 0, 0, 0, 0, 0],
+        distribution: distribution || [0, 0, 0, 0, 0],
+        monthlyLabels: labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        distributionLabels: response.data.distributionLabels || ['90-100%', '80-89%', '70-79%', '60-69%', '<60%']
+      });
     } catch (error) {
       console.error('Error fetching chart data:', error);
+      // Set fallback data
+      setChartData({
+        monthly: [0, 0, 0, 0, 0, 0],
+        distribution: [0, 0, 0, 0, 0],
+        monthlyLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        distributionLabels: ['90-100%', '80-89%', '70-79%', '60-69%', '<60%']
+      });
     }
-  };
+  }, []);
+
+
 
   // File upload handler
 
@@ -1307,10 +1282,10 @@ const AdminDashboard = () => {
                 <h3>Monthly Test Submissions</h3>
                 <Line
                   data={{
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'July', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                     datasets: [{
                       label: 'Submissions',
-                      data: chartData.monthly || [0, 0, 0, 0, 0, 0],
+                      data: chartData.monthly,
                       borderColor: '#3b82f6',
                       backgroundColor: 'rgba(59, 130, 246, 0.1)',
                       fill: true

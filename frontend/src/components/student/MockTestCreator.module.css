@@ -1,0 +1,378 @@
+/* ==========================================================================
+   MOCK TEST CREATOR - ENHANCED STYLESHEET
+   ========================================================================== */
+
+/* --- 1. Root & Dark Mode Variables --- */
+:root {
+  --font-primary: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --font-code: 'Fira Code', 'Courier New', monospace;
+
+  /* Light Theme */
+  --c-primary: #4a47a3;
+  --c-primary-dark: #3b388a;
+  --c-secondary: #706fd3;
+  --c-accent: #8a88e0;
+  --c-success: #2ecc71;
+  --c-error: #e74c3c;
+  --c-warning: #f39c12;
+
+  --bg-body: #f4f7f9;
+  --bg-main: #ffffff;
+  --bg-inset: #f8f9fa;
+  --bg-overlay: rgba(255, 255, 255, 0.7);
+
+  --text-main: #212529;
+  --text-muted: #6c757d;
+  --text-on-primary: #ffffff;
+
+  --border-color: #dee2e6;
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --transition-speed: 0.3s;
+}
+
+.dark {
+  /* Dark Theme */
+  --c-primary: #8a88e0;
+  --c-primary-dark: #a09ee8;
+  --c-secondary: #706fd3;
+  --c-accent: #4a47a3;
+  --c-success: #27ae60;
+  --c-error: #c0392b;
+  --c-warning: #d68910;
+
+  --bg-body: #121212;
+  --bg-main: #1e1e1e;
+  --bg-inset: #2a2a2a;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+
+  --text-main: #e4e6eb;
+  --text-muted: #b0b3b8;
+  --text-on-primary: #ffffff;
+
+  --border-color: #3a3b3c;
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+
+/* --- 2. General Layout & Page Structure --- */
+.mockTestCreator {
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  font-family: var(--font-primary);
+  padding: 1.5rem;
+  transition: background-color var(--transition-speed) ease;
+}
+
+.pageHeader {
+  text-align: center;
+  margin-bottom: 2rem;
+  animation: fadeInDown 0.5s ease-out;
+}
+.pageHeader h1 {
+  color: var(--c-primary);
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  font-weight: 700;
+}
+.pageHeader p {
+  color: var(--text-muted);
+  font-size: clamp(1rem, 2.5vw, 1.1rem);
+  margin-top: 0.5rem;
+}
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* On larger screens, enable the two-column layout */
+@media (min-width: 1024px) {
+  .mainGrid {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: flex-start;
+  }
+}
+
+.card {
+  background-color: var(--bg-main);
+  padding: clamp(1.5rem, 4vw, 2rem);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-speed) ease;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+
+/* --- 3. Form Styles --- */
+.studentInfoCard {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  background: var(--bg-main);
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 2rem;
+}
+.infoItem {
+  color: var(--text-muted);
+}
+.infoItem strong {
+  color: var(--text-main);
+  margin-right: 0.5rem;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+@media (min-width: 768px) {
+  .formGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.formGroup label {
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.formControl {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-inset);
+  color: var(--text-main);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  transition: all var(--transition-speed) ease;
+}
+.formControl:focus {
+  outline: none;
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 20%, transparent);
+}
+.formControl:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.btnPrimary {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  background: linear-gradient(45deg, var(--c-secondary), var(--c-primary));
+  color: var(--text-on-primary);
+  transition: all var(--transition-speed) ease;
+  box-shadow: var(--shadow-sm);
+}
+.btnPrimary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 30%, transparent);
+}
+.btnPrimary:disabled {
+  background: var(--border-color);
+  cursor: not-allowed;
+}
+
+
+/* --- 4. Test Interface --- */
+.testInterface, .resultsContainer, .evaluationContainer, .previewCard {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.testHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 1rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.testTimer {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--c-primary);
+  background: var(--bg-inset);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+}
+.timerWarning { color: var(--c-error) !important; animation: pulse 1.5s infinite; }
+
+.questionCard {
+  margin-bottom: 2rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--c-primary);
+  padding: 1.5rem;
+  border-radius: var(--radius-md);
+}
+
+.questionText pre {
+  font-family: var(--font-code);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background-color: #2d2d2d;
+  color: #f8f8f2;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  line-height: 1.7;
+  overflow-x: auto;
+}
+
+.mcqOptions { margin-top: 1.5rem; }
+.optionLabel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--bg-main);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  margin-bottom: 1rem;
+}
+.optionLabel:has(input:checked) {
+  border-color: var(--c-primary);
+  background-color: color-mix(in srgb, var(--c-primary) 10%, var(--bg-main));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-primary) 20%, transparent);
+}
+.optionLabel input[type="radio"] {
+  flex-shrink: 0;
+  width: 1.2em;
+  height: 1.2em;
+}
+.subjectiveAnswer {
+  min-height: 150px;
+  font-family: var(--font-primary);
+}
+
+
+/* --- 5. Results & Evaluation --- */
+.summaryScore {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.summaryScore span {
+  font-size: clamp(2.5rem, 10vw, 4rem);
+  font-weight: 700;
+  color: var(--c-primary);
+}
+
+.questionResult {
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+  border-left-width: 5px;
+}
+.correct { border-left-color: var(--c-success); }
+.incorrect { border-left-color: var(--c-error); }
+.questionResult strong { color: var(--text-main); }
+.explanation {
+  background: var(--bg-inset);
+  padding: 1rem;
+  margin-top: 1rem;
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--text-muted);
+}
+.evalSection h4 {
+  color: var(--c-primary);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+.markingScheme { background-color: color-mix(in srgb, var(--c-primary) 10%, transparent); }
+
+
+/* --- 6. History Sidebar --- */
+.historySection { animation: fadeInRight 0.5s ease-out; }
+
+/* On desktop, make the history card sticky */
+@media (min-width: 1024px) {
+  .historySection .card {
+    position: sticky;
+    top: 2rem;
+  }
+}
+
+.historyList {
+  max-height: 65vh; /* Limit height on desktop */
+  overflow-y: auto;
+  padding-right: 0.5rem; /* For scrollbar spacing */
+}
+.historyItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color var(--transition-speed) ease;
+}
+.historyItem:hover { background-color: var(--bg-inset); }
+.historyInfo h4 { color: var(--c-primary); margin: 0 0 0.25rem 0; }
+.historyInfo p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+.historyScore .score { font-size: 1.2rem; font-weight: bold; color: var(--text-main); }
+.historyScore .percentage { color: var(--text-muted); }
+.historyScore .pending { font-weight: bold; color: var(--c-warning); }
+
+
+/* --- 7. Loading & Animations --- */
+.loadingOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(5px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+.spinner {
+  border: 5px solid color-mix(in srgb, var(--c-primary) 30%, transparent);
+  border-top-color: var(--c-primary);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+}
+.loadingOverlay p {
+  margin-top: 1.5rem;
+  font-size: 1.1rem;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: 0.6; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* --- 8. Mobile Specific Adjustments --- */
+@media (max-width: 767px) {
+  .mockTestCreator { padding: 1rem; }
+  .card, .testInterface, .resultsContainer, .evaluationContainer, .previewCard {
+    padding: 1.5rem;
+  }
+  .testHeader { flex-direction: column; gap: 1rem; }
+}

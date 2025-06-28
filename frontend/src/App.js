@@ -22,9 +22,10 @@ import LoadingSpinner from './components/LoadingSpinner';
 import Analytics from './components/admin/Analytics';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import offlineHandler from './utils/offlineHandler';
+import MockTestCreator from './components/student/MockTestCreator'; // ✅ Add this import
 
 // Set axios base URL
-axios.defaults.baseURL = 'https://computech-exam-platform.onrender.com';
+axios.defaults.baseURL = 'https://computech-exam-platform.onrender.com'; // Change to your server URL
 axios.defaults.withCredentials = true;
 
 // Auth & Theme contexts
@@ -137,35 +138,23 @@ function AuthProvider({ children }) {
 
   }, [verifyToken]);
 
-  const login = async (email, password) => {
-    try {
-      console.log('🔐 Attempting login for:', email);
-      const { data } = await axios.post('/api/auth/login', { 
-        email: email.trim(), 
-        password 
-      });
-      
-      if (data.success) {
-        console.log('✅ Login successful:', data.user);
-        
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        setUser(data.user);
-        toast.success(`Welcome back, ${data.user.name || data.user.email}!`);
-        return true;
-      } else {
-        toast.error(data.message || 'Login failed');
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || 
-                          err.response?.data?.errors?.[0]?.msg ||
-                          'Login failed. Please try again.';
-      toast.error(errorMessage);
-      console.error('❌ Login error:', err);
+  // inside AuthProvider
+const login = async (email, password) => {
+  try {
+    const { data } = await axios.post('/api/auth/login', { email, password });
+
+    if (data.success) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+
+      return { success: true, user: data.user };   // ← key change
     }
-    return false;
-  };
+    return { success: false, message: data.message || 'Login failed' };
+  } catch (err) {
+    return { success: false, message: 'Server error. Try again.' };
+  }
+};
 
   const logout = () => {
     console.log('🚪 Logging out user');
@@ -374,6 +363,7 @@ export default function App() {
               {/* Student section */}
               <Route path="student" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
                 <Route index element={<StudentDashboard />} />
+                <Route path="mock-test" element={<MockTestCreator />} />
                 <Route path="result/:resultId" element={<ResultDetail />} />
                 <Route path="request-review/:resultId" element={<ReviewRequestPage />} />
                 <Route path="result/:resultId/breakdown" element={<QuestionWiseResults />} />

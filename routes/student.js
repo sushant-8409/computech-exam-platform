@@ -1224,14 +1224,23 @@ router.post('/test/:testId/resume', async (req, res) => {
 
 // Get student profile
 // In routes/student.js
-router.get('/profile', async (req, res) => {
+router.get('/profile', async (req, res, next) => {
   try {
-    const student = await Student.findById(req.user.id).select('-password name email class board rollNo school');
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, message: 'Unauthenticated' });
+    }
+
+    const student = await Student.findById(req.user.id).select('-passwordHash -password');
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
     res.json({ success: true, student });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch profile' });
+  } catch (err) {
+    next(err);           // will hit your global error handler
   }
 });
+
 // In your Express route for getting answer sheets
 router.get('/answer-sheet/:key', async (req, res) => {
   try {

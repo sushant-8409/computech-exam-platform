@@ -2,133 +2,76 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 
 // ================== Middleware ==================
 app.use(cors({
-  origin: ['https://computech-exam-platform.onrender.com'], // React dev server
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://computech-exam-platform.onrender.com'] 
+    : ['http://localhost:3000'],
   methods: 'GET,POST,PUT,DELETE',
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true, 
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  credentials: true
 }));
-
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-  next();
-});
-app.use(require('./middleware/urlDecoder'));
+// ✅ IMPROVED: Conditional logging
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/static') && !req.path.endsWith('.js') && !req.path.endsWith('.css')) {
+      console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    }
+    next();
+  });
+}
 
-// ================== API Routes ==================
-app.use('/api/tests', require('./routes/tests'));
+// ================== Routes ==================
+// Register all routes at once
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/student', require('./routes/student'));
+app.use('/api/tests', require('./routes/tests'));
 app.use('/api', require('./routes/analytics'));
-const adminReviewResults = require('./routes/adminReviewResults');
-app.use('/api/admin', adminReviewResults);
 app.use('/api/files', require('./routes/files'));
-const reviewRoute = require('./routes/reviewRoutes');
-app.use('/api/admin', reviewRoute);
+app.use('/api/student/mock-tests', require('./routes/mockTest'));
 
-// In Express middleware
-app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', "frame-src 'self' drive.google.com docs.google.com");
-  next();
-});
+// ================== Static Files ==================
+app.use(express.static(path.join(__dirname, 'frontend', 'build'), {
+  maxAge: '1d' // Cache static files
+}));
 
-
-// Load auth and student routes
-let adminRoutes,authRoutes, studentRoutes;
-try {
-  authRoutes = require('./routes/auth');
-  console.log('✅ Auth routes loaded successfully');
-} catch (error) {
-  console.error('❌ Failed to load auth routes:', error.message);
-}
-
-try {
-  adminRoutes = require('./routes/admin');
-  console.log('✅ Admin routes loaded');
-} catch (error) {
-  console.error('❌ Admin routes not found:', error.message);
-  console.log('🔧 Creating minimal admin routes...');
-  adminRoutes = require('./routes/admin-minimal'); // We'll create this
-}
-try {
-  studentRoutes = require('./routes/student');
-  console.log('✅ Student routes loaded successfully');
-} catch (error) {
-  console.error('❌ Failed to load student routes:', error.message);
-}
-
-// Register auth and student routes
-if (authRoutes) {
-  app.use('/api/auth', authRoutes);
-  console.log('🔐 Auth routes registered at /api/auth');
-} else {
-  console.error('❌ Cannot register auth routes - not loaded');
-}
-
-if (studentRoutes) {
-  app.use('/api/student', studentRoutes);
-  console.log('👨🎓 Student routes registered at /api/student');
-} else {
-  console.error('❌ Cannot register student routes - not loaded');
-}
-
-// ================== Serve React Build ==================
-app.use(express.static(path.join(__dirname, 'frontend', 'build')));
-
-// React client-side routing (GET only)
+// ================== Error Handling ==================
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
 });
 
-// ================== Error Handling ==================
-// 404 handler (must be after all routes)
-app.use('*', (req, res) => {
-  console.log('❌ 404 - Route not found:', req.originalUrl);
-  res.status(404).json({
-    success: false,
-    message: `Route ${req.originalUrl} not found`,
-    availableRoutes: [
-      'GET /api/health',
-      'GET /api/test-admin',
-      authRoutes ? 'POST /api/auth/login' : 'AUTH ROUTES NOT LOADED',
-      adminRoutes ? 'GET /api/admin/health' : 'ADMIN ROUTES NOT LOADED',
-      studentRoutes ? 'GET /api/student/dashboard' : 'STUDENT ROUTES NOT LOADED'
-    ]
-  });
-});
-
-// Global error handler
 app.use((error, req, res, next) => {
-  console.error('🔥 Global error handler:', error);
+  console.error('🔥 Server error:', error.message);
   res.status(500).json({
     success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
   });
 });
 
-// ================== MongoDB & Server Start ==================
-const mongoURI = process.env.MONGODB_URI;
-mongoose.connect(mongoURI)
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
-
+// ================== Server Start ==================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`\n🚀 Server running on port ${PORT}`);
-  console.log(`🔧 Backend URL: http://localhost:${PORT}\n`);
-});
 
-module.exports = app;
+const startServer = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✅ Connected to MongoDB');
+    
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('❌ Server startup failed:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
