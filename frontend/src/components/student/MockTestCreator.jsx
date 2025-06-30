@@ -7,7 +7,11 @@ import { useNavigate } from 'react-router-dom';
 // 1. HELPER & DISPLAY COMPONENTS
 // These are the small, reusable building blocks for the main UI.
 //==================================================================
-
+const ALL_SUBJECTS = [
+  'Computer Science', 'Computer Application', 'Mathematics', 'Physics',
+  'English Literature', 'English Language', 'Biology', 'History',
+  'Geography', 'Economic Applications', 'Chemistry'
+];
 const LoadingSpinner = ({ text }) => (
     <div className={styles.loadingOverlay}>
         <div className={styles.spinner}></div>
@@ -145,10 +149,16 @@ const TestCreationForm = ({ studentData, testHistory, onGenerate, onHistoryClick
 
     // Auto-select subject based on student's class
     const filteredSubjects = useMemo(() => {
-        if (!studentData?.class) return [];
-        const studentClass = parseInt(String(studentData.class).replace(/\D/g, ''), 10);
-        if (studentClass <= 10) return ['Computer Application'];
-        return ['Computer Science'];
+        // Rule 1: Check if the student's name is 'Nomaan' (case-insensitive check).
+        if (studentData?.name?.toLowerCase() === 'nomaan') {
+            // If so, return all subjects EXCEPT for the two computer subjects.
+            return ALL_SUBJECTS.filter(
+                subject => subject !== 'Computer Science' && subject !== 'Computer Application'
+            );
+        } else {
+            // Rule 2 (Default): For everyone else, only show the two computer subjects.
+            return ['Computer Science', 'Computer Application'];
+        }
     }, [studentData]);
     
     useEffect(() => {
