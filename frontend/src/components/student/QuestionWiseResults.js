@@ -17,18 +17,26 @@ export default function QuestionWiseResults() {
   const [error,   setError]   = useState(null);
   const [showAnswerKey, setShowAnswerKey] = useState(false);
 
+  // In src/components/student/QuestionWiseResults.jsx
+
+// ... (imports and other component code remain the same)
+
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
+        // ✅ UPDATED: Call the same consolidated endpoint
         const { data } = await axios.get(
-          `/api/student/result/${resultId}/detailed`
+          `/api/student/results/${resultId}`
         );
         if (!data.success) {
           throw new Error(data.message || 'Failed to load result');
         }
+        
+        // ✅ UPDATED: Set state from the new, consistent data structure
         setResult(data.result);
         setTest(data.test);
+
       } catch (err) {
         console.error(err);
         setError(err.response?.data?.message || 'Failed to load result details');
@@ -38,6 +46,8 @@ export default function QuestionWiseResults() {
       }
     })();
   }, [resultId]);
+
+// ... (the rest of the component code will now function correctly)
 
   if (loading) {
     return <LoadingSpinner text="Loading detailed results..." />;

@@ -1,247 +1,206 @@
-/* routes/adminReview.js */
-const express  = require('express');
-const mongoose = require('mongoose');
-const router   = express.Router();
+const express = require('express');
+const router = express.Router();
 
-const Result        = require('../models/Result');
-const ReviewResult  = require('../models/ReviewResult');
-const Test          = require('../models/Test');
+// Models
+const Result = require('../models/Result');
+const ReviewResult = require('../models/ReviewResult');
+const Test = require('../models/Test');
+
+// Middleware
 const { authenticateAdmin } = require('../middleware/auth');
-const notificationService   = require('../services/notificationService');
 
-/* helper – compact dto for the list pane */
-function dto(row, reviewMode = false) {
-  return {
-    ...row.toObject(),
-    reviewMode,
-    studentName: row.studentId?.name,
-    testTitle:   row.testId?.title
-  };
-}
 
-/* ────────────────────────────────────────────────────────── */
-/*  GET  /results-for-review                                  */
-/*    • pending results  (full marking)                       */
-/*    • reviewResults (status under review)                   */
-/* ────────────────────────────────────────────────────────── */
-router.get('/results-for-review', authenticateAdmin, async (_req, res) => {
-  try {
-    /* 1 ▸ pending results (full papers) */
-    const pending = await Result.find({ status: 'pending' })
-      .populate('studentId', 'name email')
-      .populate('testId',    'title class board totalMarks questionsCount')
-      .lean();
+/* ==========================================================================
+   1. GET PENDING & UNDER-REVIEW RESULTS FOR THE ADMIN LIST
+   ========================================================================== */
+router.get('/results-for-review', authenticateAdmin, async (req, res) => {
+    try {
+        const pending = await Result.find({ status: 'pending' }).populate('studentId', 'name').populate('testId', 'title').lean();
+        const under = await ReviewResult.find({ status: 'under review' }).populate('studentId', 'name').populate('testId', 'title').lean();
 
-    /* 2 ▸ under-review rows (only subset of Qs) */
-    const under = await ReviewResult.find({ status: 'under review' })
-      .populate('studentId', 'name email')
-      .populate('testId',    'title class board totalMarks questionsCount')
-      .lean();
+        const makeItem = (row, reviewMode = false) => ({
+            _id: row._id, reviewMode, status: row.status,
+            studentName: row.studentId?.name || 'N/A',
+            testTitle: row.testId?.title || row.testTitle || 'N/A',
+            answerSheetUrl: row.answerSheetUrl ?? null, adminComments: row.adminComments ?? '',
+            questionWiseMarks: row.questionWiseMarks || [],
+            studentComments: row.studentComments || '',
+        });
 
-    /* 3 ▸ normalise into one shape */
-    const makeItem = (row, reviewMode = false) => ({
-      _id:              row._id,
-      reviewMode,                       // which PATCH route to hit
-      status:           row.status,     // 'pending' | 'under review'
-      /* student */
-      studentId:        row.studentId?._id,
-      studentName:      row.studentId?.name,
-      studentEmail:     row.studentId?.email,
-      /* test */
-      testId:           row.testId?._id,
-      testTitle:        row.testId?.title,
-      class:            row.testId?.class,
-      board:            row.testId?.board,
-      totalMarks:       row.testId?.totalMarks,
-      questionsCount:   row.testId?.questionsCount,
-      /* data for UI */
-      answerSheetUrl:   row.answerSheetUrl ?? null,
-      adminComments:    row.adminComments ?? '',
-      /* marks array */
-      questionWiseMarks: row.questionWiseMarks || []
-    });
+        const list = [...pending.map(r => makeItem(r, false)), ...under.map(r => makeItem(r, true))]
+            .sort((a, b) => new Date(b._id.getTimestamp()) - new Date(a._id.getTimestamp()));
 
-    const list = [
-      ...pending.map(r => makeItem(r, false)),
-      ...under  .map(r => makeItem(r, true ))
-    ].sort((a, b) => new Date(b._id.getTimestamp()) - new Date(a._id.getTimestamp()));
-
-    res.json({ success: true, results: list });
-  } catch (err) {
-    console.error('results-for-review error:', err.message);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-/* ────────────────────────────────────────────────────────── */
-/*  PATCH  /results/:id/marks  → PENDING → PUBLISHED          */
-/* ────────────────────────────────────────────────────────── */
-router.patch('/results/:id/marks', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      questionWiseMarks,
-      marksObtained,
-      percentage,
-      adminComments
-    } = req.body;
-
-    const result = await Result.findById(id).orFail();
-
-    /* full replace – status becomes published */
-    result.questionWiseMarks = questionWiseMarks;
-    result.marksObtained     = marksObtained;
-    result.totalMarks        = result.testId
-      ? (await Test.findById(result.testId).select('totalMarks')).totalMarks
-      : result.totalMarks;
-    result.percentage        = percentage;
-    result.adminComments     = adminComments;
-    result.status            = 'published';
-    result.markedBy          = req.user._id;
-    result.markedAt          = new Date();
-    await result.save();
-
-    /* notify */
-    await notificationService.sendNotification(
-      req.user._id,
-      'result_published',
-      `📊 Result Published: ${result.testTitle}`,
-      `${percentage}% marks finalised.`,
-      { resultData: {
-          _id: result._id,
-          studentName: result.studentId?.name,
-          studentEmail: result.studentId?.email,
-          testTitle: result.testTitle,
-          marksObtained,
-          totalMarks: result.totalMarks,
-          percentage,
-          status: 'published'
-      }}
-    );
-
-    res.json({ success: true, result });
-  } catch (e) {
-    res.status(400).json({ success: false, message: e.message });
-  }
-});
-
-/* ────────────────────────────────────────────────────────── */
-/*  PATCH  /review-results/:id/marks  → UNDER → REVIEWED      */
-/* ────────────────────────────────────────────────────────── */
-/* PATCH  /api/admin/review-results/:id/marks
-   – merges the edited questions
-   – recalculates scores
-   – sets status:
-       • if Result.status was 'pending'      -> 'published'
-       • if Result.status was 'under review' -> 'reviewed'
-   – deletes the ReviewResult document
-*/
-/* PATCH  /api/admin/review-results/:id/marks  */
-/* ──────────────────────────────────────────────────────────────── */
-/* PATCH  /api/admin/review-results/:id/marks                       */
-/*   • updates ONLY the questions under review                      */
-/*   • recalculates totals                                          */
-/*   • sets status → reviewed, deletes ReviewResult row             */
-/* ──────────────────────────────────────────────────────────────── */
-/* PATCH  /review-results/:id/marks  → UNDER → REVIEWED */
-router.patch('/review-results/:id/marks', authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { questionWiseMarks = [], adminComments = '' } = req.body;
-
-    /* 1 ▸ fetch docs */
-    const rr = await ReviewResult.findById(id).orFail();
-    const result = await Result.findOne({
-      studentId: rr.studentId,
-      testId: rr.testId
-    })
-    .populate('testId', 'totalMarks')
-    .orFail();
-
-    if (result.status !== 'under review') {
-      return res.status(409).json({ success: false, message: 'Not under review' });
+        res.json({ success: true, results: list });
+    } catch (err) {
+        console.error('Error fetching results for review:', err);
+        res.status(500).json({ success: false, message: 'Server error fetching review list.' });
     }
+});
 
-    /* 2 ▸ build a Set of question numbers under review */
-    const reviewSet = new Set(rr.questionWiseMarks.map(q => q.questionNo));
 
-    /* 3 ▸ merge ONLY the questions under review */
-    const updatedMap = new Map();
-    
-    // Start with ALL existing questions
-    result.questionWiseMarks.forEach(q => {
-      updatedMap.set(q.questionNo, { ...q });
-    });
+/* ==========================================================================
+   2. GET QUESTION DETAILS FOR THE GRADING GRID
+   ========================================================================== */
 
-    // Update ONLY the questions that are under review
-    questionWiseMarks.forEach(q => {
-      if (reviewSet.has(q.questionNo)) {
-        const current = updatedMap.get(q.questionNo) || {};
-        updatedMap.set(q.questionNo, { 
-          ...current, 
-          obtainedMarks: q.obtainedMarks,
-          remarks: q.remarks || current.remarks || '',
-          markedBy: req.user._id,
-          markedAt: new Date()
+router.get('/results/:id/questions', authenticateAdmin, async (req, res) => {
+    try {
+        const result = await Result.findById(req.params.id).select('testId').lean();
+        if (!result) return res.status(404).json({ success: false, message: 'Result not found.' });
+
+        const test = await Test.findById(result.testId).select('questions questionsCount').lean();
+        if (!test) return res.status(404).json({ success: false, message: 'Associated test not found.' });
+
+        let questionsToGrade = [];
+        if (test.questions && test.questions.length > 0) {
+            questionsToGrade = test.questions.map(q => ({ questionNo: q.questionNo, maxMarks: q.marks }));
+        } else if (test.questionsCount > 0) {
+            questionsToGrade = Array.from({ length: test.questionsCount }, (_, i) => ({ questionNo: i + 1, maxMarks: 0 }));
+        }
+
+        questionsToGrade.sort((a, b) => a.questionNo - b.questionNo);
+        res.json({ success: true, questions: questionsToGrade.map(q => q.questionNo), maxMarks: questionsToGrade.map(q => q.maxMarks) });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch question data.' });
+    }
+});
+
+router.get('/review-results/:id/questions', authenticateAdmin, async (req, res) => {
+    try {
+        const reviewResult = await ReviewResult.findById(req.params.id).select('questionWiseMarks').lean();
+        if (!reviewResult) return res.status(404).json({ success: false, message: 'Review request not found.' });
+        const questionsToGrade = (reviewResult.questionWiseMarks || []).sort((a, b) => a.questionNo - b.questionNo);
+        res.json({ success: true, questions: questionsToGrade.map(q => q.questionNo), maxMarks: questionsToGrade.map(q => q.maxMarks) });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch question data.' });
+    }
+});
+
+
+/* ==========================================================================
+   3. SAVE GRADED RESULTS
+   ========================================================================== */
+
+// Save a 'pending' result, which marks it as 'published'
+router.patch('/results/:id/marks', authenticateAdmin, async (req, res) => {
+    try {
+        // ✅ Your auth middleware provides req.user with an email. We will use that.
+        if (!req.user || !req.user.email) {
+            return res.status(401).json({ success: false, message: 'Authentication error: Admin email not found.' });
+        }
+
+        const { questionWiseMarks, adminComments } = req.body;
+        const marksObtained = (questionWiseMarks || []).reduce((sum, q) => sum + (Number(q.obtainedMarks) || 0), 0);
+
+        const result = await Result.findById(req.params.id).populate('testId', 'totalMarks').orFail();
+        const totalMarks = result.testId?.totalMarks || (questionWiseMarks || []).reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0);
+
+        Object.assign(result, {
+            questionWiseMarks, marksObtained, totalMarks, adminComments, status: 'published',
+            markedBy: req.user.email, // ✅ Use the admin's email as the marker
+            markedAt: new Date()
+        });
+        await result.save();
+
+        res.json({ success: true, result });
+    } catch (e) {
+        console.error("Error patching result marks:", e);
+        res.status(400).json({ success: false, message: e.message });
+    }
+});
+
+// Save an 'under review' result, which marks it as 'reviewed'
+router.patch('/review-results/:id/marks',
+  authenticateAdmin,                           // or whoever is allowed
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { questionWiseMarks = [], adminComments = '' } = req.body;
+
+      if (!questionWiseMarks.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'questionWiseMarks is required'
         });
       }
-    });
 
-    const merged = [...updatedMap.values()].sort((a, b) => a.questionNo - b.questionNo);
+      /* -----------------------------------------------------------
+       * 1️⃣  Load the review doc (must still be “under review”)
+       * --------------------------------------------------------- */
+      const review = await ReviewResult.findById(id);
+      if (!review)
+        return res.status(404).json({ success:false, message:'ReviewResult not found' });
 
-    /* 4 ▸ recalc totals from ALL questions (not just reviewed ones) */
-    const marksObtained = merged.reduce((s, q) => s + (Number(q.obtainedMarks) || 0), 0);
-    
-    // Total marks should be sum of ALL maxMarks, not just reviewed questions
-    const totalMarks = merged.reduce((s, q) => s + (Number(q.maxMarks) || 0), 0);
-    
-    const percentage = totalMarks ? +((marksObtained / totalMarks) * 100).toFixed(2) : 0;
+      if (review.status !== 'under review')
+        return res.status(400).json({ success:false,
+          message:`Cannot update marks; current status is ${review.status}` });
 
-    /* 5 ▸ persist Result with ALL questions */
-    Object.assign(result, {
-      questionWiseMarks: merged,  // Contains ALL questions
-      marksObtained,              // Sum of obtained marks from ALL questions
-      totalMarks,                 // Sum of max marks from ALL questions
-      percentage,
-      adminComments,
-      status: 'reviewed',
-      markedBy: req.user._id,
-      markedAt: new Date()
-    });
-    await result.save();
-
-    /* 6 ▸ delete ReviewResult row */
-    await ReviewResult.deleteOne({ _id: id });
-
-    /* 7 ▸ notify */
-    await notificationService.sendNotification(
-      req.user._id,
-      'result_published',
-      `📊 Result Reviewed: ${result.testTitle}`,
-      `${percentage}% marks finalised.`,
-      {
-        resultData: {
-          _id: result._id,
-          studentName: result.studentId?.name,
-          studentEmail: result.studentId?.email,
-          testTitle: result.testTitle,
-          marksObtained,
-          totalMarks,
-          percentage,
-          status: 'reviewed'
+      /* -----------------------------------------------------------
+       * 2️⃣  Overwrite ONLY the questions that came in the payload
+       * --------------------------------------------------------- */
+      review.questionWiseMarks = review.questionWiseMarks.map(q => {
+        const incoming = questionWiseMarks.find(i => i.questionNo === q.questionNo);
+        if (incoming) {
+          q.obtainedMarks = incoming.obtainedMarks;
+          if (incoming.maxMarks !== undefined) q.maxMarks = incoming.maxMarks;
+          q.remarks  = incoming.remarks ?? q.remarks;
+          q.markedBy = req.user._id;
+          q.markedAt = new Date();
         }
-      }
-    );
+        return q;
+      });
 
-    return res.json({ success: true, result });
-  } catch (err) {
-    console.error('review-patch', err.message);
-    res.status(400).json({ success: false, message: err.message });
-  }
+      /* ---------- 3️⃣  Re-aggregate the review doc ---------- */
+      review.marksObtained = review.questionWiseMarks.reduce(
+        (sum, q) => sum + (Number(q.obtainedMarks) || 0), 0);
+      review.totalMarks    = review.questionWiseMarks.reduce(
+        (sum, q) => sum + (Number(q.maxMarks)      || 0), 0);
+
+      review.adminComments = adminComments;
+      review.status        = 'reviewed';          // or leave “under review” if you want 2-step approval
+      await review.save();
+
+
+      /* -----------------------------------------------------------
+       * 4️⃣  Mirror the same changes into the MAIN Result document
+       * --------------------------------------------------------- */
+      const result = await Result.findOne({
+        studentId : review.studentId,
+        testId    : review.testId
+      });
+
+      if (!result)
+        return res.status(404).json({ success:false, message:'Parent Result not found' });
+
+      // overwrite the same questions inside Result.questionWiseMarks
+      result.questionWiseMarks = result.questionWiseMarks.map(q => {
+        const upd = review.questionWiseMarks.find(rq => rq.questionNo === q.questionNo);
+        if (upd) {
+          q.obtainedMarks = upd.obtainedMarks;
+          q.maxMarks      = upd.maxMarks;
+          q.remarks       = upd.remarks;
+          q.markedBy      = upd.markedBy;
+          q.markedAt      = upd.markedAt;
+        }
+        return q;
+      });
+
+      // 🔥  THE CORE REQUIREMENT  🔥
+      result.marksObtained = result.questionWiseMarks.reduce(
+        (s, q) => s + (Number(q.obtainedMarks) || 0), 0);
+      result.totalMarks    = result.questionWiseMarks.reduce(
+        (s, q) => s + (Number(q.maxMarks)      || 0), 0);
+
+      result.status = 'reviewed';                 // or whatever your flow dictates
+      await result.save();
+
+      return res.json({ success:true, message:'Marks updated successfully',
+                        data:{ reviewId:review._id, resultId:result._id } });
+    }
+    catch (err) {
+      console.error('Update-review-marks error:', err);
+      res.status(500).json({ success:false, message:'Server error' });
+    }
 });
-
-
-
 
 
 module.exports = router;

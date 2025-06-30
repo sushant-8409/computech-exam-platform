@@ -1,124 +1,218 @@
-/* ReviewRequestPage.module.css
-   ─────────────────────────────────────────────── */
+/* ==========================================================================
+   Main Container & Layout
+   ========================================================================== */
+.container {
+  padding: 1rem 1.5rem;
+  background-color: var(--bg-page);
+  min-height: calc(100vh - 80px); /* Adjust 80px based on your header height */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
 
-/* 1 ─ ROOT CARD */
 .requestReview {
-  --primary: #3f51b5;
-  --primary-dark: #2c3e9e;
-  --border: #d1d9e6;
-
-  max-width: 700px;
-  margin: 48px auto;
-  padding: 40px 46px;
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  box-shadow: 0 10px 30px rgba(31, 45, 61, 0.08);
-  font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-panel);
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+  box-shadow: 0 4px 12px var(--shadow-color-md);
+  width: 100%;
+  max-width: 700px; /* Constrain width for readability */
+  margin-top: 2rem;
 }
 
-/* 2 ─ HEADING */
-.requestReview h2 {
-  margin: 0 0 32px;
-  font-size: 28px;
+/* ==========================================================================
+   Header & Instructions
+   ========================================================================== */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-primary);
+  padding-bottom: 1rem;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.75rem;
+  color: var(--text-primary);
   font-weight: 700;
-  color: var(--primary-dark);
-  letter-spacing: 0.3px;
-  text-align: center;
 }
 
-/* 3 ─ FORM */
-.requestReview form {
+.backButton {
+  background: var(--bg-page);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.backButton:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-secondary);
+  transform: translateX(-2px);
+}
+
+.instructions {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: var(--accent-bg-light);
+  color: var(--accent-color);
+  border-left: 4px solid var(--accent-color);
+  border-radius: 4px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* ==========================================================================
+   Form & Inputs
+   ========================================================================== */
+.form {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 2rem;
 }
 
-/* comment field */
+.gridLabel,
 .commentBlock label {
-  font-weight: 600;
-  color: #333;
   display: block;
-  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
 }
 
+/* Question Selection Grid */
+.gridContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  background-color: var(--bg-page);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  background-color: var(--bg-panel);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-primary);
+  font-weight: 500;
+  user-select: none; /* Prevents text selection on click */
+}
+
+.checkboxLabel:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-secondary);
+  transform: translateY(-1px);
+}
+
+.checkboxLabel input[type="checkbox"] {
+  /* Modern checkboxes */
+  width: 1.25em;
+  height: 1.25em;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+/* Style the text next to a checked checkbox */
+.checkboxLabel input[type="checkbox"]:checked + span {
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+/* Comments Textarea */
 .commentBlock textarea {
   width: 100%;
-  min-height: 130px;
-  padding: 12px 14px;
-  font-size: 15px;
-  line-height: 1.55;
-  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
   border-radius: 8px;
+  border: 1px solid var(--border-secondary);
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-family: inherit;
   resize: vertical;
-  transition: border-color 0.18s;
+  min-height: 120px;
+  transition: all 0.2s ease;
 }
+
 .commentBlock textarea:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.12);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-bg-light);
 }
 
-/* 4 ─ QUESTION GRID */
-.qGrid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px 20px;
-  align-items: center;
-}
-
-.qGrid > p {
-  width: 100%;
-  margin: 0 0 4px;
-  font-weight: 600;
-  color: #333;
-}
-
-/* pill-style check-boxes */
-.qGrid label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: #fafafa;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.18s, border-color 0.18s;
-  user-select: none;
-}
-.qGrid label:hover {
-  background: #f0f3ff;
-  border-color: var(--primary);
-}
-.qGrid input[type="checkbox"] {
-  accent-color: var(--primary);
-  width: 16px;
-  height: 16px;
-}
-
-/* 5 ─ SUBMIT BUTTON */
+/* ==========================================================================
+   Submit Button
+   ========================================================================== */
 .submitBtn {
-  align-self: center;
-  background: var(--primary);
-  color: #fff;
-  padding: 12px 44px;
-  font-size: 16px;
-  font-weight: 600;
+  background: var(--accent-color);
+  color: var(--text-on-accent);
+  padding: 0.8rem 1.5rem;
   border: none;
-  border-radius: 30px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
-  box-shadow: 0 4px 12px rgba(63, 81, 181, 0.25);
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  width: 100%;
+  margin-top: 1rem;
 }
-.submitBtn:hover          { background: var(--primary-dark); }
-.submitBtn:active         { transform: scale(0.96); }
-.submitBtn:disabled       { background:#b6bedc; box-shadow:none; cursor:not-allowed; }
 
-/* 6 ─ RESPONSIVE */
-@media (max-width: 600px) {
-  .requestReview   { margin: 24px 16px; padding: 28px 22px; }
-  .qGrid           { gap: 10px 14px; }
-  .submitBtn       { width: 100%; padding: 12px 0; }
+.submitBtn:hover:not(:disabled) {
+  opacity: 0.85;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--text-muted);
+}
+
+
+/* ==========================================================================
+   Accessibility & Helper Classes
+   ========================================================================== */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+  .requestReview {
+    padding: 1.5rem;
+    margin-top: 1rem;
+  }
+  .header h2 {
+    font-size: 1.5rem;
+  }
+  .gridContainer {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
 }

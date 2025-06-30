@@ -2,30 +2,44 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-
-import styles from './ReviewRequestPage.module.css';   // ⬅️  CSS-module
+import LoadingSpinner from '../LoadingSpinner'; // It's good practice to have a loading state
+import styles from './ReviewRequestPage.module.css';
 
 export default function ReviewRequestPage() {
-  const { resultId }  = useParams();
-  const navigate      = useNavigate();
+  const { resultId } = useParams();
+  const navigate = useNavigate();
 
-  const [count, setCount]       = useState(0);
+  // ✅ State to hold the actual question data from the result
+  const [questions, setQuestions] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [comments, setComments] = useState('');
+  const [loading, setLoading] = useState(true); // Add loading state
 
-  /* ─── original logic (unchanged) ─────────────────────────── */
+  // ✅ Updated data fetching logic
   useEffect(() => {
-    async function loadTest() {
+    const loadResultDetails = async () => {
+      setLoading(true);
       try {
+        // Use the correct, consolidated endpoint
         const { data } = await axios.get(
-          `/api/student/result/${resultId}/detailed`
+          `/api/student/results/${resultId}`
         );
-        setCount(data.test.questionsCount);
-      } catch {
-        toast.error('Failed to load test info');
+        
+        // Use the questionWiseMarks array from the result as the source of truth
+        if (data.success && data.result?.questionWiseMarks) {
+          setQuestions(data.result.questionWiseMarks);
+        } else {
+          throw new Error(data.message || 'Result data is incomplete or not found.');
+        }
+      } catch (err) {
+        toast.error(err.message || 'Failed to load result details.');
+        setQuestions([]); // Ensure questions is an empty array on error
+      } finally {
+        setLoading(false);
       }
-    }
-    loadTest();
+    };
+
+    loadResultDetails();
   }, [resultId]);
 
   const toggle = (qNo) => {
@@ -39,61 +53,86 @@ export default function ReviewRequestPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (selected.size === 0) {
-      toast.error('Select at least one question');
+      toast.error('Please select at least one question to send for review.');
       return;
     }
+    if (!comments.trim()) {
+        toast.error('Please provide a reason or comment for your review request.');
+        return;
+    }
+
     try {
       await axios.post(`/api/student/results/${resultId}/request-review`, {
         questionNumbers: [...selected],
         comments,
       });
-      toast.success('Review requested');
-      navigate('/student');
-    } catch {
-      toast.error('Failed to submit request');
+      toast.success('Your review request has been submitted successfully!');
+      navigate('/student/results'); // Navigate to the results list
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit request.');
     }
   };
 
-  /* ─── render ─────────────────────────────────────────────── */
+  if (loading) {
+    return <LoadingSpinner text="Loading result questions..." />;
+  }
+
   return (
-    <div className={styles.requestReview}>
-      <h2>Request a Review</h2>
+    <main className={styles.container}>
+      <div className={styles.requestReview}>
+        <header className={styles.header}>
+            <button onClick={() => navigate(-1)} className={styles.backButton}>
+             ← Back
+            </button>
+            <h2>Request a Re-evaluation</h2>
+        </header>
+        <p className={styles.instructions}>
+          If you believe there was an error in grading, please select the specific questions you would like reviewed and provide a clear reason in the comments section.
+        </p>
 
-      <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.qGrid}>
+            <label id="q-grid-label" className={styles.gridLabel}>Select Question(s) for Review:</label>
 
-        {/* comment textarea */}
-        <div className={styles.commentBlock}>
-          <label>Comments</label>
-          <textarea
-            value={comments}
-            onChange={(e) => setComments(e.target.value)}
-            required
-          />
-        </div>
+            <div className={styles.gridContainer} role="group" aria-labelledby="q-grid-label">
+                {questions.length > 0 ? (
+                    questions.map((q) => (
+                        <label key={q.questionNo} className={styles.checkboxLabel}>
+                        <input
+                            type="checkbox"
+                            checked={selected.has(q.questionNo)}
+                            onChange={() => toggle(q.questionNo)}
+                        />
+                        <span>Question {q.questionNo}</span>
+                        </label>
+                    ))
+                ) : (
+                    <p>No questions found in this result to review.</p>
+                )}
+            </div>
+          </div>
 
-        {/* question check-boxes */}
-        <div className={styles.qGrid}>
-          <p>Select question(s):</p>
+          <div className={styles.commentBlock}>
+            <label htmlFor="comments-textarea">Reason for Review Request</label>
+            <textarea
+              id="comments-textarea"
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              placeholder="Please provide a clear and concise reason for your review request..."
+              required
+              rows="5"
+            />
+          </div>
 
-          {[...Array(count)].map((_, idx) => {
-            const qNo = idx + 1;
-            return (
-              <label key={qNo}>
-                <input
-                  type="checkbox"
-                  checked={selected.has(qNo)}
-                  onChange={() => toggle(qNo)}
-                />
-                Q{qNo}
-              </label>
-            );
-          })}
-        </div>
-
-        <button type="submit" className={styles.submitBtn}>
-          Submit Review Request
-        </button>
-      </form>
-    </div>
+          <button 
+            type="submit" 
+            className={styles.submitBtn} 
+            disabled={selected.size === 0 || !comments.trim()}
+          >
+            Submit Review Request
+          </button>
+        </form>
+      </div>
+    </main>
   );
 }

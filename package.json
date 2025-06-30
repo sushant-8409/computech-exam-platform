@@ -12,8 +12,10 @@
     "postinstall": "cd frontend && npm install"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.0.0",
     "@google/generative-ai": "^0.24.1",
     "@smithy/node-http-handler": "^4.0.6",
+    "antd": "^5.26.2",
     "bcryptjs": "^2.4.3",
     "bootstrap": "^5.3.6",
     "concurrently": "^8.2.2",

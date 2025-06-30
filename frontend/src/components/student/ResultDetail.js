@@ -65,13 +65,23 @@ const ResultDetail = () => {
   // Accessibility: focus management
   const btnRefs = [useRef(), useRef(), useRef()];
 
+  // In src/components/student/ResultDetail.js
+
+// ... (imports and other component code remain the same)
+
   useEffect(() => {
     const fetchResult = async () => {
       try {
-        const { data } = await axios.get(`/api/student/result/${resultId}`);
+        // ✅ UPDATED: Call the new, consolidated endpoint
+        const { data } = await axios.get(`/api/student/results/${resultId}`);
         if (!data.success) throw new Error(data.message);
+        
+        // ✅ UPDATED: Set state from the new, clean data structure
         setResult(data.result);
-        setTest(data.result.test);
+        setTest(data.test);
+        // We can also store student data if needed elsewhere
+        // setStudent(data.student); 
+
       } catch (err) {
         setError(err.response?.data?.message || err.message);
       } finally {
@@ -80,6 +90,8 @@ const ResultDetail = () => {
     };
     fetchResult();
   }, [resultId]);
+
+// ... (the rest of the component code, including PDF generation, should now work correctly)
 
   // Fetch QR code for PDF
   useEffect(() => {

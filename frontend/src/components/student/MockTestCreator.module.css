@@ -1,5 +1,5 @@
 /* ==========================================================================
-   MOCK TEST CREATOR - ENHANCED STYLESHEET
+   MOCK TEST CREATOR - COMPLETE STYLESHEET
    ========================================================================== */
 
 /* --- 1. Root & Dark Mode Variables --- */
@@ -15,45 +15,38 @@
   --c-success: #2ecc71;
   --c-error: #e74c3c;
   --c-warning: #f39c12;
-
   --bg-body: #f4f7f9;
   --bg-main: #ffffff;
   --bg-inset: #f8f9fa;
   --bg-overlay: rgba(255, 255, 255, 0.7);
-
   --text-main: #212529;
   --text-muted: #6c757d;
   --text-on-primary: #ffffff;
-
   --border-color: #dee2e6;
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --transition-speed: 0.3s;
 }
 
-.dark {
+/* This .dark class should be toggled on your root <html> element */
+html.dark {
   /* Dark Theme */
   --c-primary: #8a88e0;
   --c-primary-dark: #a09ee8;
   --c-secondary: #706fd3;
   --c-accent: #4a47a3;
   --c-success: #27ae60;
-  --c-error: #c0392b;
-  --c-warning: #d68910;
-
+  --c-error: #e74c3c; /* A brighter red for dark mode */
+  --c-warning: #f1c40f;
   --bg-body: #121212;
   --bg-main: #1e1e1e;
   --bg-inset: #2a2a2a;
   --bg-overlay: rgba(0, 0, 0, 0.7);
-
   --text-main: #e4e6eb;
   --text-muted: #b0b3b8;
-  --text-on-primary: #ffffff;
-
   --border-color: #3a3b3c;
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -67,6 +60,7 @@
   font-family: var(--font-primary);
   padding: 1.5rem;
   transition: background-color var(--transition-speed) ease;
+  min-height: 100vh;
 }
 
 .pageHeader {
@@ -83,17 +77,21 @@
   color: var(--text-muted);
   font-size: clamp(1rem, 2.5vw, 1.1rem);
   margin-top: 0.5rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.contentArea {
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .mainGrid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
 }
-
-/* On larger screens, enable the two-column layout */
 @media (min-width: 1024px) {
   .mainGrid {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
@@ -112,7 +110,7 @@
 }
 
 
-/* --- 3. Form Styles --- */
+/* --- 3. Form & Preview Styles --- */
 .studentInfoCard {
   display: flex;
   justify-content: center;
@@ -124,13 +122,8 @@
   box-shadow: var(--shadow-sm);
   margin-bottom: 2rem;
 }
-.infoItem {
-  color: var(--text-muted);
-}
-.infoItem strong {
-  color: var(--text-main);
-  margin-right: 0.5rem;
-}
+.infoItem { color: var(--text-muted); }
+.infoItem strong { color: var(--text-main); margin-right: 0.5rem; }
 
 .formGrid {
   display: grid;
@@ -138,17 +131,9 @@
   gap: 1.5rem;
   margin-bottom: 2rem;
 }
-@media (min-width: 768px) {
-  .formGrid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
+@media (min-width: 768px) { .formGrid { grid-template-columns: 1fr 1fr; } }
 
-.formGroup label {
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: var(--text-muted);
-}
+.formGroup label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-muted); }
 .formControl {
   width: 100%;
   padding: 0.8rem 1rem;
@@ -164,215 +149,254 @@
   border-color: var(--c-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 20%, transparent);
 }
-.formControl:disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
-}
+.formControl:disabled { cursor: not-allowed; opacity: 0.7; }
 
 .btnPrimary {
-  display: block;
-  width: 100%;
-  padding: 1rem;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 1.1rem;
-  font-weight: bold;
-  cursor: pointer;
-  background: linear-gradient(45deg, var(--c-secondary), var(--c-primary));
-  color: var(--text-on-primary);
-  transition: all var(--transition-speed) ease;
+  display: block; width: 100%; padding: 1rem; border: none;
+  border-radius: var(--radius-md); font-size: 1.1rem; font-weight: bold;
+  cursor: pointer; background: linear-gradient(45deg, var(--c-secondary), var(--c-primary));
+  color: var(--text-on-primary); transition: all var(--transition-speed) ease;
   box-shadow: var(--shadow-sm);
 }
 .btnPrimary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px color-mix(in srgb, var(--c-primary) 30%, transparent);
 }
-.btnPrimary:disabled {
-  background: var(--border-color);
-  cursor: not-allowed;
-}
+.btnPrimary:disabled { background: var(--border-color); cursor: not-allowed; }
+
+.previewCard { padding: 2rem; text-align: center; }
+.previewActions { display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; }
+.btnSecondary { background: var(--bg-inset); color: var(--text-main); border: 1px solid var(--border-color); }
+.btnSuccess { background: var(--c-success); color: white; }
 
 
 /* --- 4. Test Interface --- */
-.testInterface, .resultsContainer, .evaluationContainer, .previewCard {
-  animation: fadeInUp 0.5s ease-out;
-}
+.testInterface, .resultsContainer, .evaluationContainer { animation: fadeInUp 0.5s ease-out; }
 
 .testHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 1rem;
-  margin-bottom: 2rem;
-  border-bottom: 1px solid var(--border-color);
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 1rem; margin-bottom: 2rem; border-bottom: 1px solid var(--border-color);
 }
+.testHeader h2 { margin: 0; font-size: 1.5rem; }
 .testTimer {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--c-primary);
-  background: var(--bg-inset);
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-md);
+  font-size: 1.5rem; font-weight: 700; color: var(--c-primary);
+  background: var(--bg-inset); padding: 0.5rem 1rem; border-radius: var(--radius-md);
 }
 .timerWarning { color: var(--c-error) !important; animation: pulse 1.5s infinite; }
 
 .questionCard {
-  margin-bottom: 2rem;
-  background: var(--bg-inset);
-  border: 1px solid var(--border-color);
-  border-left: 4px solid var(--c-primary);
-  padding: 1.5rem;
-  border-radius: var(--radius-md);
+  margin-bottom: 2rem; background: var(--bg-inset); border: 1px solid var(--border-color);
+  border-left: 4px solid var(--c-primary); padding: 1.5rem; border-radius: var(--radius-md);
 }
+.questionHeader { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; }
+.questionNumber { font-weight: bold; font-size: 1.1rem; }
+.questionMarks { font-size: 0.9rem; color: var(--text-muted); }
 
 .questionText pre {
-  font-family: var(--font-code);
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  background-color: #2d2d2d;
-  color: #f8f8f2;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  line-height: 1.7;
-  overflow-x: auto;
+  font-family: var(--font-code); white-space: pre-wrap; word-wrap: break-word;
+  background-color: #2d2d2d; color: #f8f8f2; padding: 1rem; border-radius: var(--radius-md);
+  line-height: 1.7; overflow-x: auto;
 }
 
 .mcqOptions { margin-top: 1.5rem; }
 .optionLabel {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  background: var(--bg-main);
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  cursor: pointer;
-  transition: all var(--transition-speed) ease;
-  margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 1rem; background: var(--bg-main); padding: 1rem;
+  border-radius: var(--radius-md); border: 1px solid var(--border-color);
+  cursor: pointer; transition: all var(--transition-speed) ease; margin-bottom: 1rem;
 }
-.optionLabel:has(input:checked) {
+.optionLabel:has(input:checked), .optionLabel:hover {
   border-color: var(--c-primary);
   background-color: color-mix(in srgb, var(--c-primary) 10%, var(--bg-main));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-primary) 20%, transparent);
 }
-.optionLabel input[type="radio"] {
-  flex-shrink: 0;
-  width: 1.2em;
-  height: 1.2em;
+.optionLabel input[type="radio"] { flex-shrink: 0; width: 1.2em; height: 1.2em; accent-color: var(--c-primary); }
+
+.testFooter { margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; }
+
+
+/* --- 5. ENHANCED TEXT & CODE EDITORS --- */
+.subjectiveAnswer, .codeEditor {
+  width: 100%; padding: 1rem; border-radius: var(--radius-md);
+  border: 1px solid var(--border-color); font-size: 1rem; line-height: 1.7;
+  transition: all var(--transition-speed) ease; margin-top: 1rem;
+}
+.subjectiveAnswer:focus, .codeEditor:focus {
+  outline: none; border-color: var(--c-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 20%, transparent);
 }
 .subjectiveAnswer {
-  min-height: 150px;
-  font-family: var(--font-primary);
+  min-height: 150px; font-family: var(--font-primary);
+  background-color: var(--bg-inset); color: var(--text-main); resize: vertical;
+}
+.codingArea { margin-top: 1.5rem; }
+.codingArea label { font-weight: 500; color: var(--text-muted); font-size: 0.9rem; }
+.codeEditor {
+  min-height: 300px; font-family: var(--font-code);
+  background-color: #282c34; color: #abb2bf; border-color: #3a3b3c;
+  resize: vertical; tab-size: 4; white-space: pre; overflow: auto;
+}
+.codeEditor:focus {
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 35%, transparent);
 }
 
 
-/* --- 5. Results & Evaluation --- */
-.summaryScore {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-.summaryScore span {
-  font-size: clamp(2.5rem, 10vw, 4rem);
-  font-weight: 700;
-  color: var(--c-primary);
-}
+/* --- 6. Results & Evaluation --- */
+.resultsContainer h2, .evaluationContainer h2 { text-align: center; margin-bottom: 2rem; }
+.summaryScore { text-align: center; margin-bottom: 2rem; }
+.summaryScore p { margin: 0.5rem 0; font-size: 1.2rem; color: var(--text-muted); }
+.summaryScore span { font-size: clamp(2.5rem, 10vw, 4rem); font-weight: 700; color: var(--c-primary); }
 
 .questionResult {
-  border: 1px solid var(--border-color);
-  padding: 1.5rem;
-  border-radius: var(--radius-md);
-  margin-bottom: 1.5rem;
-  border-left-width: 5px;
+  border: 1px solid var(--border-color); padding: 1.5rem; border-radius: var(--radius-md);
+  margin-bottom: 1.5rem; border-left-width: 5px;
 }
 .correct { border-left-color: var(--c-success); }
 .incorrect { border-left-color: var(--c-error); }
 .questionResult strong { color: var(--text-main); }
 .explanation {
-  background: var(--bg-inset);
-  padding: 1rem;
-  margin-top: 1rem;
-  border-radius: var(--radius-md);
-  border-left: 3px solid var(--text-muted);
+  background: var(--bg-inset); padding: 1rem; margin-top: 1rem;
+  border-radius: var(--radius-md); border-left: 3px solid var(--text-muted);
 }
-.evalSection h4 {
-  color: var(--c-primary);
-  border-bottom: 2px solid var(--border-color);
-  padding-bottom: 0.5rem;
-  margin-bottom: 1rem;
+.verdict { font-weight: bold; margin-top: 1rem; }
+.codeBlock, .outputBlock {
+  background-color: var(--bg-inset); padding: 1rem; border-radius: var(--radius-md);
+  white-space: pre-wrap; word-break: break-all; font-family: var(--font-code);
+  border: 1px solid var(--border-color); margin: 0.5rem 0;
 }
-.markingScheme { background-color: color-mix(in srgb, var(--c-primary) 10%, transparent); }
+.codeBlock { background-color: #282c34; color: #abb2bf; border-color: #3a3b3c; }
+.outputError { border-color: var(--c-error); color: var(--c-error); background-color: color-mix(in srgb, var(--c-error) 10%, transparent); }
 
 
-/* --- 6. History Sidebar --- */
+/* --- 7. History Sidebar --- */
 .historySection { animation: fadeInRight 0.5s ease-out; }
-
-/* On desktop, make the history card sticky */
-@media (min-width: 1024px) {
-  .historySection .card {
-    position: sticky;
-    top: 2rem;
-  }
-}
-
-.historyList {
-  max-height: 65vh; /* Limit height on desktop */
-  overflow-y: auto;
-  padding-right: 0.5rem; /* For scrollbar spacing */
-}
+@media (min-width: 1024px) { .historySection .card { position: sticky; top: 2rem; } }
+.historyList { max-height: 65vh; overflow-y: auto; padding-right: 0.5rem; }
 .historyItem {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color var(--transition-speed) ease;
+  display: flex; justify-content: space-between; align-items: center; padding: 1rem;
+  border-bottom: 1px solid var(--border-color); transition: background-color var(--transition-speed) ease;
+  cursor: pointer;
 }
 .historyItem:hover { background-color: var(--bg-inset); }
-.historyInfo h4 { color: var(--c-primary); margin: 0 0 0.25rem 0; }
+.historyInfo h4 { color: var(--c-primary); margin: 0 0 0.25rem 0; font-size: 1rem; }
 .historyInfo p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
-.historyScore .score { font-size: 1.2rem; font-weight: bold; color: var(--text-main); }
-.historyScore .percentage { color: var(--text-muted); }
-.historyScore .pending { font-weight: bold; color: var(--c-warning); }
+.historyScore { text-align: right; }
+.historyScore .score { font-size: 1.2rem; font-weight: bold; color: var(--text-main); display: block; }
+.historyScore .percentage { color: var(--text-muted); font-size: 0.9rem; }
 
 
-/* --- 7. Loading & Animations --- */
+/* --- 8. Loading & Animations --- */
 .loadingOverlay {
-  position: fixed;
-  inset: 0;
-  background: var(--bg-overlay);
-  backdrop-filter: blur(5px);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
+  position: fixed; inset: 0; background: var(--bg-overlay);
+  backdrop-filter: blur(5px); display: flex; flex-direction: column;
+  justify-content: center; align-items: center; z-index: 9999;
 }
 .spinner {
   border: 5px solid color-mix(in srgb, var(--c-primary) 30%, transparent);
-  border-top-color: var(--c-primary);
-  border-radius: 50%;
-  width: 50px;
-  height: 50px;
+  border-top-color: var(--c-primary); border-radius: 50%; width: 50px; height: 50px;
   animation: spin 1s linear infinite;
 }
-.loadingOverlay p {
-  margin-top: 1.5rem;
-  font-size: 1.1rem;
-  color: var(--text-main);
-  font-weight: 500;
-}
-
+.loadingOverlay p { margin-top: 1.5rem; font-size: 1.1rem; color: var(--text-main); font-weight: 500; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 @keyframes pulse { 50% { opacity: 0.6; } }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
-/* --- 8. Mobile Specific Adjustments --- */
+
+/* --- 9. Mobile Specific Adjustments --- */
 @media (max-width: 767px) {
   .mockTestCreator { padding: 1rem; }
-  .card, .testInterface, .resultsContainer, .evaluationContainer, .previewCard {
-    padding: 1.5rem;
-  }
+  .card, .testInterface, .resultsContainer, .evaluationContainer, .previewCard { padding: 1.5rem; }
   .testHeader { flex-direction: column; gap: 1rem; }
+}
+
+/* --- 10. Warning/Profile Incomplete Card --- */
+.profileWarningCard {
+  text-align: center;
+  padding: 2rem;
+  border: 1px solid var(--c-warning);
+  background-color: color-mix(in srgb, var(--c-warning) 10%, transparent);
+}
+.profileWarningCard h3 {
+  color: var(--c-warning);
+  margin-top: 0;
+}
+.profileWarningCard p {
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+.profileWarningCard .btnPrimary {
+    background: var(--c-warning);
+}
+/* Add this to MockTestCreator.module.css */
+
+.evaluationContainer {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.evalCard {
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+  background-color: var(--bg-inset);
+}
+
+.evalSection {
+  margin-top: 1rem;
+}
+
+.evalSection h4 {
+  color: var(--c-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.studentAnswer {
+  background-color: var(--bg-main);
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.markingScheme {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.scoreInputGroup {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px dashed var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.scoreInputGroup label {
+  font-weight: bold;
+  color: var(--text-main);
+}
+
+.scoreInput {
+  width: 80px;
+  padding: 0.5rem;
+  font-size: 1.1rem;
+  text-align: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+.scoreInput:focus {
+  outline: none;
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary) 20%, transparent);
 }

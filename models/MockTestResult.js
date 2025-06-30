@@ -21,7 +21,7 @@ const mockTestResultSchema = new mongoose.Schema({
   },
   questionType: {
     type: String,
-    enum: ['mcq', 'subjective'],
+    enum: ['mcq', 'subjective', 'coding'],
     required: true
   },
   answers: {
