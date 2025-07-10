@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const { body, validationResult } = require('express-validator');
 const multer = require('multer');
 const QRCode = require('qrcode');
+const https = require('https');
 
 // Middleware & Services
 const { authenticateStudent } = require('../middleware/auth');
@@ -81,6 +82,43 @@ router.get('/tests', authenticateStudent, async (req, res) => {
    TEST TAKING & SUBMISSION
    ========================================================================== */
 
+/**
+ * Fetches the current UTC time from an external API for high accuracy.
+ * Falls back to the server's local time if the API is unreachable.
+ * @returns {Promise<number>} The current Unix timestamp in milliseconds.
+ */
+function getAccurateTime() {
+    return new Promise((resolve) => {
+        const request = https.get('https://worldtimeapi.org/api/timezone/Etc/UTC', (res) => {
+            if (res.statusCode !== 200) {
+                console.warn(`WorldTimeAPI failed with status: ${res.statusCode}. Falling back to server time.`);
+                resolve(Date.now());
+                return;
+            }
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    // The API returns unixtime in seconds, convert to milliseconds
+                    resolve(JSON.parse(data).unixtime * 1000);
+                } catch (e) {
+                    console.warn('Failed to parse WorldTimeAPI response. Falling back to server time.');
+                    resolve(Date.now());
+                }
+            });
+        });
+        request.on('error', (e) => {
+            console.warn(`WorldTimeAPI request failed: ${e.message}. Falling back to server time.`);
+            resolve(Date.now());
+        });
+        request.setTimeout(2000, () => { // 2-second timeout
+            request.destroy();
+            console.warn('WorldTimeAPI request timed out. Falling back to server time.');
+            resolve(Date.now());
+        });
+    });
+}
+
 // ✅ NEW: Start or restore a test session, creating a server-authoritative start time.
 router.post('/test/:testId/start', authenticateStudent, async (req, res) => {
     try {
@@ -113,7 +151,8 @@ router.post('/test/:testId/start', authenticateStudent, async (req, res) => {
         const startTime = result.startedAt.getTime();
         const durationInSeconds = test.duration * 60;
         const endTime = startTime + (durationInSeconds * 1000);
-        const remainingSeconds = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+        const currentTime = await getAccurateTime();
+        const remainingSeconds = Math.max(0, Math.round((endTime - currentTime) / 1000));
 
         res.json({ success: true, message: 'Test session initiated.', remainingSeconds, startTime });
     } catch (error) {
@@ -137,7 +176,8 @@ router.get('/test/:testId/time', authenticateStudent, async (req, res) => {
         if (!result || !result.startedAt) return res.status(404).json({ success: false, message: 'Test session not started or found.' });
 
         const endTime = new Date(result.startedAt).getTime() + (test.duration * 60 * 1000);
-        const remainingSeconds = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+        const currentTime = await getAccurateTime();
+        const remainingSeconds = Math.max(0, Math.round((endTime - currentTime) / 1000));
 
         res.json({ success: true, remainingSeconds });
     } catch (error) {

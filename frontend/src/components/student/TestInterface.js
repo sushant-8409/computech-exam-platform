@@ -576,22 +576,19 @@ const TestInterface = () => {
   useEffect(() => {
     if (test && !testStarted && !loading && !isSubmitted) {
       setTestStarted(true);
-      testStartTimeRef.current = Date.now();
       setLastFocusTime(Date.now());
 
       if (!timerInitialized) {
         const startTestSession = async () => {
           try {
             const token = localStorage.getItem('token');
-            const { data } = await axios.post(
-              `/api/student/test/${testId}/start`,
-              {},
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const { data } = await axios.post(`/api/student/test/${testId}/start`, {}, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
 
             if (data.success) {
               const { remainingSeconds, startTime } = data;
-              
+
               // Set the end time based on the server's authoritative time
               testEndTimeRef.current = Date.now() + remainingSeconds * 1000;
               setTimeRemaining(remainingSeconds);
@@ -601,25 +598,19 @@ const TestInterface = () => {
               if (remainingSeconds <= 0) {
                 toast.error('⏰ Test time has already expired!');
                 handleAutoSubmit('time_limit');
+              } else {
+                toast.info(`🚀 Test session initiated. Time remaining: ${formatTime(remainingSeconds)}`);
               }
+            } else {
+              throw new Error(data.message || 'Failed to start test session.');
+            }
+          } catch (err) {
+            console.error("Failed to start/restore test session:", err);
+            toast.error(err.response?.data?.message || "Could not start the test. Redirecting...");
+            navigate('/student');
           }
-        } else {
-          const startTime = Date.now();
-          const durationInMinutes = test.duration;
-          
-          // ✅ Set the fixed end time for the test
-          testEndTimeRef.current = startTime + durationInMinutes * 60 * 1000;
-
-          setTimeRemaining(durationInMinutes * 60);
-          setTimerInitialized(true);
-          testStartTimeRef.current = startTime;
-
-          localStorage.setItem(`test-start-time-${testId}`, startTime.toString());
-          localStorage.setItem(`test-duration-${testId}`, durationInMinutes.toString());
-          localStorage.setItem(`current-test-id`, testId);
-
-          toast.success(`🚀 Test started! You have ${test.duration} minutes to complete.`);
-        }
+        };
+        startTestSession();
       }
 
       setPdfUrl(test.questionPaperURL);
@@ -642,7 +633,7 @@ const TestInterface = () => {
         }
       }
     }
-  }, [test, testStarted, loading, testId, timerInitialized, handleAutoSubmit, isSubmitted]);
+  }, [test, testStarted, loading, testId, timerInitialized, handleAutoSubmit, isSubmitted, navigate, formatTime]);
 
   // Timer effect
   // ✅ Robust Timer Effect
@@ -669,6 +660,37 @@ const TestInterface = () => {
 
     return () => clearInterval(timerRef.current);
   }, [timerInitialized, testStarted, isSubmitting, isSubmitted, handleAutoSubmit]);
+
+  // ✅ Periodic Timer Sync Effect
+  useEffect(() => {
+    if (!timerInitialized || !testStarted || isSubmitting || isSubmitted) {
+      return;
+    }
+
+    // Sync with the server every 5 minutes to correct any client-side clock drift.
+    const syncInterval = setInterval(async () => {
+      try {
+        console.log('🔄 Syncing timer with server for accuracy...');
+        const token = localStorage.getItem('token');
+        const { data } = await axios.get(
+          `/api/student/test/${testId}/time`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (data.success) {
+          const { remainingSeconds } = data;
+          // Re-calibrate the client's end time based on the server's authoritative value.
+          testEndTimeRef.current = Date.now() + remainingSeconds * 1000;
+          setTimeRemaining(remainingSeconds);
+          toast.info('🔄 Timer synced with server.', { toastId: 'timer-sync', autoClose: 2000 });
+        }
+      } catch (err) {
+        console.warn('Timer sync failed:', err.response?.data?.message || err.message);
+      }
+    }, 120000); // Sync every 2 minutes for faster tuning
+
+    return () => clearInterval(syncInterval);
+  }, [timerInitialized, testStarted, isSubmitting, isSubmitted, testId]);
 
   // Auto-save answers
   useEffect(() => {
