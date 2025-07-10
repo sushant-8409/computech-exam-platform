@@ -21,6 +21,7 @@ const TestInterface = () => {
   const [autoSubmit, setAutoSubmit] = useState(false);
   const [autoSubmitReason, setAutoSubmitReason] = useState('');
   const timerRef = useRef(null);
+  const testEndTimeRef = useRef(null); // To store the exact end timestamp
   const violationTimeoutRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [answerSheetUrl, setAnswerSheetUrl] = useState(null);
@@ -579,34 +580,42 @@ const TestInterface = () => {
       setLastFocusTime(Date.now());
 
       if (!timerInitialized) {
-        const savedStartTime = localStorage.getItem(`test-start-time-${testId}`);
-        const savedDuration = localStorage.getItem(`test-duration-${testId}`);
-        const savedTestId = localStorage.getItem(`current-test-id`);
+        const startTestSession = async () => {
+          try {
+            const token = localStorage.getItem('token');
+            const { data } = await axios.post(
+              `/api/student/test/${testId}/start`,
+              {},
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
 
-        if (savedStartTime && savedDuration && savedTestId === testId) {
-          const startTime = parseInt(savedStartTime);
-          const duration = parseInt(savedDuration);
-          const elapsed = Math.floor((Date.now() - startTime) / 1000);
-          const remaining = Math.max(0, (duration * 60) - elapsed);
+            if (data.success) {
+              const { remainingSeconds, startTime } = data;
+              
+              // Set the end time based on the server's authoritative time
+              testEndTimeRef.current = Date.now() + remainingSeconds * 1000;
+              setTimeRemaining(remainingSeconds);
+              testStartTimeRef.current = startTime;
+              setTimerInitialized(true);
 
-          setTimeRemaining(remaining);
+              if (remainingSeconds <= 0) {
+                toast.error('⏰ Test time has already expired!');
+                handleAutoSubmit('time_limit');
+              }
+          }
+        } else {
+          const startTime = Date.now();
+          const durationInMinutes = test.duration;
+          
+          // ✅ Set the fixed end time for the test
+          testEndTimeRef.current = startTime + durationInMinutes * 60 * 1000;
+
+          setTimeRemaining(durationInMinutes * 60);
           setTimerInitialized(true);
           testStartTimeRef.current = startTime;
 
-          if (remaining <= 0) {
-            toast.error('⏰ Test time has expired!');
-            handleAutoSubmit('time_limit');
-            return;
-          } else {
-            toast.info(`⏰ Test session restored. Time remaining: ${Math.floor(remaining / 60)}:${(remaining % 60).toString().padStart(2, '0')}`);
-          }
-        } else {
-          setTimeRemaining(test.duration * 60);
-          setTimerInitialized(true);
-          testStartTimeRef.current = Date.now();
-
-          localStorage.setItem(`test-start-time-${testId}`, Date.now().toString());
-          localStorage.setItem(`test-duration-${testId}`, test.duration.toString());
+          localStorage.setItem(`test-start-time-${testId}`, startTime.toString());
+          localStorage.setItem(`test-duration-${testId}`, durationInMinutes.toString());
           localStorage.setItem(`current-test-id`, testId);
 
           toast.success(`🚀 Test started! You have ${test.duration} minutes to complete.`);
@@ -636,33 +645,30 @@ const TestInterface = () => {
   }, [test, testStarted, loading, testId, timerInitialized, handleAutoSubmit, isSubmitted]);
 
   // Timer effect
+  // ✅ Robust Timer Effect
   useEffect(() => {
-    if (!test || !testStarted || isSubmitting || timeRemaining <= 0 || !timerInitialized || isSubmitted) return;
+    if (!timerInitialized || !testStarted || isSubmitting || isSubmitted) {
+      return;
+    }
 
     timerRef.current = setInterval(() => {
-      setTimeRemaining(prev => {
-        const newTime = prev - 1;
+      // Calculate remaining time based on the fixed end time.
+      // This is resilient to browser tab throttling.
+      const remainingSeconds = Math.round((testEndTimeRef.current - Date.now()) / 1000);
 
-        if (newTime > 0) {
-          localStorage.setItem(`test-remaining-${testId}`, newTime.toString());
-        }
-
-        if (newTime <= 0 && !submissionLockRef.current) {
-          clearInterval(timerRef.current);
+      if (remainingSeconds > 0) {
+        setTimeRemaining(remainingSeconds);
+      } else {
+        setTimeRemaining(0);
+        clearInterval(timerRef.current);
+        if (!submissionLockRef.current) {
           handleAutoSubmit('time_limit');
-          return 0;
         }
-
-        return newTime;
-      });
+      }
     }, 1000);
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [test, testStarted, isSubmitting, timeRemaining, handleAutoSubmit, timerInitialized, testId, isSubmitted]);
+    return () => clearInterval(timerRef.current);
+  }, [timerInitialized, testStarted, isSubmitting, isSubmitted, handleAutoSubmit]);
 
   // Auto-save answers
   useEffect(() => {

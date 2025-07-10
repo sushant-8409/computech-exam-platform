@@ -81,6 +81,71 @@ router.get('/tests', authenticateStudent, async (req, res) => {
    TEST TAKING & SUBMISSION
    ========================================================================== */
 
+// ✅ NEW: Start or restore a test session, creating a server-authoritative start time.
+router.post('/test/:testId/start', authenticateStudent, async (req, res) => {
+    try {
+        const { testId } = req.params;
+        const studentId = req.student._id;
+
+        const test = await Test.findById(testId).select('duration title subject totalMarks').lean();
+        if (!test) {
+            return res.status(404).json({ success: false, message: 'Test not found.' });
+        }
+
+        // Find or create the result document to establish a server-side start time.
+        // This makes the session resilient to browser cache clearing or tab closing.
+        const result = await Result.findOneAndUpdate(
+            { studentId, testId },
+            { 
+                $setOnInsert: {
+                    studentId,
+                    testId,
+                    testTitle: test.title,
+                    testSubject: test.subject,
+                    totalMarks: test.totalMarks,
+                    startedAt: new Date(),
+                    status: 'pending'
+                }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        ).lean();
+
+        const startTime = result.startedAt.getTime();
+        const durationInSeconds = test.duration * 60;
+        const endTime = startTime + (durationInSeconds * 1000);
+        const remainingSeconds = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+
+        res.json({ success: true, message: 'Test session initiated.', remainingSeconds, startTime });
+    } catch (error) {
+        console.error('Test Start Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to start the test session.' });
+    }
+});
+
+// ✅ NEW: Get the authoritative remaining time from the server.
+router.get('/test/:testId/time', authenticateStudent, async (req, res) => {
+    try {
+        const { testId } = req.params;
+        const studentId = req.student._id;
+
+        const [test, result] = await Promise.all([
+            Test.findById(testId).select('duration').lean(),
+            Result.findOne({ studentId, testId }).select('startedAt').lean()
+        ]);
+
+        if (!test) return res.status(404).json({ success: false, message: 'Test not found.' });
+        if (!result || !result.startedAt) return res.status(404).json({ success: false, message: 'Test session not started or found.' });
+
+        const endTime = new Date(result.startedAt).getTime() + (test.duration * 60 * 1000);
+        const remainingSeconds = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+
+        res.json({ success: true, remainingSeconds });
+    } catch (error) {
+        console.error('Fetch Time Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch remaining time.' });
+    }
+});
+
 router.get('/test/:testId', authenticateStudent, async (req, res) => {
     try {
         const { testId } = req.params;
