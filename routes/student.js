@@ -82,6 +82,7 @@ router.get('/tests', authenticateStudent, async (req, res) => {
    TEST TAKING & SUBMISSION
    ========================================================================== */
 
+<<<<<<< HEAD
 /**
  * Fetches the current UTC time from an external API for high accuracy.
  * Falls back to the server's local time if the API is unreachable.
@@ -186,6 +187,8 @@ router.get('/test/:testId/time', authenticateStudent, async (req, res) => {
     }
 });
 
+=======
+>>>>>>> parent of d6a5bdd (feat(TestSession): Implement server-authoritative test session start and remaining time retrieval)
 router.get('/test/:testId', authenticateStudent, async (req, res) => {
     try {
         const { testId } = req.params;

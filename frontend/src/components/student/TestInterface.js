@@ -21,7 +21,6 @@ const TestInterface = () => {
   const [autoSubmit, setAutoSubmit] = useState(false);
   const [autoSubmitReason, setAutoSubmitReason] = useState('');
   const timerRef = useRef(null);
-  const testEndTimeRef = useRef(null); // To store the exact end timestamp
   const violationTimeoutRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [answerSheetUrl, setAnswerSheetUrl] = useState(null);
@@ -579,6 +578,7 @@ const TestInterface = () => {
       setLastFocusTime(Date.now());
 
       if (!timerInitialized) {
+<<<<<<< HEAD
         const startTestSession = async () => {
           try {
             const token = localStorage.getItem('token');
@@ -611,6 +611,40 @@ const TestInterface = () => {
           }
         };
         startTestSession();
+=======
+        const savedStartTime = localStorage.getItem(`test-start-time-${testId}`);
+        const savedDuration = localStorage.getItem(`test-duration-${testId}`);
+        const savedTestId = localStorage.getItem(`current-test-id`);
+
+        if (savedStartTime && savedDuration && savedTestId === testId) {
+          const startTime = parseInt(savedStartTime);
+          const duration = parseInt(savedDuration);
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          const remaining = Math.max(0, (duration * 60) - elapsed);
+
+          setTimeRemaining(remaining);
+          setTimerInitialized(true);
+          testStartTimeRef.current = startTime;
+
+          if (remaining <= 0) {
+            toast.error('⏰ Test time has expired!');
+            handleAutoSubmit('time_limit');
+            return;
+          } else {
+            toast.info(`⏰ Test session restored. Time remaining: ${Math.floor(remaining / 60)}:${(remaining % 60).toString().padStart(2, '0')}`);
+          }
+        } else {
+          setTimeRemaining(test.duration * 60);
+          setTimerInitialized(true);
+          testStartTimeRef.current = Date.now();
+
+          localStorage.setItem(`test-start-time-${testId}`, Date.now().toString());
+          localStorage.setItem(`test-duration-${testId}`, test.duration.toString());
+          localStorage.setItem(`current-test-id`, testId);
+
+          toast.success(`🚀 Test started! You have ${test.duration} minutes to complete.`);
+        }
+>>>>>>> parent of d6a5bdd (feat(TestSession): Implement server-authoritative test session start and remaining time retrieval)
       }
 
       setPdfUrl(test.questionPaperURL);
@@ -636,30 +670,33 @@ const TestInterface = () => {
   }, [test, testStarted, loading, testId, timerInitialized, handleAutoSubmit, isSubmitted, navigate, formatTime]);
 
   // Timer effect
-  // ✅ Robust Timer Effect
   useEffect(() => {
-    if (!timerInitialized || !testStarted || isSubmitting || isSubmitted) {
-      return;
-    }
+    if (!test || !testStarted || isSubmitting || timeRemaining <= 0 || !timerInitialized || isSubmitted) return;
 
     timerRef.current = setInterval(() => {
-      // Calculate remaining time based on the fixed end time.
-      // This is resilient to browser tab throttling.
-      const remainingSeconds = Math.round((testEndTimeRef.current - Date.now()) / 1000);
+      setTimeRemaining(prev => {
+        const newTime = prev - 1;
 
-      if (remainingSeconds > 0) {
-        setTimeRemaining(remainingSeconds);
-      } else {
-        setTimeRemaining(0);
-        clearInterval(timerRef.current);
-        if (!submissionLockRef.current) {
-          handleAutoSubmit('time_limit');
+        if (newTime > 0) {
+          localStorage.setItem(`test-remaining-${testId}`, newTime.toString());
         }
-      }
+
+        if (newTime <= 0 && !submissionLockRef.current) {
+          clearInterval(timerRef.current);
+          handleAutoSubmit('time_limit');
+          return 0;
+        }
+
+        return newTime;
+      });
     }, 1000);
 
-    return () => clearInterval(timerRef.current);
-  }, [timerInitialized, testStarted, isSubmitting, isSubmitted, handleAutoSubmit]);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [test, testStarted, isSubmitting, timeRemaining, handleAutoSubmit, timerInitialized, testId, isSubmitted]);
 
   // ✅ Periodic Timer Sync Effect
   useEffect(() => {

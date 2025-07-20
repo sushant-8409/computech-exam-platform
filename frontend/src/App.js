@@ -25,7 +25,7 @@ import offlineHandler from './utils/offlineHandler';
 import MockTestCreator from './components/student/MockTestCreator'; // ✅ Add this import
 
 // Set axios base URL
-axios.defaults.baseURL = 'https://computech-exam-platform.onrender.com'; // Change to your server URL
+axios.defaults.baseURL = 'http://localhost:5000'; // Change to your server URL
 axios.defaults.withCredentials = true;
 
 // Auth & Theme contexts
