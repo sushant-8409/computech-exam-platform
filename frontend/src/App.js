@@ -319,10 +319,12 @@ function ProtectedRoute({ children, adminOnly = false }) {
   }
   
   if (!user) {
+    console.log('🔒 Protected route accessed without authentication, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
   if (adminOnly && user.role !== 'admin') {
+    console.log('🚫 Non-admin user attempted to access admin route, redirecting to student dashboard');
     return <Navigate to="/student" replace />;
   }
   
@@ -338,6 +340,23 @@ function SmartRedirect() {
   }
   
   return <Navigate to="/login" replace />;
+}
+
+// ✅ Universal redirect for any unmatched URL - ensures login redirect
+function UniversalRedirect() {
+  const { user, loading, authChecked } = useAuth();
+  
+  if (loading || !authChecked) {
+    return <LoadingSpinner text="Loading..." />;
+  }
+  
+  if (!user) {
+    console.log('🔒 Unauthorized access to unknown route, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
+  
+  // If user is authenticated but hits unknown route, redirect to their dashboard
+  return <Navigate to={user.role === 'admin' ? '/admin' : '/student'} replace />;
 }
 
 export default function App() {
@@ -357,10 +376,10 @@ export default function App() {
           <PWAInstallPrompt />
           <Routes>
 
-            {/* Public login */}
+            {/* ✅ ONLY Public route - login */}
             <Route path="/login" element={<LoginRoute />} />
 
-            {/* ✅ SPECIAL ROUTE: TestInterface WITHOUT Header */}
+            {/* ✅ PROTECTED ROUTES: TestInterface WITHOUT Header */}
             <Route path="/student/test/:testId" element={
               <ProtectedRoute>
                 <AppLayoutWithoutHeader />
@@ -369,7 +388,7 @@ export default function App() {
               <Route index element={<TestInterface />} />
             </Route>
 
-            {/* ✅ MAIN APP ROUTES: All other routes WITH Header */}
+            {/* ✅ PROTECTED ROUTES: All other routes WITH Header */}
             <Route path="/" element={
               <ProtectedRoute>
                 <AppLayoutWithHeader />
@@ -381,7 +400,6 @@ export default function App() {
               {/* Admin section */}
               <Route path="admin" element={<ProtectedRoute adminOnly><Outlet /></ProtectedRoute>}>
                 <Route index element={<AdminDashboard />} />
-                <Route path="*" element={<AdminDashboard />} />
                 <Route path="tests" element={<AdminDashboard />} />
                 <Route path="tests/edit/:id" element={<EditTestPage />} />
                 <Route path="answer-review" element={<AnswerSheetReview />} />
@@ -406,10 +424,11 @@ export default function App() {
                 </ProtectedRoute>
               } />
 
-              {/* Fallback redirect */}
-              <Route path="*" element={<SmartRedirect />} />
-
             </Route>
+
+            {/* ✅ UNIVERSAL CATCH-ALL: Any unmatched URL redirects to login if not authenticated */}
+            <Route path="*" element={<UniversalRedirect />} />
+
           </Routes>
         </BrowserRouter>
       </AuthProvider>
