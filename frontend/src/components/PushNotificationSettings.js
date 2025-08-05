@@ -42,13 +42,21 @@ const PushNotificationSettings = () => {
       
     } catch (error) {
       console.error('❌ Failed to initialize push notifications:', error);
-      toast.error('Failed to initialize push notifications');
-      // Set a safe default state
-      setStatus({
+      
+      // Still try to get basic support status
+      const basicStatus = {
         supported: pushManager.isSupported(),
         subscribed: false,
-        permission: Notification.permission
-      });
+        permission: 'Notification' in window ? Notification.permission : 'unavailable'
+      };
+      
+      console.log('📊 Setting basic status due to init error:', basicStatus);
+      setStatus(basicStatus);
+      
+      // Only show error toast if it's a real error, not just unsupported
+      if (basicStatus.supported) {
+        toast.error('Failed to initialize push notifications');
+      }
     } finally {
       setLoading(false);
     }
@@ -126,6 +134,12 @@ const PushNotificationSettings = () => {
     }
   };
 
+  // Add refresh functionality
+  const handleRefresh = async () => {
+    console.log('🔄 Manually refreshing push notification status...');
+    await initializePushNotifications();
+  };
+
   if (!status.supported) {
     return (
       <div className={styles.pushNotificationSettings}>
@@ -141,6 +155,20 @@ const PushNotificationSettings = () => {
             <p className={`${styles.permissionBannerMessage} ${styles.denied}`}>
               Push notifications are not supported in this browser. Please try using a modern browser like Chrome, Firefox, or Safari.
             </p>
+            <div className={styles.debugInfo}>
+              <small>
+                Debug Info: Protocol: {window.location.protocol}, Host: {window.location.host}
+              </small>
+            </div>
+          </div>
+          <div className={styles.permissionBannerActions}>
+            <button 
+              onClick={handleRefresh} 
+              className={`${styles.permissionBannerButton} ${styles.secondary}`}
+              disabled={loading}
+            >
+              {loading ? '🔄 Checking...' : '🔄 Retry'}
+            </button>
           </div>
         </div>
       </div>

@@ -2,6 +2,11 @@
    THEME SYSTEM - CSS VARIABLES
    ============================================ */
 
+/* ✅ SMOOTH SCROLLING BEHAVIOR */
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   /* ✅ LIGHT THEME - DEFAULT */
   --bg-primary: #ffffff;
@@ -263,6 +268,37 @@
   font-weight: 500;
 }
 
+/* ✅ CLICKABLE STATS CARDS */
+.statsCard.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.statsCard.clickable:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 20px 60px var(--shadow-medium);
+}
+
+.statsCard.clickable:active {
+  transform: translateY(-4px) scale(1.01);
+  transition: all 0.1s ease;
+}
+
+.statsCard.clickable::after {
+  content: "👆 Click to scroll";
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.statsCard.clickable:hover::after {
+  opacity: 1;
+}
+
 /* ============================================
    TEST SECTIONS
    ============================================ */
@@ -270,6 +306,8 @@
 .testSection {
   margin: 3rem 0;
   width: 100%;
+  scroll-margin-top: 100px; /* ✅ Account for fixed header */
+  transition: all 0.3s ease;
 }
 
 .testSection h2 {
@@ -496,6 +534,8 @@
 .resultsSection {
   margin: 3rem 0;
   width: 100%;
+  scroll-margin-top: 100px; /* ✅ Account for fixed header */
+  transition: all 0.3s ease;
 }
 
 .resultsSection h2 {
@@ -1800,6 +1840,113 @@
 }
 
 /* ============================================
+   ANALYTICS SECTION
+   ============================================ */
+
+.analyticsSection {
+  margin: 3rem 0;
+  width: 100%;
+}
+
+.analyticsCard {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px var(--shadow-light);
+  transition: all 0.3s ease;
+}
+
+.analyticsCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px var(--shadow-medium);
+}
+
+.analyticsContent {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.analyticsIcon {
+  font-size: 4rem;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+  color: white;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.analyticsInfo {
+  flex: 1;
+}
+
+.analyticsInfo h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.analyticsInfo p {
+  margin: 0 0 1rem 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.analyticsStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.analyticsStats span {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid var(--border-light);
+}
+
+.analyticsBtn {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+.analyticsBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, var(--primary-hover), var(--primary-color));
+}
+
+.analyticsBtn:disabled {
+  background: var(--bg-quaternary);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.analyticsBtn:disabled:hover {
+  transform: none;
+}
+
+/* ============================================
    DARK MODE - PORTALS SECTION
    ============================================ */
 
@@ -1863,5 +2010,66 @@
     padding: 10px 20px;
     font-size: 13px;
     width: 100%;
+  }
+}
+
+/* ============================================
+   DARK MODE - ANALYTICS SECTION
+   ============================================ */
+
+.dark .analyticsCard {
+  background: var(--card-bg);
+  border-color: var(--card-border);
+}
+
+.dark .analyticsStats span {
+  background: var(--bg-quaternary);
+  border-color: var(--border-dark);
+}
+
+/* ============================================
+   RESPONSIVE - ANALYTICS SECTION
+   ============================================ */
+
+@media (max-width: 768px) {
+  .analyticsContent {
+    flex-direction: column;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .analyticsIcon {
+    font-size: 3rem;
+    width: 60px;
+    height: 60px;
+  }
+  
+  .analyticsInfo h3 {
+    font-size: 1.25rem;
+  }
+  
+  .analyticsStats {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .analyticsSection {
+    margin: 2rem 0;
+  }
+  
+  .analyticsCard {
+    padding: 1.5rem;
+  }
+  
+  .analyticsIcon {
+    font-size: 2.5rem;
+    width: 50px;
+    height: 50px;
+  }
+  
+  .analyticsStats {
+    flex-direction: column;
+    align-items: center;
   }
 }

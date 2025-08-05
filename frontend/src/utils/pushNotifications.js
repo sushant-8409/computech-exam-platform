@@ -23,37 +23,84 @@ class PushNotificationManager {
 
   // Check if push notifications are supported
   isSupported() {
-    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    const hasServiceWorker = 'serviceWorker' in navigator;
+    const hasPushManager = 'PushManager' in window;
+    const hasNotification = 'Notification' in window;
+    
+    console.log('🔍 Push notification support check:', {
+      serviceWorker: hasServiceWorker,
+      pushManager: hasPushManager,
+      notification: hasNotification,
+      overall: hasServiceWorker && hasPushManager && hasNotification
+    });
+    
+    return hasServiceWorker && hasPushManager && hasNotification;
   }
 
   // Initialize push notifications
   async initialize() {
     try {
       console.log('🚀 Initializing push notification manager...');
+      console.log('🌐 User Agent:', navigator.userAgent);
+      console.log('🔒 Protocol:', window.location.protocol);
+      console.log('🏠 Host:', window.location.host);
       
-      if (!this.isSupported()) {
+      const supported = this.isSupported();
+      if (!supported) {
         console.warn('⚠️ Push notifications not supported in this browser');
         this.isSubscribed = false;
         return false;
       }
 
+      console.log('✅ Push notifications are supported');
+
       // Reset state
       this.isSubscribed = false;
       this.subscription = null;
 
+      // Check if we're on HTTPS or localhost
+      const isSecure = window.location.protocol === 'https:' || 
+                      window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1';
+      
+      if (!isSecure) {
+        console.warn('⚠️ Push notifications require HTTPS or localhost');
+        this.isSubscribed = false;
+        return false;
+      }
+
+      console.log('🔒 Secure context confirmed');
+
       // Register service worker
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      console.log('✅ Service Worker registered:', registration.scope);
+      console.log('📝 Registering service worker...');
+      let registration;
+      
+      try {
+        registration = await navigator.serviceWorker.register('/sw.js');
+        console.log('✅ Service Worker registered:', registration.scope);
+      } catch (swError) {
+        console.warn('⚠️ Service Worker registration failed:', swError);
+        // Try alternative registration
+        try {
+          registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+          console.log('✅ Service Worker registered with explicit scope:', registration.scope);
+        } catch (swError2) {
+          console.error('❌ Service Worker registration failed completely:', swError2);
+          throw new Error('Service Worker registration failed');
+        }
+      }
 
       // Wait for service worker to be ready
+      console.log('⏳ Waiting for service worker to be ready...');
       await navigator.serviceWorker.ready;
       console.log('✅ Service Worker ready');
 
       // Check existing subscription
+      console.log('🔍 Checking for existing subscription...');
       const existingSubscription = await registration.pushManager.getSubscription();
       
       if (existingSubscription) {
-        console.log('🔍 Found existing push subscription');
+        console.log('🔍 Found existing push subscription:', existingSubscription);
         this.subscription = existingSubscription;
         this.isSubscribed = true;
         
@@ -208,10 +255,20 @@ class PushNotificationManager {
 
   // Get subscription status
   getStatus() {
-    return {
-      supported: this.isSupported(),
+    const supported = this.isSupported();
+    const permission = 'Notification' in window ? Notification.permission : 'unavailable';
+    
+    console.log('📊 Getting push notification status:', {
+      supported,
       subscribed: this.isSubscribed,
-      permission: Notification.permission
+      permission,
+      hasSubscription: !!this.subscription
+    });
+    
+    return {
+      supported,
+      subscribed: this.isSubscribed,
+      permission
     };
   }
 

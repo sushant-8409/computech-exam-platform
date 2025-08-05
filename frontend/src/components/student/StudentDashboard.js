@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../Header';
 import PushNotificationSettings from '../PushNotificationSettings';  // ✅ Import Push Notification Settings
 import StudentNotifications from './StudentNotifications';  // ✅ Import Student Notifications
+import StudentAnalytics from './StudentAnalytics';  // ✅ Import Student Analytics
 import styles from './StudentDashboard.module.css';
 
 const StudentDashboard = () => {
@@ -17,7 +18,20 @@ const StudentDashboard = () => {
   const [error, setError] = useState(null);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [checkingGoogleStatus, setCheckingGoogleStatus] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);  // ✅ Analytics modal state
   const navigate = useNavigate();
+
+  // ✅ Smooth scroll function
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest'
+      });
+    }
+  };
 
   useEffect(() => {
     fetchStudentData();
@@ -234,25 +248,64 @@ const StudentDashboard = () => {
 
         {/* Stats Grid */}
         <div className={styles.statsGrid}>
-          <div className={`${styles.statsCard} ${styles.availableCard}`}>
+          <div 
+            className={`${styles.statsCard} ${styles.availableCard} ${available.length > 0 ? styles.clickable : ''}`}
+            onClick={() => available.length > 0 && scrollToSection('availableTestsSection')}
+            title={available.length > 0 ? 'Click to scroll to available tests' : 'No available tests'}
+          >
             <h3>{available.length}</h3>
             <p>🔴 Available Tests</p>
-            <small>Take Now!</small>
+            <small>{available.length > 0 ? 'Take Now!' : 'None Available'}</small>
           </div>
           <div className={`${styles.statsCard} ${styles.upcomingCard}`}>
             <h3>{upcoming.length}</h3>
             <p>📅 Upcoming Tests</p>
             <small>Scheduled</small>
           </div>
-          <div className={`${styles.statsCard} ${styles.completedCard}`}>
+          <div 
+            className={`${styles.statsCard} ${styles.completedCard} ${results.length > 0 ? styles.clickable : ''}`}
+            onClick={() => results.length > 0 && scrollToSection('resultsSection')}
+            title={results.length > 0 ? 'Click to scroll to your results' : 'No completed tests'}
+          >
             <h3>{completedTests}</h3>
             <p>✅ Completed Tests</p>
             <small>Finished</small>
           </div>
-          <div className={`${styles.statsCard} ${styles.resultsCard}`}>
+          <div 
+            className={`${styles.statsCard} ${styles.resultsCard} ${results.length > 0 ? styles.clickable : ''}`}
+            onClick={() => results.length > 0 && scrollToSection('resultsSection')}
+            title={results.length > 0 ? 'Click to scroll to your results' : 'No results ready'}
+          >
             <h3>{resultsReady}</h3>
             <p>📊 Results Ready</p>
             <small>View Scores</small>
+          </div>
+        </div>
+
+        {/* ✅ Analytics Quick Access */}
+        <div className={styles.analyticsSection}>
+          <div className={styles.analyticsCard}>
+            <div className={styles.analyticsContent}>
+              <div className={styles.analyticsIcon}>📊</div>
+              <div className={styles.analyticsInfo}>
+                <h3>Performance Analytics</h3>
+                <p>View detailed insights about your academic performance, trends, and progress over time</p>
+                <div className={styles.analyticsStats}>
+                  <span>📈 Trends</span>
+                  <span>📚 Subject Analysis</span>
+                  <span>🏆 Grade Distribution</span>
+                  <span>📄 PDF Reports</span>
+                </div>
+              </div>
+            </div>
+            <button 
+              className={styles.analyticsBtn}
+              onClick={() => setShowAnalytics(true)}
+              disabled={results.length === 0}
+              title={results.length === 0 ? 'Complete some tests to view analytics' : 'View detailed performance analytics'}
+            >
+              {results.length === 0 ? '📊 No Data Yet' : '📊 View Analytics'}
+            </button>
           </div>
         </div>
 
@@ -346,7 +399,7 @@ const StudentDashboard = () => {
 
         {/* Available Tests Section */}
         {available.length > 0 && (
-          <div className={`${styles.testSection} ${styles.availableSection}`}>
+          <div id="availableTestsSection" className={`${styles.testSection} ${styles.availableSection}`}>
             <h2>🔴 Tests Available Now - Take Immediately!</h2>
             <div className={styles.testGrid}>
               {available.map(test => (
@@ -405,7 +458,7 @@ const StudentDashboard = () => {
 
         {/* Test Results Section */}
         {results.length > 0 && (
-          <div className={styles.resultsSection}>
+          <div id="resultsSection" className={styles.resultsSection}>
             <h2>📊 Your Test Results</h2>
             <div className={styles.tableContainer}>
               <table className={styles.resultsTable}>
@@ -504,6 +557,14 @@ const StudentDashboard = () => {
       <div className={styles.dashboardSection}>
         <PushNotificationSettings />
       </div>
+
+      {/* ✅ Analytics Modal */}
+      <StudentAnalytics 
+        results={results}
+        tests={tests}
+        isVisible={showAnalytics}
+        onClose={() => setShowAnalytics(false)}
+      />
     </div>
   );
 };

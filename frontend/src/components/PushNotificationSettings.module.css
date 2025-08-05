@@ -722,13 +722,93 @@
 }
 
 /* ============================================
+   DEBUG SECTION STYLES
+   ============================================ */
+
+.debugSection {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+.debugTitle {
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.refreshButton {
+  background: var(--secondary-color);
+  color: var(--text-inverse);
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.refreshButton:hover {
+  background: var(--secondary-hover);
+  transform: translateY(-1px);
+}
+
+.debugInfo {
+  color: var(--text-tertiary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.debugInfo strong {
+  color: var(--text-secondary);
+}
+
+.debugInfo .success {
+  color: var(--success-color);
+}
+
+.debugInfo .error {
+  color: var(--danger-color);
+}
+
+.debugInfo .warning {
+  color: var(--warning-color);
+}
+
+/* Dark theme overrides for debug section */
+[data-theme="dark"] .debugSection {
+  background: rgba(45, 45, 45, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .refreshButton {
+  background: var(--secondary-color);
+}
+
+[data-theme="dark"] .refreshButton:hover {
+  background: var(--secondary-hover);
+}
+
+/* ============================================
    PRINT STYLES
    ============================================ */
 
 @media print {
   .pushNotificationContainer,
   .notificationPermissionBanner,
-  .notificationQueue {
+  .notificationQueue,
+  .debugSection {
     display: none;
   }
 }

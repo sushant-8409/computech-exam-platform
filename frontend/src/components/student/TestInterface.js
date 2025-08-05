@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../LoadingSpinner';
-import { useOnlineStatus } from '../../hooks/useOnlineStatus'; // Add this import
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { useWebWorkerTimer } from '../../hooks/useWebWorkerTimer'; // Optimized timer hook
+import TimerDisplay from '../common/TimerDisplay'; // Optimized timer display
 import './TestInterface.module.css';
 import offlineHandler from '../../utils/offlineHandler';
 import axios from 'axios';
@@ -14,22 +16,24 @@ const TestInterface = () => {
   const { testId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-   const [offlineAnswers, setOfflineAnswers] = useState({});
+  
+  // Optimized timer hook
+  const timer = useWebWorkerTimer(testId);
+  
+  const [offlineAnswers, setOfflineAnswers] = useState({});
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [pendingSave, setPendingSave] = useState(false);
   const { isOnline, queueRequest } = useOnlineStatus();
   const mountedRef = useRef(true);
   const [autoSubmit, setAutoSubmit] = useState(false);
   const [autoSubmitReason, setAutoSubmitReason] = useState('');
-  const timerRef = useRef(null);
   const violationTimeoutRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [answerSheetUrl, setAnswerSheetUrl] = useState(null);
   const autoSaveRef = useRef(null);
   const pdfViewerRef = useRef(null);
   const testStartTimeRef = useRef(null);
-  const testEndTimeRef = useRef(null); // Add missing testEndTimeRef
-  const timerRunningRef = useRef(false); // Track if timer is currently running
+  const testEndTimeRef = useRef(null);
   const submissionLockRef = useRef(false); // Submission lock to prevent multiple submissions
   const [timeTaken, setTimeTaken] = useState(0);
   const [googleDriveConnected, setGoogleDriveConnected] = useState(false);
@@ -45,13 +49,11 @@ const TestInterface = () => {
   // Core test state
   const [test, setTest] = useState(null);
   const [answers, setAnswers] = useState({});
-  const [timeRemaining, setTimeRemaining] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false); // Track if test is submitted
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [testStarted, setTestStarted] = useState(false);
-  const [timerInitialized, setTimerInitialized] = useState(false);
 
   // File upload state
   const [answerFile, setAnswerFile] = useState(null);
@@ -71,13 +73,17 @@ const TestInterface = () => {
   const [pdfUrl, setPdfUrl] = useState('');
   const [isBetterViewer, setIsBetterViewer] = useState(false);
   const [pdfScale, setPdfScale] = useState(1);
+  // Optimized time taken tracker (separate from main timer)
   useEffect(() => {
-    const start = Date.now();
-    const iv = setInterval(() => {
-      setTimeTaken(Math.floor((Date.now() - start) / 1000));
+    if (!testStarted) return;
+    
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      setTimeTaken(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
-    return () => clearInterval(iv);
-  }, []);
+    
+    return () => clearInterval(interval);
+  }, [testStarted]);
   
   // Sync offline answers when coming back online
   const syncOfflineAnswers = useCallback(async () => {
@@ -452,12 +458,10 @@ const TestInterface = () => {
   const cleanup = () => {
     console.log('🧹 Cleaning up TestInterface...');
     
-    // Clear timer
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+    // Stop Web Worker timer
+    if (timer.isRunning) {
+      timer.stopTimer();
     }
-    timerRunningRef.current = false;
 
     // Clear timeouts
     if (violationTimeoutRef.current) {
@@ -471,8 +475,8 @@ const TestInterface = () => {
     }
 
     // Save current state before cleanup
-    if (testStarted && timeRemaining > 0 && !isSubmitted) {
-      localStorage.setItem(`test-remaining-${testId}`, timeRemaining.toString());
+    if (testStarted && timer.timeRemaining > 0 && !isSubmitted) {
+      localStorage.setItem(`test-remaining-${testId}`, timer.timeRemaining.toString());
       localStorage.setItem(`test-last-save-${testId}`, Date.now().toString());
     }
 
@@ -736,104 +740,140 @@ const TestInterface = () => {
     }
   }, [testId, navigate]);
 
-  // Setup proctoring when test starts
+  // Setup optimized timer when test starts
   useEffect(() => {
     if (test && !testStarted && !loading && !isSubmitted) {
       setTestStarted(true);
       setLastFocusTime(Date.now());
 
-      if (!timerInitialized) {
-        const startTestSession = async () => {
-          try {
-            // Check Google Drive connection before starting test
-            const isGoogleDriveConnected = await checkGoogleDriveStatus();
-            
-            if (!isGoogleDriveConnected) {
-              const shouldContinue = await showGoogleDriveWarning();
-              if (!shouldContinue) {
-                // User chose to connect Google Drive first, exit the function
-                return;
-              }
+      const initializeTimer = async () => {
+        try {
+          // Check Google Drive connection before starting test
+          const isGoogleDriveConnected = await checkGoogleDriveStatus();
+          
+          if (!isGoogleDriveConnected) {
+            const shouldContinue = await showGoogleDriveWarning();
+            if (!shouldContinue) {
+              return;
+            }
+          }
+
+          const token = localStorage.getItem('token');
+          const { data } = await axios.post(`/api/student/test/${testId}/start`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (data.success) {
+            const { remainingSeconds, startTime } = data;
+
+            testEndTimeRef.current = Date.now() + remainingSeconds * 1000;
+            testStartTimeRef.current = startTime;
+
+            if (remainingSeconds <= 0) {
+              toast.error('⏰ Test time has already expired!');
+              handleAutoSubmit('time_limit');
+              return;
             }
 
-            const token = localStorage.getItem('token');
-            const { data } = await axios.post(`/api/student/test/${testId}/start`, {}, {
-              headers: { Authorization: `Bearer ${token}` }
+            // Start the optimized Web Worker timer
+            const timerStarted = timer.startTimer({
+              duration: remainingSeconds,
+              startTime: Date.now(),
+              endTime: Date.now() + (remainingSeconds * 1000),
+              testId
             });
 
-            if (data.success) {
-              const { remainingSeconds, startTime } = data;
+            if (timerStarted) {
+              toast.info(`🚀 Test started! Time remaining: ${formatTime(remainingSeconds)}`);
+              
+              // Set up timer callbacks
+              timer.onTimerFinished(() => {
+                if (!submissionLockRef.current) {
+                  console.log('⏰ Timer finished - triggering auto-submit');
+                  handleAutoSubmit('time_limit');
+                }
+              });
 
-              // Set the end time based on the server's authoritative time
-              testEndTimeRef.current = Date.now() + remainingSeconds * 1000;
-              setTimeRemaining(remainingSeconds);
-              testStartTimeRef.current = startTime;
-              setTimerInitialized(true);
+              timer.onTimerUpdate((data) => {
+                // Periodic save every 30 seconds
+                if (data.timeRemaining > 0 && data.timeRemaining % 30 === 0) {
+                  localStorage.setItem(`test-remaining-${testId}`, data.timeRemaining.toString());
+                  localStorage.setItem(`test-last-save-${testId}`, Date.now().toString());
+                }
+              });
 
-              if (remainingSeconds <= 0) {
-                toast.error('⏰ Test time has already expired!');
-                handleAutoSubmit('time_limit');
-              } else {
-                toast.info(`🚀 Test session initiated. Time remaining: ${formatTime(remainingSeconds)}`);
-              }
+              timer.onTimerSync((syncData) => {
+                if (Math.abs(syncData.drift) > 2) {
+                  toast.info('🔄 Timer synchronized with server', { 
+                    toastId: 'timer-sync', 
+                    autoClose: 2000 
+                  });
+                }
+              });
+
             } else {
-              throw new Error(data.message || 'Failed to start test session.');
+              throw new Error('Failed to start optimized timer');
             }
-          } catch (err) {
-            console.error("Failed to start/restore test session:", err);
-            toast.error(err.response?.data?.message || "Could not start the test. Redirecting...");
-            navigate('/student');
-          }
-        };
-        startTestSession();
-
-        const savedStartTime = localStorage.getItem(`test-start-time-${testId}`);
-        const savedDuration = localStorage.getItem(`test-duration-${testId}`);
-        const savedTestId = localStorage.getItem(`current-test-id`);
-
-        if (savedStartTime && savedDuration && savedTestId === testId) {
-          const startTime = parseInt(savedStartTime);
-          const duration = parseInt(savedDuration);
-          const elapsed = Math.floor((Date.now() - startTime) / 1000);
-          const remaining = Math.max(0, (duration * 60) - elapsed);
-
-          setTimeRemaining(remaining);
-          setTimerInitialized(true);
-          testStartTimeRef.current = startTime;
-
-          if (remaining <= 0) {
-            toast.error('⏰ Test time has expired!');
-            handleAutoSubmit('time_limit');
-            return;
           } else {
-            toast.info(`⏰ Test session restored. Time remaining: ${Math.floor(remaining / 60)}:${(remaining % 60).toString().padStart(2, '0')}`);
+            throw new Error(data.message || 'Failed to start test session.');
           }
-        } else {
-          setTimeRemaining(test.duration * 60);
-          setTimerInitialized(true);
-          testStartTimeRef.current = Date.now();
-
-          localStorage.setItem(`test-start-time-${testId}`, Date.now().toString());
-          localStorage.setItem(`test-duration-${testId}`, test.duration.toString());
-          localStorage.setItem(`current-test-id`, testId);
-
-          toast.success(`🚀 Test started! You have ${test.duration} minutes to complete.`);
+        } catch (err) {
+          console.error("Failed to start test session:", err);
+          toast.error(err.response?.data?.message || "Could not start the test. Redirecting...");
+          navigate('/student');
         }
+      };
+
+      initializeTimer();
+
+      // Handle test restoration from localStorage
+      const savedStartTime = localStorage.getItem(`test-start-time-${testId}`);
+      const savedDuration = localStorage.getItem(`test-duration-${testId}`);
+      const savedTestId = localStorage.getItem(`current-test-id`);
+
+      if (savedStartTime && savedDuration && savedTestId === testId) {
+        const startTime = parseInt(savedStartTime);
+        const duration = parseInt(savedDuration);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = Math.max(0, (duration * 60) - elapsed);
+
+        testStartTimeRef.current = startTime;
+
+        if (remaining <= 0) {
+          toast.error('⏰ Test time has expired!');
+          handleAutoSubmit('time_limit');
+          return;
+        } else {
+          // Restore timer with remaining time
+          timer.startTimer({
+            duration: remaining,
+            startTime: Date.now(),
+            endTime: Date.now() + (remaining * 1000),
+            testId
+          });
+          
+          toast.info(`⏰ Test session restored. Time remaining: ${formatTime(remaining)}`);
+        }
+      } else {
+        // Store initial test session data
+        localStorage.setItem(`test-start-time-${testId}`, Date.now().toString());
+        localStorage.setItem(`test-duration-${testId}`, test.duration.toString());
+        localStorage.setItem(`current-test-id`, testId);
       }
 
-      // Fetch signed PDF URL instead of using direct URL
+      // Fetch signed PDF URL
       if (test.questionPaperURL) {
-        fetchSignedPdfUrl(); // Call without await since we're not in an async function
+        fetchSignedPdfUrl();
       }
       setupProctoring();
 
+      // Restore violations
       const savedViolations = localStorage.getItem(`test-violations-${testId}`);
       if (savedViolations) {
         try {
           const parsedViolations = JSON.parse(savedViolations);
           setViolations(parsedViolations);
 
-          // Check if violations already reached limit
           if (parsedViolations.length >= 3 && !submissionLockRef.current) {
             submissionLockRef.current = true;
             toast.error('Previous session had maximum violations. Auto-submitting...');
@@ -844,71 +884,17 @@ const TestInterface = () => {
         }
       }
     }
-  }, [test, testStarted, loading, testId, timerInitialized, handleAutoSubmit, isSubmitted, navigate, formatTime]);
+  }, [test, testStarted, loading, testId, handleAutoSubmit, isSubmitted, navigate, timer]);
 
-  // Timer effect - Fixed to prevent restart loop
+  // Server timer sync effect - syncs with backend every 2 minutes
   useEffect(() => {
-    if (!test || !testStarted || isSubmitting || !timerInitialized || isSubmitted) return;
-    
-    // Don't start timer if time is already 0
-    if (timeRemaining <= 0) {
-      if (!submissionLockRef.current) {
-        handleAutoSubmit('time_limit');
-      }
+    if (!testStarted || isSubmitting || isSubmitted || !timer.isRunning) {
       return;
     }
 
-    // Prevent multiple timer instances
-    if (timerRunningRef.current) {
-      console.log('🕐 Timer already running, skipping...');
-      return;
-    }
-
-    console.log('🕐 Starting timer with', timeRemaining, 'seconds remaining');
-    timerRunningRef.current = true;
-
-    timerRef.current = setInterval(() => {
-      setTimeRemaining(prev => {
-        const newTime = prev - 1;
-
-        // Save remaining time periodically
-        if (newTime % 10 === 0 || newTime <= 60) {
-          localStorage.setItem(`test-remaining-${testId}`, newTime.toString());
-          localStorage.setItem(`test-last-save-${testId}`, Date.now().toString());
-        }
-
-        if (newTime <= 0 && !submissionLockRef.current) {
-          console.log('⏰ Timer reached 0 - triggering auto-submit');
-          clearInterval(timerRef.current);
-          timerRunningRef.current = false;
-          setTimeout(() => handleAutoSubmit('time_limit'), 100);
-          return 0;
-        }
-
-        return newTime;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) {
-        console.log('🕐 Cleaning up timer');
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-        timerRunningRef.current = false;
-      }
-    };
-  }, [test, testStarted, isSubmitting, timerInitialized, testId, isSubmitted, handleAutoSubmit]); // Removed timeRemaining dependency
-
-  // ✅ Periodic Timer Sync Effect
-  useEffect(() => {
-    if (!timerInitialized || !testStarted || isSubmitting || isSubmitted) {
-      return;
-    }
-
-    // Sync with the server every 5 minutes to correct any client-side clock drift.
     const syncInterval = setInterval(async () => {
       try {
-        console.log('🔄 Syncing timer with server for accuracy...');
+        console.log('� Syncing timer with server...');
         const token = localStorage.getItem('token');
         const { data } = await axios.get(
           `/api/student/test/${testId}/time`,
@@ -916,19 +902,23 @@ const TestInterface = () => {
         );
 
         if (data.success) {
-          const { remainingSeconds } = data;
-          // Re-calibrate the client's end time based on the server's authoritative value.
-          testEndTimeRef.current = Date.now() + remainingSeconds * 1000;
-          setTimeRemaining(remainingSeconds);
-          toast.info('🔄 Timer synced with server.', { toastId: 'timer-sync', autoClose: 2000 });
+          const { remainingSeconds, serverTime } = data;
+          
+          // Sync the Web Worker timer with server time
+          timer.syncTimer({ 
+            remainingSeconds, 
+            serverTime: serverTime || Date.now() 
+          });
+          
+          console.log(`� Timer synced: ${remainingSeconds}s remaining`);
         }
       } catch (err) {
         console.warn('Timer sync failed:', err.response?.data?.message || err.message);
       }
-    }, 120000); // Sync every 2 minutes for faster tuning
+    }, 120000); // Sync every 2 minutes
 
     return () => clearInterval(syncInterval);
-  }, [timerInitialized, testStarted, isSubmitting, isSubmitted, testId]);
+  }, [testStarted, isSubmitting, isSubmitted, testId, timer]);
 
   // Auto-save answers
   useEffect(() => {
@@ -950,36 +940,37 @@ const TestInterface = () => {
     };
   }, [answers, testStarted, testId, isSubmitted]);
 
-  // Timer recovery mechanism - checks if timer stopped unexpectedly
+  // Timer cleanup and page unload handling
   useEffect(() => {
-    if (!testStarted || isSubmitted || isSubmitting || timeRemaining <= 0) return;
-
-    const timerCheck = setInterval(() => {
-      if (!timerRunningRef.current && timeRemaining > 0 && !submissionLockRef.current) {
-        console.log('🔧 Timer stopped unexpectedly - attempting recovery');
+    const handleBeforeUnload = (e) => {
+      if (testStarted && !isSubmitting && timer.timeRemaining > 0 && !isSubmitted) {
+        // Save current timer state
+        localStorage.setItem(`test-remaining-${testId}`, timer.timeRemaining.toString());
+        localStorage.setItem(`test-last-save-${testId}`, Date.now().toString());
         
-        // Check localStorage for more accurate time
-        const savedRemaining = localStorage.getItem(`test-remaining-${testId}`);
-        const lastSave = localStorage.getItem(`test-last-save-${testId}`);
-        
-        if (savedRemaining && lastSave) {
-          const timeSinceLastSave = Math.floor((Date.now() - parseInt(lastSave)) / 1000);
-          const calculatedRemaining = Math.max(0, parseInt(savedRemaining) - timeSinceLastSave);
-          
-          if (calculatedRemaining > 0) {
-            setTimeRemaining(calculatedRemaining);
-            // Force timer restart by toggling timerInitialized
-            setTimerInitialized(false);
-            setTimeout(() => setTimerInitialized(true), 100);
-          } else {
-            handleAutoSubmit('time_limit');
-          }
-        }
+        e.preventDefault();
+        e.returnValue = 'Are you sure you want to refresh? Your test session will continue but refreshing may cause issues.';
+        return e.returnValue;
       }
-    }, 5000); // Check every 5 seconds
+    };
 
-    return () => clearInterval(timerCheck);
-  }, [testStarted, isSubmitted, isSubmitting, timeRemaining, testId, handleAutoSubmit]);
+    const handleUnload = () => {
+      if (testStarted && timer.isRunning) {
+        // Stop timer and save state
+        timer.stopTimer();
+        localStorage.setItem(`test-remaining-${testId}`, timer.timeRemaining.toString());
+        localStorage.setItem(`test-last-save-${testId}`, Date.now().toString());
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('unload', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('unload', handleUnload);
+    };
+  }, [testStarted, isSubmitting, testId, isSubmitted, timer]);
 
   // Handle escape key for better viewer
   useEffect(() => {
@@ -994,32 +985,6 @@ const TestInterface = () => {
       return () => document.removeEventListener('keydown', handleEscape);
     }
   }, [isBetterViewer]);
-
-  // Warning for page refresh/navigation
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (testStarted && !isSubmitting && timeRemaining > 0 && !isSubmitted) {
-        e.preventDefault();
-        e.returnValue = 'Are you sure you want to refresh? Your test session will continue but refreshing may cause issues.';
-        return e.returnValue;
-      }
-    };
-
-    const handleUnload = () => {
-      if (testStarted && !isSubmitting && timeRemaining > 0 && !isSubmitted) {
-        localStorage.setItem(`test-remaining-${testId}`, timeRemaining.toString());
-        localStorage.setItem(`test-last-save-${testId}`, Date.now().toString());
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('unload', handleUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('unload', handleUnload);
-    };
-  }, [testStarted, isSubmitting, timeRemaining, testId, isSubmitted]);
   
   // Enhanced answer change handler with offline support
   const handleAnswerChange = (questionIndex, value) => {
@@ -1613,9 +1578,14 @@ const TestInterface = () => {
               ✕
             </button>
 
-            {/* Timer badge in corner */}
+            {/* Optimized Timer Display in Better Viewer */}
             <div className="better-viewer-timer">
-              ⏰ {formatTime(timeRemaining)}
+              <TimerDisplay 
+                timeRemaining={timer.timeRemaining}
+                size="small"
+                showWarning={true}
+                onTimeOut={() => handleAutoSubmit('time_limit')}
+              />
             </div>
 
             {/* Zoom controls */}
@@ -1879,9 +1849,14 @@ const TestInterface = () => {
 
       <div className="test-controls">
         <div className="timer-container">
-          <span className={`timer ${timeRemaining < 300 ? 'warning' : timeRemaining < 600 ? 'caution' : ''}`}>
-            ⏰ {formatTime(timeRemaining)}
-          </span>
+          <TimerDisplay 
+            timeRemaining={timer.timeRemaining}
+            size="medium"
+            showWarning={true}
+            warningThreshold={600}
+            criticalThreshold={300}
+            onTimeOut={() => handleAutoSubmit('time_limit')}
+          />
         </div>
 
         <div className="control-buttons">

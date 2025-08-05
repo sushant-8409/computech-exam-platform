@@ -1,0 +1,275 @@
+/* Timer Display Component Styles */
+.timerDisplay {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Courier New', 'Monaco', monospace;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-default);
+  user-select: none;
+  will-change: background-color, border-color, color;
+  transform: translateZ(0); /* Force hardware acceleration */
+}
+
+.timerContent {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.timerIcon {
+  font-size: 1.2em;
+  animation: none;
+  transition: transform 0.2s ease;
+}
+
+.timerText {
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: 0.05em;
+  min-width: 4ch; /* Prevent layout shifts */
+}
+
+/* Size variants */
+.small {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.75rem;
+}
+
+.medium {
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+}
+
+.large {
+  font-size: 1.25rem;
+  padding: 0.75rem 1.25rem;
+}
+
+.xlarge {
+  font-size: 1.5rem;
+  padding: 1rem 1.5rem;
+}
+
+/* Warning states */
+.normal {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-color: var(--success-color);
+}
+
+.warning {
+  color: var(--warning-dark);
+  background: var(--warning-light);
+  border-color: var(--warning-color);
+  animation: warningPulse 2s ease-in-out infinite;
+}
+
+.critical {
+  color: var(--danger-light);
+  background: var(--danger-dark);
+  border-color: var(--danger-color);
+  animation: criticalPulse 1s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+.expired {
+  color: var(--text-inverse);
+  background: var(--danger-color);
+  border-color: var(--danger-dark);
+  animation: expiredFlash 0.5s ease-in-out infinite alternate;
+}
+
+/* Critical warning overlay */
+.criticalWarning {
+  position: absolute;
+  top: -2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--danger-color);
+  color: var(--text-inverse);
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 1000;
+  animation: slideDown 0.3s ease-out;
+}
+
+.criticalWarning::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--danger-color);
+}
+
+.pulseIcon {
+  animation: iconPulse 0.5s ease-in-out infinite alternate;
+  margin-right: 0.25rem;
+}
+
+.warningText {
+  font-size: 0.75rem;
+}
+
+/* Animations */
+@keyframes warningPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+  }
+}
+
+@keyframes criticalPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
+  }
+}
+
+@keyframes expiredFlash {
+  0% {
+    background: var(--danger-color);
+  }
+  100% {
+    background: var(--danger-dark);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes iconPulse {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.2);
+  }
+}
+
+/* Hover effects */
+.timerDisplay:hover .timerIcon {
+  transform: rotate(15deg);
+}
+
+/* Dark theme support */
+[data-theme="dark"] .normal {
+  background: rgba(45, 45, 45, 0.8);
+  border-color: var(--success-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .warning {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: var(--warning-color);
+  color: var(--warning-light);
+}
+
+[data-theme="dark"] .critical {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: var(--danger-color);
+  color: var(--danger-light);
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .timerDisplay {
+    transition: none;
+  }
+  
+  .warningPulse,
+  .criticalPulse,
+  .expiredFlash,
+  .slideDown,
+  .iconPulse {
+    animation: none;
+  }
+  
+  .timerIcon {
+    animation: none;
+  }
+  
+  .timerDisplay:hover .timerIcon {
+    transform: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .timerDisplay {
+    border-width: 3px;
+  }
+  
+  .normal {
+    border-color: currentColor;
+  }
+  
+  .warning {
+    border-color: #ff8c00;
+  }
+  
+  .critical {
+    border-color: #ff0000;
+  }
+}
+
+/* Print styles */
+@media print {
+  .timerDisplay {
+    background: white !important;
+    color: black !important;
+    border: 2px solid black !important;
+    animation: none !important;
+    box-shadow: none !important;
+  }
+  
+  .criticalWarning {
+    display: none;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .large {
+    font-size: 1.125rem;
+    padding: 0.625rem 1rem;
+  }
+  
+  .xlarge {
+    font-size: 1.25rem;
+    padding: 0.75rem 1.25rem;
+  }
+  
+  .criticalWarning {
+    font-size: 0.6875rem;
+    padding: 0.2rem 0.5rem;
+  }
+}
