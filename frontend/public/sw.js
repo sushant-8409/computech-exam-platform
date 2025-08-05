@@ -1,53 +1,235 @@
-const CACHE_NAME = 'computech-exam-v1';
-const urlsToCache = [
+const CACHE_NAME = 'computech-exam-v2.0';
+const STATIC_CACHE = 'computech-static-v2.0';
+const DYNAMIC_CACHE = 'computech-dynamic-v2.0';
+
+// Essential files to cache for offline functionality
+const STATIC_FILES = [
   '/',
   '/static/js/bundle.js',
   '/static/css/main.css',
   '/manifest.json',
   '/icon-192x192.png',
-  '/icon-512x512.png'
+  '/icon-512x512.png',
+  '/favicon.ico'
 ];
 
-// Install event - cache resources
+// API endpoints to cache for offline support
+const API_CACHE_PATTERNS = [
+  '/api/auth/verify-token',
+  '/api/student/profile',
+  '/api/tests/',
+  '/api/student/results'
+];
+
+// Install event - cache essential resources
 self.addEventListener('install', (event) => {
+  console.log('Service Worker: Installing...');
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-  );
-});
-
-// Fetch event - serve cached content when offline
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version or fetch from network
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
+    (async () => {
+      try {
+        const cache = await caches.open(STATIC_CACHE);
+        console.log('Service Worker: Caching static files');
+        await cache.addAll(STATIC_FILES);
+        console.log('Service Worker: Static files cached successfully');
+        // Force activation of new service worker
+        await self.skipWaiting();
+      } catch (error) {
+        console.error('Service Worker: Failed to cache static files', error);
       }
-    )
+    })()
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and take control
 self.addEventListener('activate', (event) => {
+  console.log('Service Worker: Activating...');
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+    (async () => {
+      try {
+        // Clean up old caches
+        const cacheNames = await caches.keys();
+        const deletePromises = cacheNames
+          .filter(cacheName => 
+            cacheName.startsWith('computech-') && 
+            cacheName !== STATIC_CACHE && 
+            cacheName !== DYNAMIC_CACHE
+          )
+          .map(cacheName => {
+            console.log('Service Worker: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+          });
+        
+        await Promise.all(deletePromises);
+        
+        // Take control of all clients immediately
+        await self.clients.claim();
+        console.log('Service Worker: Activated and ready');
+        
+        // Notify clients about update
+        const clients = await self.clients.matchAll();
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'SW_UPDATED',
+            message: 'App updated! Refresh for latest features.'
+          });
+        });
+      } catch (error) {
+        console.error('Service Worker: Activation failed', error);
+      }
+    })()
   );
 });
+
+// Enhanced fetch event with intelligent caching strategies
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+  
+  // Skip non-GET requests and chrome-extension requests
+  if (request.method !== 'GET' || url.protocol === 'chrome-extension:') {
+    return;
+  }
+
+  event.respondWith(
+    (async () => {
+      try {
+        // Strategy 1: Static files - Cache First
+        if (STATIC_FILES.includes(url.pathname) || 
+            url.pathname.startsWith('/static/')) {
+          return await cacheFirst(request, STATIC_CACHE);
+        }
+        
+        // Strategy 2: API calls - Network First with cache fallback
+        if (url.pathname.startsWith('/api/')) {
+          return await networkFirst(request, DYNAMIC_CACHE);
+        }
+        
+        // Strategy 3: Navigation requests - Network First with offline fallback
+        if (request.mode === 'navigate') {
+          return await networkFirst(request, DYNAMIC_CACHE, true);
+        }
+        
+        // Strategy 4: Everything else - Network First
+        return await networkFirst(request, DYNAMIC_CACHE);
+        
+      } catch (error) {
+        console.error('Service Worker: Fetch failed', error);
+        
+        // Return offline fallback for navigation requests
+        if (request.mode === 'navigate') {
+          const cache = await caches.open(STATIC_CACHE);
+          return await cache.match('/') || new Response('App is offline', {
+            status: 503,
+            statusText: 'Service Unavailable'
+          });
+        }
+        
+        throw error;
+      }
+    })()
+  );
+});
+
+// Cache First strategy - good for static assets
+async function cacheFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cachedResponse = await cache.match(request);
+  
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+  
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  } catch (error) {
+    console.error('Network request failed:', error);
+    throw error;
+  }
+}
+
+// Network First strategy - good for API calls and dynamic content
+async function networkFirst(request, cacheName, isNavigation = false) {
+  try {
+    const networkResponse = await fetch(request);
+    
+    if (networkResponse.ok) {
+      const cache = await caches.open(cacheName);
+      // Only cache successful responses
+      cache.put(request, networkResponse.clone());
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.log('Network failed, trying cache:', request.url);
+    
+    const cache = await caches.open(cacheName);
+    const cachedResponse = await cache.match(request);
+    
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
+    // For navigation requests, return the main app shell
+    if (isNavigation) {
+      const appShell = await cache.match('/');
+      if (appShell) {
+        return appShell;
+      }
+    }
+    
+    throw error;
+  }
+}
+
+// Handle background sync for offline actions
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'background-sync') {
+    event.waitUntil(
+      // Handle any background sync operations
+      console.log('Background sync triggered')
+    );
+  }
+});
+
+// Handle push notifications
+self.addEventListener('push', (event) => {
+  if (event.data) {
+    const data = event.data.json();
+    const options = {
+      body: data.body,
+      icon: '/icon-192x192.png',
+      badge: '/icon-192x192.png',
+      vibrate: [200, 100, 200],
+      data: data.data || {},
+      actions: data.actions || []
+    };
+    
+    event.waitUntil(
+      self.registration.showNotification(data.title, options)
+    );
+  }
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  
+  if (event.action) {
+    // Handle action button clicks
+    console.log('Notification action clicked:', event.action);
+  } else {
+    // Handle notification body click
+    event.waitUntil(
+      clients.openWindow('/')
+    );
+  }
+});
+
+console.log('Service Worker: Loaded and ready');
 
 // ✅ NEW: Push notification event handler
 self.addEventListener('push', function(event) {
