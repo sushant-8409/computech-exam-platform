@@ -27,7 +27,7 @@ import MockTestCreator from './components/student/MockTestCreator'; // ✅ Add t
 // Set axios base URL
 // Set axios base URL based on environment
 if (process.env.NODE_ENV === 'production') {
-  axios.defaults.baseURL = 'https://computech-07f0.onrender.com';
+  axios.defaults.baseURL = 'https://computech-exam-platform.onrender.com';
 } else {
   axios.defaults.baseURL = 'http://localhost:5000';
 }
