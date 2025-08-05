@@ -262,6 +262,165 @@ router.get('/history', async (req, res) => {
   }
 });
 
+// New analytics endpoint for mock tests
+router.get('/analytics', async (req, res) => {
+  try {
+    const studentId = req.student._id;
+    
+    // Get completed mock test results with analytics data
+    const results = await MockTestResult.find({ 
+      studentId,
+      status: 'completed'
+    }).sort({ submittedAt: -1 }).lean();
+
+    // Calculate basic analytics
+    const totalTests = results.length;
+    if (totalTests === 0) {
+      return res.json({
+        success: true,
+        analytics: {
+          totalTests: 0,
+          averageScore: 0,
+          highestScore: 0,
+          lowestScore: 0,
+          passingRate: 0,
+          completionRate: 0,
+          subjectPerformance: {},
+          questionTypePerformance: {},
+          monthlyProgress: [],
+          gradeDistribution: {},
+          avgTimeTaken: 0
+        }
+      });
+    }
+
+    // Calculate performance metrics
+    const scores = results.map(r => (r.marksObtained / r.totalMarks) * 100);
+    const averageScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const highestScore = Math.max(...scores);
+    const lowestScore = Math.min(...scores);
+    const passingRate = (scores.filter(s => s >= 40).length / scores.length) * 100;
+    
+    // Get total attempted tests (including incomplete ones)
+    const totalAttempted = await MockTestResult.countDocuments({ studentId });
+    const completionRate = totalAttempted > 0 ? (totalTests / totalAttempted) * 100 : 0;
+
+    // Average time taken (in minutes)
+    const avgTimeTaken = results.reduce((sum, r) => sum + (r.timeTaken || 0), 0) / results.length / 60;
+
+    // Subject-wise performance
+    const subjectPerformance = {};
+    results.forEach(r => {
+      const subject = r.subject || 'General';
+      if (!subjectPerformance[subject]) {
+        subjectPerformance[subject] = {
+          totalTests: 0,
+          totalScore: 0,
+          totalMarks: 0,
+          totalObtained: 0,
+          totalTime: 0,
+          scores: []
+        };
+      }
+      const percentage = (r.marksObtained / r.totalMarks) * 100;
+      subjectPerformance[subject].totalTests++;
+      subjectPerformance[subject].totalScore += percentage;
+      subjectPerformance[subject].totalMarks += r.totalMarks;
+      subjectPerformance[subject].totalObtained += r.marksObtained;
+      subjectPerformance[subject].totalTime += (r.timeTaken || 0);
+      subjectPerformance[subject].scores.push(percentage);
+    });
+
+    // Calculate averages for subjects
+    Object.keys(subjectPerformance).forEach(subject => {
+      const data = subjectPerformance[subject];
+      data.averageScore = data.totalScore / data.totalTests;
+      data.averageTime = data.totalTime / data.totalTests / 60; // minutes
+    });
+
+    // Question type performance
+    const questionTypePerformance = {};
+    results.forEach(r => {
+      const type = r.questionType || 'Unknown';
+      if (!questionTypePerformance[type]) {
+        questionTypePerformance[type] = {
+          totalTests: 0,
+          totalScore: 0,
+          scores: []
+        };
+      }
+      const percentage = (r.marksObtained / r.totalMarks) * 100;
+      questionTypePerformance[type].totalTests++;
+      questionTypePerformance[type].totalScore += percentage;
+      questionTypePerformance[type].scores.push(percentage);
+    });
+
+    Object.keys(questionTypePerformance).forEach(type => {
+      const data = questionTypePerformance[type];
+      data.averageScore = data.totalScore / data.totalTests;
+    });
+
+    // Monthly progress
+    const monthlyProgress = {};
+    results.forEach(r => {
+      if (r.submittedAt || r.evaluatedAt) {
+        const date = new Date(r.submittedAt || r.evaluatedAt);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthlyProgress[monthKey]) {
+          monthlyProgress[monthKey] = {
+            totalTests: 0,
+            totalScore: 0,
+            scores: []
+          };
+        }
+        const percentage = (r.marksObtained / r.totalMarks) * 100;
+        monthlyProgress[monthKey].totalTests++;
+        monthlyProgress[monthKey].totalScore += percentage;
+        monthlyProgress[monthKey].scores.push(percentage);
+      }
+    });
+
+    const monthlyProgressArray = Object.keys(monthlyProgress)
+      .sort()
+      .map(month => ({
+        month,
+        averageScore: monthlyProgress[month].totalScore / monthlyProgress[month].totalTests,
+        totalTests: monthlyProgress[month].totalTests
+      }));
+
+    // Grade distribution
+    const gradeDistribution = {
+      'A+ (90-100%)': scores.filter(s => s >= 90).length,
+      'A (80-89%)': scores.filter(s => s >= 80 && s < 90).length,
+      'B+ (70-79%)': scores.filter(s => s >= 70 && s < 80).length,
+      'B (60-69%)': scores.filter(s => s >= 60 && s < 70).length,
+      'C (50-59%)': scores.filter(s => s >= 50 && s < 60).length,
+      'D (40-49%)': scores.filter(s => s >= 40 && s < 50).length,
+      'F (Below 40%)': scores.filter(s => s < 40).length,
+    };
+
+    res.json({
+      success: true,
+      analytics: {
+        totalTests,
+        averageScore: Math.round(averageScore * 10) / 10,
+        highestScore: Math.round(highestScore * 10) / 10,
+        lowestScore: Math.round(lowestScore * 10) / 10,
+        passingRate: Math.round(passingRate * 10) / 10,
+        completionRate: Math.round(completionRate * 10) / 10,
+        avgTimeTaken: Math.round(avgTimeTaken * 10) / 10,
+        subjectPerformance,
+        questionTypePerformance,
+        monthlyProgress: monthlyProgressArray,
+        gradeDistribution
+      }
+    });
+  } catch (error) {
+    console.error('Mock test analytics error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch analytics' });
+  }
+});
+
 router.post('/evaluate-subjective', async (req, res) => {
   try {
     const { resultId, questionWiseMarks } = req.body;
