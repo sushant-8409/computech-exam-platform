@@ -22,7 +22,8 @@ import LoadingSpinner from './components/LoadingSpinner';
 import Analytics from './components/admin/Analytics';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import offlineHandler from './utils/offlineHandler';
-import MockTestCreator from './components/student/MockTestCreator'; // ✅ Add this import
+import MockTestCreator from './components/student/MockTestCreator';
+import { useDevToolsProtection } from './hooks/useDevToolsProtection'; // Security protection
 
 // Set axios base URL
 // Set axios base URL based on environment
@@ -360,6 +361,29 @@ function UniversalRedirect() {
 }
 
 export default function App() {
+  // Initialize DevTools protection for the entire application
+  const { getViolationCount } = useDevToolsProtection({
+    enabled: true,
+    maxViolations: 5,
+    onViolation: (violation) => {
+      console.warn('🔒 Security violation detected:', violation);
+      
+      // Log security violations to server if needed
+      try {
+        axios.post('/api/security/violation', {
+          type: violation.type,
+          timestamp: violation.timestamp,
+          userAgent: violation.userAgent,
+          url: violation.url
+        }).catch(() => {
+          // Ignore server errors for security logging
+        });
+      } catch (e) {
+        // Ignore errors in violation reporting
+      }
+    }
+  });
+
   useEffect(() => {
     // ✅ Actually initialize the offline handler
     const cleanup = offlineHandler.init();

@@ -46,7 +46,30 @@ const studentSchema = new mongoose.Schema({
     token_type: { type: String },
     expiry_date: { type: Number }
   },
-  googleConnected: { type: Boolean, default: false }
+  googleConnected: { type: Boolean, default: false },
+  
+  // Security violation tracking
+  securityViolations: [{
+    violationType: { type: String, required: true },
+    violationDetails: { type: mongoose.Schema.Types.Mixed },
+    timestamp: { type: Date, default: Date.now },
+    testId: { type: String },
+    userAgent: { type: String },
+    screenResolution: { type: String },
+    ipAddress: { type: String },
+    sessionId: { type: String }
+  }],
+  lastSecurityViolation: { type: Date },
+  securityStatus: { 
+    type: String, 
+    enum: ['clean', 'flagged', 'suspended'], 
+    default: 'clean' 
+  },
+  securityRiskLevel: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    default: 'low'
+  }
 }, {
   collection: 'students',
   timestamps: true,

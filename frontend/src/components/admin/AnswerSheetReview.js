@@ -6,8 +6,12 @@ import { toast } from 'react-toastify';
 // Make sure you have a way to navigate, e.g., from react-router-dom
 import { useNavigate } from 'react-router-dom';
 import { enhanceEmbedUrl } from '../../utils/googleDriveUtils';
+import { useTheme } from '../../App'; // Import theme context
 
 export default function AnswerSheetReview() {
+  // Theme context
+  const { darkMode } = useTheme();
+  
   // State for the list and active item
   const [list, setList] = useState([]);
   const [active, setActive] = useState(null);
@@ -179,7 +183,7 @@ export default function AnswerSheetReview() {
   };
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${darkMode ? styles.dark : styles.light}`}>
       <aside className={styles.left}>
         <h2>Pending / Under-review</h2>
         <ul className={styles.rows}>

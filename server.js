@@ -65,6 +65,7 @@ app.use('/api/tests', require('./routes/tests'));
 app.use('/api', require('./routes/analytics'));
 app.use('/api/files', require('./routes/files'));
 app.use('/api/student/mock-tests', require('./routes/mockTest'));
+app.use('/api', require('./routes/security')); // Security violation tracking
 // app.use(require('./routes/upload.routes')); // Temporarily commented out to debug
 // Registering all admin routes sequentially as in the original file
 app.use('/api/admin', require('./routes/admin'));

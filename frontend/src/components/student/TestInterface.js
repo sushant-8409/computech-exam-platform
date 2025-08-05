@@ -6,6 +6,7 @@ import LoadingSpinner from '../LoadingSpinner';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useWebWorkerTimer } from '../../hooks/useWebWorkerTimer'; // Optimized timer hook
 import TimerDisplay from '../common/TimerDisplay'; // Optimized timer display
+import { useDevToolsProtection } from '../../hooks/useDevToolsProtection'; // Security protection
 import './TestInterface.module.css';
 import offlineHandler from '../../utils/offlineHandler';
 import axios from 'axios';
@@ -16,6 +17,37 @@ const TestInterface = () => {
   const { testId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  // Security protection for exam environment - Allow 5 violations before termination
+  useDevToolsProtection({
+    strictMode: true, // Enables tab switching monitoring
+    maxViolations: 5, // Allow 5 violations before termination
+    onViolation: (type, count) => {
+      console.warn(`Exam Security Violation: ${type} (${count}/5)`);
+      
+      // Show warning for violations but don't immediately terminate
+      if (count < 5) {
+        toast.warning(`Security Warning: ${type} (${count}/5 violations)`, {
+          position: "top-center",
+          autoClose: 3000,
+          style: { background: '#ff9800', color: 'white' }
+        });
+      }
+      
+      // Report security violation to server
+      if (user && testId) {
+        axios.post('/api/security-violation', {
+          studentId: user._id,
+          testId: testId,
+          violationType: type,
+          violationCount: count,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          screenResolution: `${window.screen.width}x${window.screen.height}`
+        }).catch(err => console.error('Failed to report security violation:', err));
+      }
+    }
+  });
   
   // Optimized timer hook
   const timer = useWebWorkerTimer(testId);
@@ -66,6 +98,7 @@ const TestInterface = () => {
   const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(false);
   const [focusLostCount, setFocusLostCount] = useState(0);
   const [lastFocusTime, setLastFocusTime] = useState(Date.now());
+  const [fiveMinuteWarningShown, setFiveMinuteWarningShown] = useState(false);
 
   // PDF and viewer state
   const [pdfError, setPdfError] = useState(false);
@@ -234,11 +267,11 @@ const TestInterface = () => {
 
     setViolations(prev => {
       const newViolations = [...prev, violation];
-      console.log(`🚨 Violation recorded: ${type} (${newViolations.length}/3)`);
+      console.log(`🚨 Violation recorded: ${type} (${newViolations.length}/5)`);
 
       localStorage.setItem(`test-violations-${testId}`, JSON.stringify(newViolations));
 
-      if (newViolations.length >= 3 && !submissionLockRef.current) {
+      if (newViolations.length >= 5 && !submissionLockRef.current) {
         toast.error('🚨 MAXIMUM VIOLATIONS REACHED! Test will be auto-submitted in 5 seconds!', {
           autoClose: false,
           toastId: 'max-violations'
@@ -250,8 +283,8 @@ const TestInterface = () => {
           handleAutoSubmit('violations');
         }, 5000);
       } else if (!submissionLockRef.current) {
-        const remaining = 3 - newViolations.length;
-        toast.error(`🚨 VIOLATION ${newViolations.length}/3: ${type}! ${remaining} warnings remaining.`, {
+        const remaining = 5 - newViolations.length;
+        toast.error(`🚨 VIOLATION ${newViolations.length}/5: ${type}! ${remaining} warnings remaining.`, {
           autoClose: 4000,
           toastId: `violation-${newViolations.length}`
         });
@@ -795,6 +828,39 @@ const TestInterface = () => {
               });
 
               timer.onTimerUpdate((data) => {
+                // 5-minute warning with red flash
+                if (data.timeRemaining === 300 && !fiveMinuteWarningShown) { // 5 minutes = 300 seconds
+                  setFiveMinuteWarningShown(true);
+                  
+                  // Red flash effect
+                  document.body.style.animation = 'redFlash 0.3s ease-in-out 3';
+                  
+                  // Define the red flash animation if not already defined
+                  if (!document.getElementById('redFlashStyle')) {
+                    const style = document.createElement('style');
+                    style.id = 'redFlashStyle';
+                    style.textContent = `
+                      @keyframes redFlash {
+                        0% { background-color: transparent; }
+                        50% { background-color: rgba(220, 38, 38, 0.2); }
+                        100% { background-color: transparent; }
+                      }
+                    `;
+                    document.head.appendChild(style);
+                  }
+                  
+                  // Remove flash animation after it completes
+                  setTimeout(() => {
+                    document.body.style.animation = '';
+                  }, 1000);
+                  
+                  // Show warning toast
+                  toast.error('⏰ WARNING: Only 5 minutes remaining!', {
+                    autoClose: 8000,
+                    toastId: 'five-minute-warning'
+                  });
+                }
+
                 // Periodic save every 30 seconds
                 if (data.timeRemaining > 0 && data.timeRemaining % 30 === 0) {
                   localStorage.setItem(`test-remaining-${testId}`, data.timeRemaining.toString());
@@ -852,6 +918,57 @@ const TestInterface = () => {
             testId
           });
           
+          // Add the same timer callbacks for restored timer
+          timer.onTimerUpdate((data) => {
+            // 5-minute warning with red flash
+            if (data.timeRemaining === 300 && !fiveMinuteWarningShown) { // 5 minutes = 300 seconds
+              setFiveMinuteWarningShown(true);
+              
+              // Red flash effect
+              document.body.style.animation = 'redFlash 0.3s ease-in-out 3';
+              
+              // Define the red flash animation if not already defined
+              if (!document.getElementById('redFlashStyle')) {
+                const style = document.createElement('style');
+                style.id = 'redFlashStyle';
+                style.textContent = `
+                  @keyframes redFlash {
+                    0% { background-color: transparent; }
+                    50% { background-color: rgba(220, 38, 38, 0.2); }
+                    100% { background-color: transparent; }
+                  }
+                `;
+                document.head.appendChild(style);
+              }
+              
+              // Remove flash animation after it completes
+              setTimeout(() => {
+                document.body.style.animation = '';
+              }, 1000);
+              
+              // Show warning toast
+              toast.error('⏰ WARNING: Only 5 minutes remaining!', {
+                autoClose: 8000,
+                toastId: 'five-minute-warning'
+              });
+            }
+
+            // Periodic save every 30 seconds
+            if (data.timeRemaining > 0 && data.timeRemaining % 30 === 0) {
+              localStorage.setItem(`test-remaining-${testId}`, data.timeRemaining.toString());
+              localStorage.setItem(`test-last-save-${testId}`, Date.now().toString());
+            }
+          });
+
+          timer.onTimerSync((syncData) => {
+            if (Math.abs(syncData.drift) > 2) {
+              toast.info('🔄 Timer synchronized with server', { 
+                toastId: 'timer-sync', 
+                autoClose: 2000 
+              });
+            }
+          });
+          
           toast.info(`⏰ Test session restored. Time remaining: ${formatTime(remaining)}`);
         }
       } else {
@@ -884,7 +1001,7 @@ const TestInterface = () => {
         }
       }
     }
-  }, [test, testStarted, loading, testId, handleAutoSubmit, isSubmitted, navigate, timer]);
+  }, [test, testStarted, loading, testId, handleAutoSubmit, isSubmitted, navigate, timer, fiveMinuteWarningShown]);
 
   // Server timer sync effect - syncs with backend every 2 minutes
   useEffect(() => {
