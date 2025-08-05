@@ -237,18 +237,34 @@ class DevToolsProtection {
     
     // Check if this is a critical violation termination
     if (this.violationCount === 0) {
-      // This means it was a critical violation (keyboard shortcut)
-      alert('🚨 SECURITY ALERT: Developer tools shortcut detected!\n\nFor exam integrity, the session must be terminated.\n\nPlease contact your instructor if this was an error.');
+      // This means it was a critical violation (keyboard shortcut) - immediate logout
+      console.error('🚨 CRITICAL VIOLATION: Developer tools detected - logging out immediately');
+      
+      // Clear any stored authentication data
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('refreshToken');
+      sessionStorage.clear();
+      
+      // Redirect to login immediately without alert
+      window.location.href = '/login?reason=security&violation=devtools';
+      return;
     } else {
-      // This is due to multiple non-critical violations
+      // This is due to multiple non-critical violations - show warning before redirect
       alert(`⚠️ SECURITY ALERT: Multiple security violations detected (${this.violationCount}/${this.maxViolations})\n\nActions like right-clicking, text selection, tab switching, or window switching are not allowed during the exam.\n\nThe session will now be terminated.`);
+      
+      // Clear stored data for non-critical violations too
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('refreshToken');
+      sessionStorage.clear();
     }
     
-    // Redirect or close
+    // Redirect based on mode
     if (this.strictMode) {
       window.location.href = '/login?reason=security';
     } else {
-      // Give user a moment to see their work before redirect
+      // Give user a moment to see their work before redirect (only for non-critical violations)
       setTimeout(() => {
         window.location.href = '/student?reason=security';
       }, 2000);
