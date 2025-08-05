@@ -66,9 +66,9 @@ if ('serviceWorker' in navigator) {
   
   window.addEventListener('appinstalled', (evt) => {
     console.log('App installed successfully');
-    // Track the installation
-    if (typeof gtag !== 'undefined') {
-      gtag('event', 'app_installed', {
+    // Track the installation (only if gtag is available)
+    if (typeof window.gtag !== 'undefined') {
+      window.gtag('event', 'app_installed', {
         event_category: 'pwa',
         event_label: 'mobile_app_install'
       });

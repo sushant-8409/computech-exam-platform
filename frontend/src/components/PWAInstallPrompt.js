@@ -199,26 +199,5 @@ Benefits:
     </div>
   );
 };
-          <ul>
-            <li>📱 Works offline during exams</li>
-            <li>⚡ Faster loading times</li>
-            <li>🔔 Push notifications for results</li>
-            <li>🏠 Quick access from home screen</li>
-            <li>🔒 Enhanced security features</li>
-          </ul>
-        </div>
-
-        <div className="pwa-actions">
-          <button className="pwa-install-btn" onClick={handleInstall}>
-            {isIOS ? 'Show Instructions' : 'Install App'}
-          </button>
-          <button className="pwa-later-btn" onClick={handleLater}>
-            Maybe Later
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default PWAInstallPrompt;
