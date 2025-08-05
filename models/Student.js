@@ -36,7 +36,17 @@ const studentSchema = new mongoose.Schema({
   parentPhoneNumber: { type: String },
   lastLogin: { type: Date },
   loginAttempts: { type: Number, default: 0 },
-  lockUntil: { type: Date }
+  lockUntil: { type: Date },
+  
+  // Google OAuth tokens for Drive uploads
+  googleTokens: {
+    access_token: { type: String },
+    refresh_token: { type: String },
+    scope: { type: String },
+    token_type: { type: String },
+    expiry_date: { type: Number }
+  },
+  googleConnected: { type: Boolean, default: false }
 }, {
   collection: 'students',
   timestamps: true,

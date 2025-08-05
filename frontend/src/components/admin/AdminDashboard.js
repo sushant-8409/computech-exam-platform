@@ -61,6 +61,191 @@ const AdminDashboard = () => {
   const fileInputRef = useRef(null);
   const { testId } = useParams();
   const answerKeyInputRef = useRef(null);
+  const [gdriveConnected, setGDriveConnected] = useState(false);
+
+  // Authentication check helper
+  const checkAuth = () => {
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    
+    console.log('🔍 Authentication check:', {
+      hasToken: !!token,
+      tokenPreview: token ? `${token.slice(0, 10)}...` : 'none',
+      hasUser: !!user,
+      hasStoredUser: !!storedUser,
+      userRole: user?.role || 'none'
+    });
+
+    if (!token || !user) {
+      console.log('❌ No authentication found, redirecting to login');
+      navigate('/login');
+      return false;
+    }
+    return true;
+  };
+
+  const checkGDriveStatus = async () => {
+    try {
+      console.log('🔍 Checking Google Drive status...');
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('❌ No auth token found');
+        setGDriveConnected(false);
+        return;
+      }
+
+      // Use the correct endpoint that checks admin Google Drive status
+      const res = await axios.get('/api/student/google-drive-status', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      console.log('📊 Google Drive status response:', res.data);
+      setGDriveConnected(res.data.connected);
+      
+      if (res.data.connected) {
+        console.log('✅ Google Drive is connected');
+      } else {
+        console.log('❌ Google Drive not connected:', res.data.message);
+      }
+    } catch (error) {
+      console.error('❌ Error checking Google Drive status:', error);
+      setGDriveConnected(false);
+    }
+  };
+
+  useEffect(() => {
+    checkGDriveStatus();
+  }, []);
+ const handleConnectGDrive = () => {
+  console.log('🔗 Connect button clicked!');
+  
+  // Get user token for OAuth state
+  const token = localStorage.getItem('token');
+  if (!token) {
+    toast.error('Please log in first');
+    return;
+  }
+
+  // More robust URL detection
+  const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  const serverUrl = isProduction 
+    ? 'https://computech-exam-platform.onrender.com' 
+    : 'http://localhost:5000';
+  
+  const authUrl = `${serverUrl}/auth/google?token=${encodeURIComponent(token)}`;
+  console.log('🔗 Opening OAuth popup:', authUrl);
+  
+  // Open popup window for OAuth
+  const popup = window.open(
+    authUrl,
+    'googleDriveAuth',
+    'width=500,height=600,scrollbars=yes,resizable=yes'
+  );
+
+  if (!popup) {
+    toast.error('Popup blocked! Please allow popups for this site.');
+    return;
+  }
+
+  // Listen for messages from the popup
+  const handleMessage = (event) => {
+    // Security check
+    if (event.origin !== serverUrl) {
+      console.warn('Received message from unexpected origin:', event.origin);
+      return;
+    }
+
+    console.log('� Received message from popup:', event.data);
+
+    if (event.data.type === 'OAUTH_SUCCESS') {
+      console.log('✅ OAuth successful!');
+      popup.close();
+      toast.success('Google Drive connected successfully!');
+      
+      // Update the connection status
+      setGDriveConnected(true);
+      checkGDriveStatus(); // Refresh status
+      
+      // Remove event listener
+      window.removeEventListener('message', handleMessage);
+    } else if (event.data.type === 'OAUTH_ERROR') {
+      console.error('❌ OAuth error:', event.data.error);
+      popup.close();
+      toast.error(`OAuth failed: ${event.data.error}`);
+      
+      // Remove event listener
+      window.removeEventListener('message', handleMessage);
+    }
+  };
+
+  // Add message listener
+  window.addEventListener('message', handleMessage);
+
+  // Cleanup if popup is closed manually
+  const checkPopup = setInterval(() => {
+    if (popup.closed) {
+      console.log('🔴 Popup closed manually');
+      clearInterval(checkPopup);
+      window.removeEventListener('message', handleMessage);
+    }
+  }, 1000);
+};
+
+
+ useEffect(() => {
+  // Check if user just completed OAuth
+  const urlParams = new URLSearchParams(window.location.search);
+  const tab = urlParams.get('tab');
+  const oauth = urlParams.get('oauth');
+  const error = urlParams.get('error');
+  
+  console.log('🔍 Checking URL params:', { tab, oauth, error });
+  
+  if (tab === 'create-test') {
+    console.log('🎯 Setting active tab to create-test');
+    setActiveTab('create-test');
+    
+    if (oauth === 'success') {
+      console.log('✅ OAuth success detected');
+      toast.success('✅ Google Drive connected successfully!');
+      checkGDriveStatus(); // Recheck connection status
+    }
+  }
+  
+  if (error) {
+    let errorMessage = 'Google Drive connection failed';
+    switch (error) {
+      case 'oauth_denied':
+        errorMessage = 'Google OAuth was denied. Please try again.';
+        break;
+      case 'oauth_no_code':
+        errorMessage = 'No authorization code received from Google.';
+        break;
+      case 'oauth_token_failed':
+        errorMessage = 'Failed to exchange authorization code for tokens.';
+        break;
+      case 'oauth_init_failed':
+        errorMessage = 'Failed to initiate Google OAuth flow.';
+        break;
+    }
+    console.log('❌ OAuth error:', errorMessage);
+    toast.error(errorMessage);
+  }
+  
+  // Clear URL parameters after processing
+  if (tab || oauth || error) {
+    console.log('🧹 Cleaning URL parameters');
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, newUrl);
+  }
+}, []);
+
+
+
+
   // Dashboard Data
   const [dashboardStats, setDashboardStats] = useState({
     totalStudents: 0,
@@ -78,11 +263,11 @@ const AdminDashboard = () => {
   const [recentActivity, setRecentActivity] = useState([]);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [chartData, setChartData] = useState({
-  monthly: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 12 months
-  distribution: [0, 0, 0, 0, 0],
-  monthlyLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-  distributionLabels: ['90-100%', '80-89%', '70-79%', '60-69%', '<60%']
-});
+    monthly: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 12 months
+    distribution: [0, 0, 0, 0, 0],
+    monthlyLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    distributionLabels: ['90-100%', '80-89%', '70-79%', '60-69%', '<60%']
+  });
 
 
   // Data Management
@@ -121,7 +306,7 @@ const AdminDashboard = () => {
     }
   });
   const initialFormState = {
-    title: '', subject: '', class: '', board: '',
+    title: '', description: '', subject: '', class: '', board: '',
     duration: 60, totalMarks: 100, passingMarks: 40,
     questionsCount: 10, startDate: '', endDate: '',
     answerKeyVisible: false, resumeEnabled: true,
@@ -136,7 +321,7 @@ const AdminDashboard = () => {
     proctoringSettings: { strictMode: true, allowTabSwitch: 0, requireFullscreen: true, blockRightClick: true, blockKeyboardShortcuts: true }
   });
   const [testForm, setTestForm] = useState({
-    title: '', subject: '', class: '', board: '',
+    title: '', description: '', subject: '', class: '', board: '',
     duration: 60, totalMarks: 100, passingMarks: 40,
     questionsCount: 10, startDate: '', endDate: '',
     answerKeyVisible: false, resumeEnabled: true,
@@ -170,6 +355,9 @@ const AdminDashboard = () => {
       console.log('✅ Analytics data loaded:', response.data);
     } catch (error) {
       console.error('❌ Failed to fetch analytics:', error);
+      if (error.response?.status === 401) {
+        console.log('🔒 Unauthorized access to analytics');
+      }
       toast.error('Failed to load analytics data');
     }
   };
@@ -205,10 +393,22 @@ const AdminDashboard = () => {
   // Fetch grade distribution data
   const fetchGradeDistribution = async () => {
     try {
-      const response = await axios.get('/api/admin/analytics/grade-distribution');
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('❌ No token found for grade distribution');
+        setGradeDistribution([]);
+        return;
+      }
+
+      const response = await axios.get('/api/admin/analytics/grade-distribution', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setGradeDistribution(response.data);
     } catch (error) {
       console.error('❌ Failed to fetch grade distribution:', error);
+      if (error.response?.status === 401) {
+        console.log('🔒 Unauthorized access to grade distribution');
+      }
       // Fallback data
       setGradeDistribution([
         { grade: 'A+', count: 0, percentage: 0 },
@@ -224,7 +424,16 @@ const AdminDashboard = () => {
   // Fetch subject performance data
   const fetchSubjectPerformance = async () => {
     try {
-      const response = await axios.get('/api/admin/analytics/subject-performance');
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('❌ No token found for subject performance');
+        setSubjectPerformance([]);
+        return;
+      }
+
+      const response = await axios.get('/api/admin/analytics/subject-performance', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       console.log('Subject performance response:', response.data); // Debug log
 
       // Ensure we always set an array
@@ -240,6 +449,9 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error('❌ Failed to fetch subject performance:', error);
+      if (error.response?.status === 401) {
+        console.log('🔒 Unauthorized access to subject performance');
+      }
       setSubjectPerformance([]); // Always set to empty array on error
     }
   };
@@ -247,20 +459,29 @@ const AdminDashboard = () => {
   const fetchDashboardData = useCallback(async () => {
     setDashboardLoading(true);
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('❌ No token found for dashboard data');
+        toast.error('Authentication required. Please login again.');
+        return;
+      }
+
+      const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+
       // Fetch dashboard statistics
-      const dashboardResponse = await axios.get('/api/admin/dashboard/stats');
+      const dashboardResponse = await axios.get('/api/admin/dashboard/stats', authHeaders);
       setDashboardStats(dashboardResponse.data);
 
       // Fetch tests
-      const testsResponse = await axios.get('/api/admin/tests');
+      const testsResponse = await axios.get('/api/admin/tests', authHeaders);
       setTests(testsResponse.data.tests || []);
 
       // Fetch students  
-      const studentsResponse = await axios.get('/api/admin/students');
+      const studentsResponse = await axios.get('/api/admin/students', authHeaders);
       setStudents(studentsResponse.data.students || []);
 
       // Fetch results
-      const resultsResponse = await axios.get('/api/admin/results');
+      const resultsResponse = await axios.get('/api/admin/results', authHeaders);
       setResults(resultsResponse.data.results || []);
 
       // Fetch additional dashboard data
@@ -272,7 +493,12 @@ const AdminDashboard = () => {
 
     } catch (error) {
       console.error('❌ Failed to fetch dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+      if (error.response?.status === 401) {
+        console.log('🔒 Unauthorized access to dashboard data');
+        toast.error('Session expired. Please login again.');
+      } else {
+        toast.error('Failed to load dashboard data');
+      }
     } finally {
       setDashboardLoading(false);
     }
@@ -281,10 +507,22 @@ const AdminDashboard = () => {
   // Fetch recent activity data
   const fetchRecentActivity = async () => {
     try {
-      const response = await axios.get('/api/admin/recent-activity');
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('❌ No token found for recent activity');
+        setRecentActivity([]);
+        return;
+      }
+
+      const response = await axios.get('/api/admin/recent-activity', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setRecentActivity(response.data);
     } catch (error) {
       console.error('❌ Failed to fetch recent activity:', error);
+      if (error.response?.status === 401) {
+        console.log('🔒 Unauthorized access to recent activity');
+      }
       setRecentActivity([]);
     }
   };
@@ -294,9 +532,22 @@ const AdminDashboard = () => {
   const [bulkActionMode, setBulkActionMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]);
   useEffect(() => {
-    axios.get('/api/admin/tests')
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('❌ No token found for admin tests');
+      return;
+    }
+
+    axios.get('/api/admin/tests', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(({ data }) => setTests(data.tests || []))
-      .catch(err => console.error('Fetch tests error:', err));
+      .catch(err => {
+        console.error('Fetch tests error:', err);
+        if (err.response?.status === 401) {
+          console.log('🔒 Unauthorized access to admin tests');
+        }
+      });
   }, []);
 
   const handleChange = e => {
@@ -399,6 +650,11 @@ const AdminDashboard = () => {
 
   // Initialize dashboard
   useEffect(() => {
+    // Check authentication first
+    if (!checkAuth()) {
+      return;
+    }
+
     fetchDashboardData();
     fetchChartData();
     fetchAnalyticsData();
@@ -408,7 +664,7 @@ const AdminDashboard = () => {
       setDarkMode(true);
       document.body.classList.add('dark-theme');
     }
-  }, []);
+  }, [user]); // Add user dependency to re-run when user changes
 
   // Theme toggle effect
   useEffect(() => {
@@ -429,8 +685,23 @@ const AdminDashboard = () => {
   // Fetch chart data
   const fetchChartData = useCallback(async () => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('❌ No token found for chart data');
+        // Set fallback data
+        setChartData({
+          monthly: [0, 0, 0, 0, 0, 0],
+          distribution: [0, 0, 0, 0, 0],
+          monthlyLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+          distributionLabels: ['90-100%', '80-89%', '70-79%', '60-69%', '<60%']
+        });
+        return;
+      }
+
       console.log('📊 Fetching chart data...');
-      const response = await axios.get('/api/admin/dashboard/charts');
+      const response = await axios.get('/api/admin/dashboard/charts', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       console.log('Chart data response:', response.data);
       const { monthly, distribution, labels } = response.data.charts;
       // Replace dispatch calls with setChartData
@@ -442,6 +713,9 @@ const AdminDashboard = () => {
       });
     } catch (error) {
       console.error('Error fetching chart data:', error);
+      if (error.response?.status === 401) {
+        console.log('🔒 Unauthorized access to chart data');
+      }
       // Set fallback data
       setChartData({
         monthly: [0, 0, 0, 0, 0, 0],
@@ -465,6 +739,12 @@ const AdminDashboard = () => {
       return;
     }
 
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Authentication required. Please login again.');
+      return;
+    }
+
     const result = await Swal.fire({
       title: 'Are you sure?',
       text: `Are you sure you want to ${action} ${selectedItems.length} items?`,
@@ -483,6 +763,8 @@ const AdminDashboard = () => {
         action,
         items: selectedItems,
         type: activeTab
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       toast.success(`Successfully ${action}ed ${selectedItems.length} items`);
@@ -490,7 +772,13 @@ const AdminDashboard = () => {
       setBulkActionMode(false);
       fetchDashboardData();
     } catch (error) {
-      toast.error(`Failed to ${action} items`);
+      console.error('❌ Bulk action failed:', error);
+      if (error.response?.status === 401) {
+        console.log('🔒 Unauthorized access to bulk action');
+        toast.error('Session expired. Please login again.');
+      } else {
+        toast.error(`Failed to ${action} items`);
+      }
     }
   };
 
@@ -509,20 +797,71 @@ const AdminDashboard = () => {
       return toast.error('🚫 You must upload the question paper first');
     }
 
+    // Validate required fields
+    if (!testForm.title?.trim()) {
+      return toast.error('📝 Test title is required');
+    }
+    if (!testForm.subject?.trim()) {
+      return toast.error('📚 Subject is required');
+    }
+    if (!testForm.class?.trim()) {
+      return toast.error('🎓 Class is required');
+    }
+    if (!testForm.board?.trim()) {
+      return toast.error('🏫 Board is required');
+    }
+    if (!testForm.startDate || !testForm.endDate) {
+      return toast.error('📅 Start date and end date are required');
+    }
+
+    // Validate dates
+    const startDate = new Date(testForm.startDate);
+    const endDate = new Date(testForm.endDate);
+    if (startDate >= endDate) {
+      return toast.error('📅 End date must be after start date');
+    }
+
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const payload = {
         ...testForm,
+        description: testForm.description || '', // Add default description
+        // Ensure dates are in ISO format
+        startDate: new Date(testForm.startDate).toISOString(),
+        endDate: new Date(testForm.endDate).toISOString(),
+        // Ensure numeric fields are numbers
+        duration: Number(testForm.duration),
+        totalMarks: Number(testForm.totalMarks),
+        passingMarks: Number(testForm.passingMarks),
+        questionsCount: Number(testForm.questionsCount),
         questionPaperURL: fileUrls.questionPaper,
-        answerKeyURL: fileUrls.answerKey
+        answerKeyURL: fileUrls.answerKey || '' // Allow empty answer key
       };
 
-      await axios.post(
+      console.log('📤 Sending test creation payload:', payload);
+      console.log('📝 Payload fields check:', {
+        hasTitle: !!payload.title,
+        hasSubject: !!payload.subject,
+        hasClass: !!payload.class,
+        hasBoard: !!payload.board,
+        hasStartDate: !!payload.startDate,
+        hasEndDate: !!payload.endDate,
+        startDateValue: payload.startDate,
+        endDateValue: payload.endDate,
+        durationType: typeof payload.duration,
+        totalMarksType: typeof payload.totalMarks,
+        passingMarksType: typeof payload.passingMarks,
+        questionsCountType: typeof payload.questionsCount
+      });
+
+      const response = await axios.post(
         '/api/admin/tests',
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      
+      console.log('✅ Test created successfully:', response.data);
       setTestForm(initialFormState);
       setFiles({ questionPaper: null, answerKey: null });
       setFileUrls({ questionPaper: '', answerKey: '' });
@@ -530,8 +869,28 @@ const AdminDashboard = () => {
       toast.success('🚀 Test created! Redirecting…');
       navigate(-1);
     } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || 'Creation failed');
+      console.error('❌ Test creation error:', err);
+      console.error('❌ Error response data:', err.response?.data);
+      console.error('❌ Error response status:', err.response?.status);
+      
+      // Handle validation errors specifically
+      if (err.response?.status === 422) {
+        const errorData = err.response?.data;
+        console.error('❌ Validation error details:', errorData);
+        
+        const errors = errorData?.errors;
+        if (errors && Array.isArray(errors)) {
+          const errorMessages = errors.map(error => `${error.path || error.param}: ${error.msg}`).join(', ');
+          toast.error(`Validation errors: ${errorMessages}`);
+        } else if (errorData?.message) {
+          toast.error(`Validation failed: ${errorData.message}`);
+        } else {
+          toast.error('Validation failed. Please check all required fields.');
+          console.error('❌ Unknown validation error format:', errorData);
+        }
+      } else {
+        toast.error(err.response?.data?.message || 'Test creation failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -549,6 +908,11 @@ const AdminDashboard = () => {
       return toast.error('📄 Select the question paper PDF first');
     }
 
+    // Check authentication first
+    if (!checkAuth()) {
+      return;
+    }
+
     setUploading(true);
     try {
       const token = localStorage.getItem('token');
@@ -556,11 +920,13 @@ const AdminDashboard = () => {
       fd.append('questionPaper', files.questionPaper);
       if (files.answerKey) fd.append('answerKey', files.answerKey);
 
+      console.log('📤 Starting file upload...');
       // Call updated upload-temp API that returns MEGA URLs
       const { data } = await axios.post('/api/admin/tests/upload-temp', fd, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      console.log('✅ Upload response:', data);
       // Store direct MEGA URLs in state
       setFileUrls({
         questionPaper: data.data.questionPaper?.url || '',
@@ -569,15 +935,27 @@ const AdminDashboard = () => {
       setIsUploaded(true);
       toast.success('✅ Files uploaded to Google Drive successfully!');
     } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || 'Google Drive upload failed');
+      console.error('❌ Upload error:', err);
+      
+      if (err.response?.status === 401) {
+        if (err.response?.data?.needsAuth) {
+          toast.error('🔗 Please connect to Google Drive first');
+          setGDriveConnected(false);
+        } else {
+          console.log('🔒 Authentication expired during upload');
+          toast.error('Session expired. Please login again.');
+        }
+      } else {
+        toast.error(err.response?.data?.message || 'Google Drive upload failed');
+      }
     } finally {
       setUploading(false);
     }
   }, [
     uploading,
     files.questionPaper,
-    files.answerKey
+    files.answerKey,
+    checkAuth
   ]);
 
 
@@ -1487,6 +1865,31 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
+        <div style={{ marginBottom: '1rem' }}>
+  {!gdriveConnected ? (
+    <button
+      className="btn btn-warning"
+      onClick={(e) => {
+        e.preventDefault();
+        handleConnectGDrive();
+      }}
+      type="button"
+    >
+      <i className="fab fa-google-drive" style={{ marginRight: 8 }} />
+      Connect Google Drive
+    </button>
+  ) : (
+    <button
+      className="btn btn-success"
+      disabled
+      type="button"
+    >
+      <i className="fab fa-google-drive" style={{ marginRight: 8 }} />
+      Google Drive Connected
+    </button>
+  )}
+</div>
+
 
         {/* File Uploads */}
         <div className="form-section">
@@ -1723,7 +2126,7 @@ const AdminDashboard = () => {
         <div className="form-actions">
           <button
             onClick={handleUploadFiles}
-            disabled={uploading || isUploaded || (!files.questionPaper && !files.answerKey)}
+            disabled={uploading || isUploaded || !gdriveConnected || (!files.questionPaper && !files.answerKey)}
           >
             {uploading ? 'Uploading...' : '📁 Upload Files'}
           </button>

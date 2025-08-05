@@ -10,12 +10,95 @@ const studentController = require('../controllers/StudentController');
 // Adjust path as needed
 const Notification = require('../models/Notification');
 const NotificationSettings = require('../models/NotificationSettings');
-const { uploadToGDrive } = require('../services/gdrive'); // Adjust path as neede
+const { uploadToGDrive: uploadViaOauth } = require('../services/oauthDrive');
+ // Adjust path as neede
 const upload = multer({ storage: multer.memoryStorage() });
 const notificationService = require('../services/notificationService');
 const SYSTEM_ADMIN_ID = '000000000000000000000001';
 const ReviewResult   = require('../models/ReviewResult');
 const { authenticateAdmin } = require('../middleware/auth');
+
+// Apply authentication middleware to all admin routes
+router.use(authenticateAdmin);
+
+// Test route for Google Drive upload debugging
+router.post('/tests/test-drive-access', async (req, res) => {
+  try {
+    console.log('🧪 Testing Google Drive access...');
+    
+    // Check session tokens
+    const tokens = req.session.googleTokens || req.session.tokens;
+    if (!tokens) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'No Google tokens found. Please connect to Google Drive first.',
+        step: 'authentication'
+      });
+    }
+
+    console.log('✅ Tokens found, testing Drive API...');
+
+    // Test Drive API access
+    const { google } = require('googleapis');
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_OAUTH_CLIENT_ID,
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials(tokens);
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    // Test 1: Check user access
+    const aboutResponse = await drive.about.get({ fields: 'user, storageQuota' });
+    console.log('✅ Drive API access successful');
+
+    // Test 2: List files (limited)
+    const filesResponse = await drive.files.list({ pageSize: 5, fields: 'files(id, name)' });
+    console.log('✅ File listing successful');
+
+    // Test 3: Check folder access if specified
+    let folderAccess = null;
+    if (process.env.GOOGLE_DRIVE_FOLDER_ID) {
+      try {
+        const folderResponse = await drive.files.get({
+          fileId: process.env.GOOGLE_DRIVE_FOLDER_ID,
+          fields: 'id, name, permissions, capabilities'
+        });
+        folderAccess = {
+          success: true,
+          folder: folderResponse.data
+        };
+      } catch (folderError) {
+        folderAccess = {
+          success: false,
+          error: folderError.message
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Google Drive access test successful',
+      results: {
+        user: aboutResponse.data.user,
+        storageQuota: aboutResponse.data.storageQuota,
+        fileCount: filesResponse.data.files.length,
+        folderAccess,
+        tokenScopes: tokens.scope || 'unknown'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Drive access test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Google Drive access test failed',
+      error: error.message,
+      code: error.code,
+      details: error.errors
+    });
+  }
+});
 
 // validation rules for creating a test
 const validators = [
@@ -68,7 +151,7 @@ router.use(requireAdmin);
 // ============================================
 
 // Dashboard Statistics with proper database queries
-router.get('/dashboard/stats', async (req, res) => {
+router.get('/dashboard/stats', authenticateAdmin, async (req, res) => {
   try {
     console.log('📊 Dashboard stats requested');
     console.log('🔗 MongoDB connection state:', mongoose.connection.readyState);
@@ -209,17 +292,34 @@ router.get('/dashboard/stats', async (req, res) => {
   }
 });
 // In routes/admin.js
-router.get('/result/:resultId', async (req, res) => {
+router.get('/result/:resultId', authenticateAdmin, async (req, res) => {
   try {
     const { resultId } = req.params;
     const result = await Result.findById(resultId)
-      .populate('studentId', 'name email class board')
-      .populate('testId', 'title subject');
+      .populate('studentId', 'name email class board school')
+      .populate('testId', 'title subject totalMarks passingMarks questionsCount questionPaperURL answerKeyURL answerKeyVisible')
+      .lean();
     if (!result) {
       return res.status(404).json({ success: false, message: 'Result not found' });
     }
-    res.json({ success: true, result });
+    
+    // Extract test and student data, similar to student endpoint
+    const { testId: testData, studentId: studentData, ...resultFields } = result;
+    
+    res.json({ 
+      success: true, 
+      result: resultFields,
+      test: testData,
+      student: { 
+        name: studentData.name, 
+        class: studentData.class, 
+        school: studentData.school,
+        email: studentData.email,
+        board: studentData.board
+      }
+    });
   } catch (error) {
+    console.error('Admin Get Result Error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch result details' });
   }
 });
@@ -576,6 +676,26 @@ router.post(
   ]),
   async (req, res, next) => {
     try {
+      console.log('📁 File upload request received');
+      console.log('🔍 Authentication check:', {
+        hasUser: !!req.user,
+        userRole: req.user?.role || 'none',
+        userId: req.user?.id || 'none'
+      });
+
+      // 🛡️ Get OAuth2 tokens from database (saved during Google OAuth)
+      const adminUser = await User.findOne({ role: 'admin' });
+      if (!adminUser || !adminUser.googleTokens) {
+        console.log('❌ No Google tokens found in database');
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Google Drive authentication required. Please connect to Google Drive first.',
+          needsAuth: true
+        });
+      }
+
+      console.log('✅ Google tokens found in database, proceeding with upload');
+      const tokens = adminUser.googleTokens;
       const fileData = {};
       const nowIST = moment().tz('Asia/Kolkata');
 
@@ -587,15 +707,17 @@ router.post(
         const sanitizedFilename = file.originalname.replace(/[^a-z0-9_.-]/gi, '_');
         const gdriveFileName = `${nowIST.format('YYYYMMDD-HHmmss')}_${sanitizedFilename}`;
 
-        const uploadResult = await uploadToGDrive(
+        // ✅ Upload using OAuth tokens instead of service account
+        const uploadResult = await uploadViaOauth(
+          tokens,
           file.buffer,
           gdriveFileName,
           file.mimetype
         );
 
         fileData[field] = {
-          url: uploadResult.url,       // Permanent Google Drive preview URL
-          fileId: uploadResult.fileId, // Google Drive file ID
+          url: uploadResult.url,
+          fileId: uploadResult.fileId,
           originalName: file.originalname
         };
       }
@@ -607,7 +729,7 @@ router.post(
       });
 
     } catch (err) {
-      console.error('⚠️ Google Drive upload error:', err);
+      console.error('⚠️ Google Drive upload error (OAuth):', err);
       res.status(500).json({
         success: false,
         message: process.env.NODE_ENV === 'development'
@@ -618,6 +740,196 @@ router.post(
   }
 );
 
+// Individual file upload endpoints for test creation
+router.post('/upload/question-paper/:testId', upload.single('question-paper'), async (req, res) => {
+  try {
+    console.log('📄 Question paper upload for test:', req.params.testId);
+    
+    const tokens = req.session.googleTokens || req.session.tokens;
+    if (!tokens) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Google Drive authentication required. Please connect to Google Drive first.',
+        needsAuth: true
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const nowIST = moment().tz('Asia/Kolkata');
+    const sanitizedFilename = req.file.originalname.replace(/[^a-z0-9_.-]/gi, '_');
+    const gdriveFileName = `${nowIST.format('YYYYMMDD-HHmmss')}_question_paper_${sanitizedFilename}`;
+
+    const uploadResult = await uploadViaOauth(
+      tokens,
+      req.file.buffer,
+      gdriveFileName,
+      req.file.mimetype
+    );
+
+    // Update test with file info
+    await Test.findByIdAndUpdate(req.params.testId, {
+      questionPaper: {
+        url: uploadResult.url,
+        fileId: uploadResult.fileId,
+        originalName: req.file.originalname
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Question paper uploaded successfully',
+      data: {
+        url: uploadResult.url,
+        fileId: uploadResult.fileId,
+        originalName: req.file.originalname
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Question paper upload error:', error);
+    res.status(500).json({
+      success: false,
+      message: `Upload failed: ${error.message}`
+    });
+  }
+});
+
+router.post('/upload/answer-sheet/:testId', upload.single('answer-sheet'), async (req, res) => {
+  try {
+    console.log('📋 Answer sheet upload for test:', req.params.testId);
+    
+    const tokens = req.session.googleTokens || req.session.tokens;
+    if (!tokens) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Google Drive authentication required. Please connect to Google Drive first.',
+        needsAuth: true
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const nowIST = moment().tz('Asia/Kolkata');
+    const sanitizedFilename = req.file.originalname.replace(/[^a-z0-9_.-]/gi, '_');
+    const gdriveFileName = `${nowIST.format('YYYYMMDD-HHmmss')}_answer_sheet_${sanitizedFilename}`;
+
+    const uploadResult = await uploadViaOauth(
+      tokens,
+      req.file.buffer,
+      gdriveFileName,
+      req.file.mimetype
+    );
+
+    // Update test with file info
+    await Test.findByIdAndUpdate(req.params.testId, {
+      answerSheet: {
+        url: uploadResult.url,
+        fileId: uploadResult.fileId,
+        originalName: req.file.originalname
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Answer sheet uploaded successfully',
+      data: {
+        url: uploadResult.url,
+        fileId: uploadResult.fileId,
+        originalName: req.file.originalname
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Answer sheet upload error:', error);
+    res.status(500).json({
+      success: false,
+      message: `Upload failed: ${error.message}`
+    });
+  }
+});
+
+router.post('/upload/answer-key/:testId', upload.single('answer-key'), async (req, res) => {
+  try {
+    console.log('🔑 Answer key upload for test:', req.params.testId);
+    
+    const tokens = req.session.googleTokens || req.session.tokens;
+    if (!tokens) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Google Drive authentication required. Please connect to Google Drive first.',
+        needsAuth: true
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const nowIST = moment().tz('Asia/Kolkata');
+    const sanitizedFilename = req.file.originalname.replace(/[^a-z0-9_.-]/gi, '_');
+    const gdriveFileName = `${nowIST.format('YYYYMMDD-HHmmss')}_answer_key_${sanitizedFilename}`;
+
+    const uploadResult = await uploadViaOauth(
+      tokens,
+      req.file.buffer,
+      gdriveFileName,
+      req.file.mimetype
+    );
+
+    // Update test with file info
+    await Test.findByIdAndUpdate(req.params.testId, {
+      answerKey: {
+        url: uploadResult.url,
+        fileId: uploadResult.fileId,
+        originalName: req.file.originalname
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Answer key uploaded successfully',
+      data: {
+        url: uploadResult.url,
+        fileId: uploadResult.fileId,
+        originalName: req.file.originalname
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Answer key upload error:', error);
+    res.status(500).json({
+      success: false,
+      message: `Upload failed: ${error.message}`
+    });
+  }
+});
+
+router.get('/gdrive-status', async (req, res) => {
+  try {
+    // Check current admin's Google connection status
+    const User = require('../models/User');
+    const admin = await User.findById(req.admin._id);
+    
+    res.json({ 
+      connected: !!(req.session && req.session.tokens) || !!(admin && admin.googleConnected),
+      hasStoredTokens: !!(admin && admin.googleTokens && admin.googleTokens.refresh_token)
+    });
+  } catch (error) {
+    res.json({ connected: false, hasStoredTokens: false });
+  }
+});
+
+// Route to initiate Google Drive connection
+router.get('/connect-gdrive', (req, res) => {
+  const { getAuthUrl } = require('../services/oauthDrive');
+  const authUrl = getAuthUrl();
+  res.redirect(authUrl);
+});
 
 // Bulk action for tests, students, results
 router.post('/bulk-action', async (req, res) => {
@@ -1077,28 +1389,145 @@ router.get('/test-notifications', async (req, res) => {
   }
 });
 
-router.get('/notification-settings', async (req, res) => {
+router.get('/notification-settings', authenticateAdmin, async (req, res) => {
   try {
-    const settings = await NotificationSettings.findOne() || {};
+    // Try to get admin-specific settings first, then global settings
+    let settings = await NotificationSettings.findOne({ adminId: req.user.id });
+    
+    if (!settings) {
+      settings = await NotificationSettings.findOne({});
+    }
+    
+    if (!settings) {
+      // Return default settings if none exist
+      settings = {
+        emailNotifications: true,
+        appNotifications: true,
+        emailTemplates: {
+          test_assigned: {
+            subject: 'New Test Assigned - {{testTitle}}',
+            body: `Hello {{studentName}},
+
+A new test has been assigned to you:
+
+Test: {{testTitle}}
+Subject: {{testSubject}}
+Class: {{testClass}}
+Start Date: {{startDate}}
+End Date: {{endDate}}
+Duration: {{duration}} minutes
+Total Marks: {{totalMarks}}
+
+Please login to your account to take the test.
+
+Best regards,
+CompuTech Team`
+          },
+          test_reminder: {
+            subject: 'Reminder: Test Due Soon - {{testTitle}}',
+            body: `Hello {{studentName}},
+
+This is a reminder that the test "{{testTitle}}" is due soon.
+
+Test Details:
+- Subject: {{testSubject}}
+- End Date: {{endDate}}
+- Duration: {{duration}} minutes
+
+Please complete the test before the deadline.
+
+Best regards,
+CompuTech Team`
+          },
+          result_published: {
+            subject: 'Test Results Published - {{testTitle}}',
+            body: `Hello {{studentName}},
+
+Your test results for "{{testTitle}}" have been published.
+
+You can view your results by logging into your account.
+
+Best regards,
+CompuTech Team`
+          }
+        },
+        appNotificationSettings: {
+          showBadge: true,
+          soundEnabled: true,
+          vibrationEnabled: true
+        }
+      };
+    }
+    
     res.json({ success: true, settings });
   } catch (error) {
+    console.error('Error fetching notification settings:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch settings' });
   }
 });
 
-router.post('/notification-settings', async (req, res) => {
+router.post('/notification-settings', authenticateAdmin, async (req, res) => {
   try {
     const { settings } = req.body;
+    console.log('💾 Saving notification settings:', settings);
 
+    // Save settings globally (not admin-specific for now)
     await NotificationSettings.findOneAndUpdate(
-      {},
+      {}, // Global settings
       { $set: settings },
       { upsert: true, new: true }
     );
 
     res.json({ success: true, message: 'Settings saved successfully' });
   } catch (error) {
+    console.error('Error saving notification settings:', error);
     res.status(500).json({ success: false, message: 'Failed to save settings' });
+  }
+});
+
+// Test notification endpoint
+router.post('/test-notification', authenticateAdmin, async (req, res) => {
+  try {
+    const { type, message, students } = req.body;
+    console.log('🧪 Testing notification:', { type, message, studentsCount: students?.length });
+    
+    if (!students || students.length === 0) {
+      return res.status(400).json({ success: false, message: 'No students provided' });
+    }
+
+    const testData = {
+      title: 'Test Notification',
+      subject: 'Test',
+      duration: 60,
+      totalMarks: 100,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // 1 day from now
+    };
+
+    const result = await notificationService.sendNotification(
+      req.user.id,
+      type || 'test_created',
+      'Test Notification',
+      message || 'This is a test notification to verify the system is working.',
+      {
+        students: students,
+        testData: testData,
+        isTestNotification: true
+      }
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Test notification sent', 
+      result 
+    });
+  } catch (error) {
+    console.error('Test notification error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to send test notification',
+      error: error.message 
+    });
   }
 });
 

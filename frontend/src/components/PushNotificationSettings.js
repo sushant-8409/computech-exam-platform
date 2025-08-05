@@ -29,16 +29,26 @@ const PushNotificationSettings = () => {
     try {
       setLoading(true);
       
+      console.log('🔄 Initializing push notifications...');
+      
       // Initialize push manager
-      await pushManager.initialize();
+      const initResult = await pushManager.initialize();
+      console.log('📱 Push manager initialization result:', initResult);
       
       // Get current status
       const currentStatus = pushManager.getStatus();
+      console.log('📊 Current push notification status:', currentStatus);
       setStatus(currentStatus);
       
     } catch (error) {
-      console.error('Failed to initialize push notifications:', error);
+      console.error('❌ Failed to initialize push notifications:', error);
       toast.error('Failed to initialize push notifications');
+      // Set a safe default state
+      setStatus({
+        supported: pushManager.isSupported(),
+        subscribed: false,
+        permission: Notification.permission
+      });
     } finally {
       setLoading(false);
     }
@@ -236,13 +246,13 @@ const PushNotificationSettings = () => {
               {loading ? '⏳ Disabling...' : '🔕 Disable Notifications'}
             </button>
             
-            <button 
+            {/* <button 
               onClick={handleTestNotification}
               disabled={loading}
               className={`${styles.btn} ${styles.btnOutline}`}
             >
               {loading ? '⏳ Sending...' : '🧪 Test Notification'}
-            </button>
+            </button> */}
           </>
         )}
       </div>

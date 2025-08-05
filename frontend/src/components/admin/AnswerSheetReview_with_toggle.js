@@ -88,13 +88,6 @@ export default function AnswerSheetReview() {
       setQMax(data.maxMarks);
       setOrigQMax(data.maxMarks);
 
-      // Update active object with test URLs from backend
-      setActive(prev => ({
-        ...prev,
-        questionPaperUrl: data.questionPaperUrl,
-        answerKeyUrl: data.answerKeyUrl
-      }));
-
       const gridMarks = [], gridRemarks = [];
       data.questions.forEach(qNum => {
         const row = (resObj.questionWiseMarks || []).find(x => x.questionNo === qNum);

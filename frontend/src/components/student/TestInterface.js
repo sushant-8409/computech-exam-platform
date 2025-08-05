@@ -9,6 +9,7 @@ import offlineHandler from '../../utils/offlineHandler';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { confirmDelete, confirmAction, successAlert, errorAlert } from '../../utils/SweetAlerts';
+import { enhanceEmbedUrl } from '../../utils/googleDriveUtils';
 const TestInterface = () => {
   const { testId } = useParams();
   const { user } = useAuth();
@@ -27,35 +28,20 @@ const TestInterface = () => {
   const autoSaveRef = useRef(null);
   const pdfViewerRef = useRef(null);
   const testStartTimeRef = useRef(null);
+  const testEndTimeRef = useRef(null); // Add missing testEndTimeRef
+  const timerRunningRef = useRef(false); // Track if timer is currently running
   const submissionLockRef = useRef(false); // Submission lock to prevent multiple submissions
   const [timeTaken, setTimeTaken] = useState(0);
-  useEffect(() => {
-    const start = Date.now();
-    const iv = setInterval(() => {
-      setTimeTaken(Math.floor((Date.now() - start) / 1000));
-    }, 1000);
-    return () => clearInterval(iv);
-  }, []);
-   useEffect(() => {
-    console.log('🌐 Initializing offline handler for test interface...');
-    const cleanup = offlineHandler.init();
-    
-    return () => {
-      if (cleanup) cleanup();
-    };
-  }, []);
-  useEffect(() => {
-    if (isOnline && pendingSave) {
-      console.log('🔄 Back online - syncing offline answers...');
-      syncOfflineAnswers();
-    }
-  }, [isOnline, pendingSave]);
+  const [googleDriveConnected, setGoogleDriveConnected] = useState(false);
+  const [checkingGoogleDrive, setCheckingGoogleDrive] = useState(false);
+
   // Capture browser info once
   const [browserInfo] = useState({
     userAgent: navigator.userAgent,
     screenResolution: `${window.screen.width}x${window.screen.height}`,
     viewport: `${window.innerWidth}x${window.innerHeight}`
   });
+
   // Core test state
   const [test, setTest] = useState(null);
   const [answers, setAnswers] = useState({});
@@ -85,6 +71,148 @@ const TestInterface = () => {
   const [pdfUrl, setPdfUrl] = useState('');
   const [isBetterViewer, setIsBetterViewer] = useState(false);
   const [pdfScale, setPdfScale] = useState(1);
+  useEffect(() => {
+    const start = Date.now();
+    const iv = setInterval(() => {
+      setTimeTaken(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(iv);
+  }, []);
+  
+  // Sync offline answers when coming back online
+  const syncOfflineAnswers = useCallback(async () => {
+    if (!isOnline || Object.keys(offlineAnswers).length === 0) return;
+
+    try {
+      setPendingSave(true);
+      
+      // Merge offline answers with current answers
+      const mergedAnswers = { ...answers, ...offlineAnswers };
+      setAnswers(mergedAnswers);
+      
+      // Save to localStorage
+      localStorage.setItem(`test-answers-${testId}`, JSON.stringify(mergedAnswers));
+      
+      // Clear offline answers
+      setOfflineAnswers({});
+      setLastSyncTime(Date.now());
+      
+      toast.success('📱 Offline answers synced successfully!');
+      console.log('✅ Offline answers synced');
+    } catch (error) {
+      console.error('❌ Failed to sync offline answers:', error);
+      toast.error('Failed to sync offline answers');
+    } finally {
+      setPendingSave(false);
+    }
+  }, [isOnline, offlineAnswers, answers, testId]);
+  
+  // Check Google Drive connection status
+  const checkGoogleDriveStatus = useCallback(async () => {
+    setCheckingGoogleDrive(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/student/google-drive-status', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setGoogleDriveConnected(response.data.connected || false);
+      return response.data.connected || false;
+    } catch (error) {
+      console.error('Error checking Google Drive status:', error);
+      setGoogleDriveConnected(false);
+      return false;
+    } finally {
+      setCheckingGoogleDrive(false);
+    }
+  }, []);
+
+  // Show Google Drive warning before starting test
+  const showGoogleDriveWarning = async () => {
+    const result = await Swal.fire({
+      title: '⚠️ Google Drive Not Connected',
+      html: `
+        <div style="text-align: left; margin: 1rem 0;">
+          <p><strong>Your Google Drive is not connected!</strong></p>
+          <br>
+          <p>Without Google Drive connection:</p>
+          <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li>❌ Answer sheet upload may fail</li>
+            <li>❌ Your test submission might not be saved</li>
+            <li>❌ You may lose your work</li>
+          </ul>
+          <br>
+          <p><strong>What would you like to do?</strong></p>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '📁 Connect Google Drive',
+      cancelButtonText: '⚡ Continue Without Connection',
+      confirmButtonColor: '#4285f4',
+      cancelButtonColor: '#dc3545',
+      reverseButtons: true,
+      allowOutsideClick: false
+    });
+
+    if (result.isConfirmed) {
+      // Open OAuth in new window and wait for completion
+      return new Promise((resolve) => {
+        const oauthWindow = window.open('/auth/google', 'googleOAuth', 'width=500,height=600');
+        
+        // Check periodically if the window is closed
+        const checkClosed = setInterval(() => {
+          if (oauthWindow.closed) {
+            clearInterval(checkClosed);
+            // Re-check Google Drive status after OAuth
+            setTimeout(async () => {
+              const isConnected = await checkGoogleDriveStatus();
+              if (isConnected) {
+                toast.success('✅ Google Drive connected successfully!');
+                resolve(true); // Allow test to start
+              } else {
+                toast.warning('⚠️ Google Drive connection failed. Proceeding without connection.');
+                resolve(true); // Still allow test to start
+              }
+            }, 1000);
+          }
+        }, 1000);
+        
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          if (!oauthWindow.closed) {
+            oauthWindow.close();
+            clearInterval(checkClosed);
+            toast.warning('⚠️ OAuth timeout. Proceeding without Google Drive.');
+            resolve(true);
+          }
+        }, 300000);
+      });
+    } else {
+      // Continue without Google Drive (risky)
+      toast.warning('⚠️ Proceeding without Google Drive - Upload may fail!', {
+        autoClose: 8000
+      });
+      return true; // Allow test to start
+    }
+  };
+  
+   useEffect(() => {
+    console.log('🌐 Initializing offline handler for test interface...');
+    const cleanup = offlineHandler.init();
+    
+    // Check Google Drive status when component loads
+    checkGoogleDriveStatus();
+    
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [checkGoogleDriveStatus]);
+  useEffect(() => {
+    if (isOnline && pendingSave) {
+      console.log('🔄 Back online - syncing offline answers...');
+      syncOfflineAnswers();
+    }
+  }, [isOnline, pendingSave, syncOfflineAnswers]);
 
   // Enhanced violation detection
   const recordViolation = useCallback((type, details, severity = 'medium') => {
@@ -284,6 +412,18 @@ const TestInterface = () => {
     }
   }, [testStarted, test, isSubmitting, recordViolation, isSubmitted]);
 
+  // Format time helper function
+  const formatTime = useCallback((seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  }, []);
+
   const handleMouseLeave = useCallback(() => {
     if (!testStarted || !test || isSubmitting || isBetterViewer || isSubmitted) return;
     recordViolation('Mouse Left Window', 'Mouse pointer left the browser window', 'low');
@@ -310,6 +450,33 @@ const TestInterface = () => {
     }
   }, [testStarted, isSubmitting, warningShown, isBetterViewer, recordViolation, isSubmitted]);
   const cleanup = () => {
+    console.log('🧹 Cleaning up TestInterface...');
+    
+    // Clear timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    timerRunningRef.current = false;
+
+    // Clear timeouts
+    if (violationTimeoutRef.current) {
+      clearTimeout(violationTimeoutRef.current);
+      violationTimeoutRef.current = null;
+    }
+    
+    if (autoSaveRef.current) {
+      clearTimeout(autoSaveRef.current);
+      autoSaveRef.current = null;
+    }
+
+    // Save current state before cleanup
+    if (testStarted && timeRemaining > 0 && !isSubmitted) {
+      localStorage.setItem(`test-remaining-${testId}`, timeRemaining.toString());
+      localStorage.setItem(`test-last-save-${testId}`, Date.now().toString());
+    }
+
+    // Remove event listeners
     document.removeEventListener('visibilitychange', handleVisibilityChange, true);
     document.removeEventListener('contextmenu', handleRightClick, true);
     document.removeEventListener('keydown', handleKeyDown, true);
@@ -317,12 +484,10 @@ const TestInterface = () => {
     window.removeEventListener('blur', handleWindowFocus, true);
     document.removeEventListener('mouseleave', handleMouseLeave);
 
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (violationTimeoutRef.current) clearTimeout(violationTimeoutRef.current);
-    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
-
+    // Restore body overflow
     document.body.style.overflow = 'auto';
 
+    // Exit fullscreen if in fullscreen mode
     if (document.exitFullscreen && document.fullscreenElement) {
       document.exitFullscreen().catch(err => console.log('Exit fullscreen error:', err));
     }
@@ -578,9 +743,19 @@ const TestInterface = () => {
       setLastFocusTime(Date.now());
 
       if (!timerInitialized) {
-<<<<<<< HEAD
         const startTestSession = async () => {
           try {
+            // Check Google Drive connection before starting test
+            const isGoogleDriveConnected = await checkGoogleDriveStatus();
+            
+            if (!isGoogleDriveConnected) {
+              const shouldContinue = await showGoogleDriveWarning();
+              if (!shouldContinue) {
+                // User chose to connect Google Drive first, exit the function
+                return;
+              }
+            }
+
             const token = localStorage.getItem('token');
             const { data } = await axios.post(`/api/student/test/${testId}/start`, {}, {
               headers: { Authorization: `Bearer ${token}` }
@@ -611,7 +786,7 @@ const TestInterface = () => {
           }
         };
         startTestSession();
-=======
+
         const savedStartTime = localStorage.getItem(`test-start-time-${testId}`);
         const savedDuration = localStorage.getItem(`test-duration-${testId}`);
         const savedTestId = localStorage.getItem(`current-test-id`);
@@ -644,10 +819,12 @@ const TestInterface = () => {
 
           toast.success(`🚀 Test started! You have ${test.duration} minutes to complete.`);
         }
->>>>>>> parent of d6a5bdd (feat(TestSession): Implement server-authoritative test session start and remaining time retrieval)
       }
 
-      setPdfUrl(test.questionPaperURL);
+      // Fetch signed PDF URL instead of using direct URL
+      if (test.questionPaperURL) {
+        fetchSignedPdfUrl(); // Call without await since we're not in an async function
+      }
       setupProctoring();
 
       const savedViolations = localStorage.getItem(`test-violations-${testId}`);
@@ -669,21 +846,42 @@ const TestInterface = () => {
     }
   }, [test, testStarted, loading, testId, timerInitialized, handleAutoSubmit, isSubmitted, navigate, formatTime]);
 
-  // Timer effect
+  // Timer effect - Fixed to prevent restart loop
   useEffect(() => {
-    if (!test || !testStarted || isSubmitting || timeRemaining <= 0 || !timerInitialized || isSubmitted) return;
+    if (!test || !testStarted || isSubmitting || !timerInitialized || isSubmitted) return;
+    
+    // Don't start timer if time is already 0
+    if (timeRemaining <= 0) {
+      if (!submissionLockRef.current) {
+        handleAutoSubmit('time_limit');
+      }
+      return;
+    }
+
+    // Prevent multiple timer instances
+    if (timerRunningRef.current) {
+      console.log('🕐 Timer already running, skipping...');
+      return;
+    }
+
+    console.log('🕐 Starting timer with', timeRemaining, 'seconds remaining');
+    timerRunningRef.current = true;
 
     timerRef.current = setInterval(() => {
       setTimeRemaining(prev => {
         const newTime = prev - 1;
 
-        if (newTime > 0) {
+        // Save remaining time periodically
+        if (newTime % 10 === 0 || newTime <= 60) {
           localStorage.setItem(`test-remaining-${testId}`, newTime.toString());
+          localStorage.setItem(`test-last-save-${testId}`, Date.now().toString());
         }
 
         if (newTime <= 0 && !submissionLockRef.current) {
+          console.log('⏰ Timer reached 0 - triggering auto-submit');
           clearInterval(timerRef.current);
-          handleAutoSubmit('time_limit');
+          timerRunningRef.current = false;
+          setTimeout(() => handleAutoSubmit('time_limit'), 100);
           return 0;
         }
 
@@ -693,10 +891,13 @@ const TestInterface = () => {
 
     return () => {
       if (timerRef.current) {
+        console.log('🕐 Cleaning up timer');
         clearInterval(timerRef.current);
+        timerRef.current = null;
+        timerRunningRef.current = false;
       }
     };
-  }, [test, testStarted, isSubmitting, timeRemaining, handleAutoSubmit, timerInitialized, testId, isSubmitted]);
+  }, [test, testStarted, isSubmitting, timerInitialized, testId, isSubmitted, handleAutoSubmit]); // Removed timeRemaining dependency
 
   // ✅ Periodic Timer Sync Effect
   useEffect(() => {
@@ -749,6 +950,37 @@ const TestInterface = () => {
     };
   }, [answers, testStarted, testId, isSubmitted]);
 
+  // Timer recovery mechanism - checks if timer stopped unexpectedly
+  useEffect(() => {
+    if (!testStarted || isSubmitted || isSubmitting || timeRemaining <= 0) return;
+
+    const timerCheck = setInterval(() => {
+      if (!timerRunningRef.current && timeRemaining > 0 && !submissionLockRef.current) {
+        console.log('🔧 Timer stopped unexpectedly - attempting recovery');
+        
+        // Check localStorage for more accurate time
+        const savedRemaining = localStorage.getItem(`test-remaining-${testId}`);
+        const lastSave = localStorage.getItem(`test-last-save-${testId}`);
+        
+        if (savedRemaining && lastSave) {
+          const timeSinceLastSave = Math.floor((Date.now() - parseInt(lastSave)) / 1000);
+          const calculatedRemaining = Math.max(0, parseInt(savedRemaining) - timeSinceLastSave);
+          
+          if (calculatedRemaining > 0) {
+            setTimeRemaining(calculatedRemaining);
+            // Force timer restart by toggling timerInitialized
+            setTimerInitialized(false);
+            setTimeout(() => setTimerInitialized(true), 100);
+          } else {
+            handleAutoSubmit('time_limit');
+          }
+        }
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(timerCheck);
+  }, [testStarted, isSubmitted, isSubmitting, timeRemaining, testId, handleAutoSubmit]);
+
   // Handle escape key for better viewer
   useEffect(() => {
     const handleEscape = (e) => {
@@ -788,33 +1020,7 @@ const TestInterface = () => {
       window.removeEventListener('unload', handleUnload);
     };
   }, [testStarted, isSubmitting, timeRemaining, testId, isSubmitted]);
-  const syncOfflineAnswers = useCallback(async () => {
-    if (!isOnline || Object.keys(offlineAnswers).length === 0) return;
-
-    try {
-      setPendingSave(true);
-      
-      // Merge offline answers with current answers
-      const mergedAnswers = { ...answers, ...offlineAnswers };
-      setAnswers(mergedAnswers);
-      
-      // Save to localStorage
-      localStorage.setItem(`test-answers-${testId}`, JSON.stringify(mergedAnswers));
-      
-      // Clear offline answers
-      setOfflineAnswers({});
-      setLastSyncTime(Date.now());
-      
-      toast.success('📱 Offline answers synced successfully!');
-      console.log('✅ Offline answers synced');
-    } catch (error) {
-      console.error('❌ Failed to sync offline answers:', error);
-      toast.error('Failed to sync offline answers');
-    } finally {
-      setPendingSave(false);
-    }
-  }, [isOnline, offlineAnswers, answers, testId]);
-
+  
   // Enhanced answer change handler with offline support
   const handleAnswerChange = (questionIndex, value) => {
     if (isSubmitted) return;
@@ -862,7 +1068,8 @@ const TestInterface = () => {
 
       if (response.data.success) {
         setTest(response.data.test);
-        setPdfUrl(response.data.test.questionPaperURL);
+        // Don't set PDF URL directly - we'll fetch the signed URL
+        // setPdfUrl(response.data.test.questionPaperURL);
       }
     } catch (error) {
       console.error('❌ Error fetching test:', error);
@@ -881,10 +1088,33 @@ const TestInterface = () => {
 
   const getFileKeyFromUrl = (url) => {
     try {
+      console.log('🔍 Extracting file key from URL:', url);
+      
+      // If it's a Google Drive URL, extract the file ID
+      if (url.includes('drive.google.com') || url.includes('/d/')) {
+        const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) {
+          console.log('📁 Extracted file ID:', match[1]);
+          return match[1];
+        }
+      }
+      
+      // If it's already a file ID (no slashes, just alphanumeric)
+      if (/^[a-zA-Z0-9-_]+$/.test(url) && !url.includes('/')) {
+        console.log('📁 Using direct file ID:', url);
+        return url;
+      }
+      
+      // Try to extract from other URL patterns
       const urlObj = new URL(url);
-      return urlObj.pathname.split('/').pop(); // Extracts "file-key" from "/bucket-name/file-key"
-    } catch {
-      return null;
+      const pathParts = urlObj.pathname.split('/');
+      const fileKey = pathParts.pop();
+      console.log('📁 Extracted file key from path:', fileKey);
+      return fileKey;
+    } catch (error) {
+      console.error('❌ Error extracting file key:', error);
+      // Return the original URL if extraction fails
+      return url;
     }
   };
   const setupProctoring = () => {
@@ -995,11 +1225,55 @@ const TestInterface = () => {
     if (!test?.questionPaperURL) return;
     setPdfLoading(true);
     try {
-      const signedUrl = await fetchFileUrl('questionpaper', test.questionPaperURL);
+      // Extract file key from the URL
+      const fileKey = getFileKeyFromUrl(test.questionPaperURL);
+      console.log('📁 Refreshing with file key:', fileKey);
+      
+      if (!fileKey) {
+        throw new Error('Could not extract file key from URL');
+      }
+      
+      const signedUrl = await fetchFileUrl('questionpaper', fileKey);
       setPdfUrl(signedUrl);
       toast.success('✅ Question paper refreshed');
     } catch (error) {
+      console.error('❌ Failed to refresh question paper:', error);
       toast.error('❌ Failed to refresh question paper');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  // Function to fetch signed PDF URL on initial load
+  const fetchSignedPdfUrl = async () => {
+    if (!test?.questionPaperURL) return;
+    setPdfLoading(true);
+    try {
+      console.log('🔍 Fetching signed PDF URL for:', test.questionPaperURL);
+      
+      // Extract file key from the URL
+      const fileKey = getFileKeyFromUrl(test.questionPaperURL);
+      console.log('📁 Using file key:', fileKey);
+      
+      if (!fileKey) {
+        throw new Error('Could not extract file key from URL');
+      }
+      
+      const signedUrl = await fetchFileUrl('questionpaper', fileKey);
+      setPdfUrl(signedUrl);
+      console.log('✅ Signed PDF URL obtained:', signedUrl);
+    } catch (error) {
+      console.error('❌ Failed to fetch signed PDF URL:', error);
+      toast.error('Failed to load question paper. Please refresh.');
+      
+      // Fallback: try using the original URL directly
+      console.log('🔄 Trying fallback with original URL...');
+      try {
+        setPdfUrl(test.questionPaperURL);
+        console.log('⚠️ Using original URL as fallback');
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+      }
     } finally {
       setPdfLoading(false);
     }
@@ -1198,16 +1472,6 @@ const TestInterface = () => {
       }
     };
   }, [answers, offlineAnswers, testStarted, testId, isSubmitted, isOnline]);
-  const formatTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const renderFullscreenPrompt = () => {
     if (!showFullscreenPrompt || !testStarted || isBetterViewer || isSubmitted) return null;
@@ -1244,9 +1508,32 @@ const TestInterface = () => {
 
   // Enhanced PDF viewer with better viewer mode
   const renderQuestionPaper = () => {
-    if (!pdfUrl && !test.questionPaperURL) return null;
-
-    const effectivePdfUrl = pdfUrl || test.questionPaperURL;
+    // Only render if we have a signed PDF URL
+    if (!pdfUrl) {
+      if (pdfLoading) {
+        return (
+          <div className="question-paper-loading">
+            <div className="loading-spinner">
+              <span>🔄 Loading question paper...</span>
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div className="question-paper-error">
+          <div className="error-message">
+            <span>❌ Question paper not available</span>
+            <button 
+              className="btn btn-sm btn-primary"
+              onClick={fetchSignedPdfUrl}
+              disabled={!test?.questionPaperURL}
+            >
+              🔄 Retry Loading
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <>
@@ -1275,13 +1562,16 @@ const TestInterface = () => {
 
           <div style={{ position: 'relative', width: '100%', height: '80vh' }}>
             <iframe
-              src={test.questionPaperURL}
+              src={enhanceEmbedUrl(pdfUrl)}
               title="Question Paper"
               className="pdf-viewer"
               style={{ width: '100%', height: '100%', border: 0 }}
+              sandbox="allow-same-origin allow-scripts"
+              scrolling="yes"
               onError={(e) => {
                 console.error('PDF load error:', e);
                 toast.error('Failed to load PDF. Retrying...');
+                fetchSignedPdfUrl(); // Retry getting signed URL
               }}
               onLoad={() => {
                 console.log('PDF loaded successfully');
@@ -1374,11 +1664,13 @@ const TestInterface = () => {
                 <div className="popout-blocker-container">
                   <iframe
                     ref={pdfViewerRef}
-                    src={`${effectivePdfUrl}#toolbar=0&navpanes=0&scrollbar=1`}
+                    src={enhanceEmbedUrl(pdfUrl)}
                     title="Question Paper Better Viewer"
                     className="pdf-viewer-better"
                     width="100%"
                     height="100%"
+                    sandbox="allow-same-origin allow-scripts"
+                    scrolling="yes"
                     onError={() => setPdfError(true)}
                     onLoad={() => setPdfError(false)}
                   />
@@ -1512,6 +1804,44 @@ const TestInterface = () => {
   return (
   <div className="test-interface">
     {renderFullscreenPrompt()}
+    
+    {/* Google Drive Status Banner */}
+    {!googleDriveConnected && !isBetterViewer && (
+      <div className="google-drive-warning-banner">
+        <div className="gdrive-warning-content">
+          <span className="gdrive-icon">⚠️</span>
+          <div className="gdrive-text">
+            <strong>Google Drive Not Connected</strong>
+            <small>Answer sheet upload may fail without Google Drive connection</small>
+          </div>
+          <button 
+            className="btn-connect-gdrive-small"
+            onClick={async () => {
+              const oauthWindow = window.open('/auth/google', 'googleOAuth', 'width=500,height=600');
+              
+              // Check periodically if the window is closed
+              const checkClosed = setInterval(() => {
+                if (oauthWindow.closed) {
+                  clearInterval(checkClosed);
+                  // Re-check Google Drive status after OAuth
+                  setTimeout(async () => {
+                    const isConnected = await checkGoogleDriveStatus();
+                    if (isConnected) {
+                      toast.success('✅ Google Drive connected successfully!');
+                    } else {
+                      toast.error('❌ Google Drive connection failed. Please try again.');
+                    }
+                  }, 1000);
+                }
+              }, 1000);
+            }}
+            disabled={checkingGoogleDrive}
+          >
+            {checkingGoogleDrive ? 'Checking...' : '📁 Connect'}
+          </button>
+        </div>
+      </div>
+    )}
     
     {/* Offline Warning Banner */}
     {!isOnline && !isBetterViewer && (

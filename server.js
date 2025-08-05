@@ -4,17 +4,25 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+console.log('🔧 Server Environment Check:');
+console.log('- NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('- PORT:', process.env.PORT || 5000);
+console.log('- Has SESSION_SECRET:', !!process.env.SESSION_SECRET);
+console.log('- Has GOOGLE_OAUTH_CLIENT_ID:', !!process.env.GOOGLE_OAUTH_CLIENT_ID);
+
 const app = express();
 
 // ================== Middleware ==================
+// In your server.js, update CORS config
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://computech-exam-platform.onrender.com'] 
-    : ['http://localhost:3000'],
-  methods: 'GET,POST,PUT,DELETE',
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://computech-exam-platform.onrender.com'] 
+    : ['http://localhost:3000', 'http://localhost:5000'], // Add port 5000
+  methods: 'GET,POST,PUT,DELETE,PATCH',
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
+
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -24,6 +32,17 @@ app.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', "frame-src 'self' drive.google.com docs.google.com");
   next();
 });
+const session = require('express-session');
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production', // true only for HTTPS in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 
 // Conditional logging for development
@@ -38,19 +57,23 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // ================== API Routes ==================
-// NOTE: All routes from your previous file are now registered here.
+// NOTE: OAuth routes MUST come first to avoid conflicts with React fallback
+app.use(require('./routes/auth.routes')); // This handles /auth/google and /auth/google/callback
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/student', require('./routes/student'));
 app.use('/api/tests', require('./routes/tests'));
 app.use('/api', require('./routes/analytics'));
 app.use('/api/files', require('./routes/files'));
 app.use('/api/student/mock-tests', require('./routes/mockTest'));
-
+// app.use(require('./routes/upload.routes')); // Temporarily commented out to debug
 // Registering all admin routes sequentially as in the original file
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/admin', require('./routes/adminReviewResults')); // Restored this route
 app.use('/api/admin', require('./routes/reviewRoutes'));    // Restored this route
 app.use('/api/admin', require('./routes/adminReview')); 
+// Add this line with your other app.use() statements
+
+
 
 // ================== Serve React Frontend ==================
 app.use(express.static(path.join(__dirname, 'frontend', 'build'), {

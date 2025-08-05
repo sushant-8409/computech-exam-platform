@@ -25,8 +25,15 @@ import offlineHandler from './utils/offlineHandler';
 import MockTestCreator from './components/student/MockTestCreator'; // ✅ Add this import
 
 // Set axios base URL
-axios.defaults.baseURL = 'http://localhost:5000'; // Change to your server URL
+// Set axios base URL based on environment
+if (process.env.NODE_ENV === 'production') {
+  axios.defaults.baseURL = 'https://computech-07f0.onrender.com';
+} else {
+  axios.defaults.baseURL = 'http://localhost:5000';
+}
 axios.defaults.withCredentials = true;
+// Change to your server URL
+
 
 // Auth & Theme contexts
 const AuthContext = createContext();
@@ -98,7 +105,17 @@ function AuthProvider({ children }) {
   const reqI = axios.interceptors.request.use(
     (config) => {
       const token = localStorage.getItem('token');
-      if (token) config.headers.Authorization = `Bearer ${token}`;
+      console.log('🔍 Request interceptor:', {
+        url: config.url,
+        hasToken: !!token,
+        tokenPreview: token ? `${token.slice(0, 10)}...` : 'none'
+      });
+      
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        console.log('⚠️ No token found in localStorage for request:', config.url);
+      }
       
       // ✅ Check if offline and handle accordingly
       if (!offlineHandler.getOnlineStatus()) {
@@ -114,8 +131,20 @@ function AuthProvider({ children }) {
   );
 
   const resI = axios.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      console.log('✅ Successful response:', {
+        url: response.config.url,
+        status: response.status
+      });
+      return response;
+    },
     (error) => {
+      console.log('❌ Response error:', {
+        url: error.config?.url,
+        status: error.response?.status,
+        message: error.response?.data?.message || error.message
+      });
+
       // ✅ Handle network errors when offline
       if (!navigator.onLine) {
         console.log('🔴 Network request failed - app is offline');
@@ -352,6 +381,7 @@ export default function App() {
               {/* Admin section */}
               <Route path="admin" element={<ProtectedRoute adminOnly><Outlet /></ProtectedRoute>}>
                 <Route index element={<AdminDashboard />} />
+                <Route path="*" element={<AdminDashboard />} />
                 <Route path="tests" element={<AdminDashboard />} />
                 <Route path="tests/edit/:id" element={<EditTestPage />} />
                 <Route path="answer-review" element={<AnswerSheetReview />} />

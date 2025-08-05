@@ -64,6 +64,7 @@ CompuTech Team`
 
   const [loading, setLoading] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState('test_assigned');
+  const [testLoading, setTestLoading] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -88,6 +89,33 @@ CompuTech Team`
       console.error('Save settings error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    setTestLoading(true);
+    try {
+      // Get some test students - you might want to replace this with actual students
+      const testStudents = [
+        { 
+          name: 'Test Student', 
+          email: 'test@example.com', // Replace with actual email for testing
+          _id: 'test-student-id' 
+        }
+      ];
+
+      await axios.post('/api/admin/test-notification', {
+        type: 'test_created',
+        message: 'This is a test notification to verify the notification system is working correctly.',
+        students: testStudents
+      });
+
+      toast.success('Test notification sent! Check your email and app notifications.');
+    } catch (error) {
+      toast.error('Failed to send test notification');
+      console.error('Test notification error:', error);
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -253,6 +281,13 @@ CompuTech Team`
       </div>
 
       <div className={styles.actionButtons}>
+        <button
+          onClick={handleTestNotification}
+          disabled={testLoading}
+          className={styles.testButton}
+        >
+          {testLoading ? '🧪 Testing...' : '🧪 Send Test Notification'}
+        </button>
         <button
           onClick={handleSaveSettings}
           disabled={loading}

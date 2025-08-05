@@ -168,6 +168,30 @@
 
 .actionButtons {
   text-align: center;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.testButton {
+  background: var(--info, #3b82f6);
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.testButton:hover:not(:disabled) {
+  background: var(--info-dark, #2563eb);
+}
+
+.testButton:disabled {
+  background: var(--disabled, #9ca3af);
+  cursor: not-allowed;
 }
 
 .saveButton {

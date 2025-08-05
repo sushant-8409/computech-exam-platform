@@ -24,6 +24,15 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 
 async function getAdmin(adminId) {
   try {
+    // Handle the special "admin" string case
+    if (adminId === 'admin') {
+      return {
+        _id: 'admin',
+        name: process.env.ADMIN_NAME || 'Administrator',
+        email: process.env.ADMIN_EMAIL || 'admin@example.com'
+      };
+    }
+
     const admin = await User.findById(adminId);
     if (admin) {
       console.log(`👤 Found admin: ${admin.name} (${admin.email})`);
@@ -94,7 +103,8 @@ class NotificationService {
     try {
       console.log(`📧 Sending notification: ${type} - ${title}`);
 
-      if (!mongoose.Types.ObjectId.isValid(adminId)) {
+      // ✅ FIXED: Handle both admin string and ObjectId
+      if (adminId !== 'admin' && !mongoose.Types.ObjectId.isValid(adminId)) {
         throw new Error(`Invalid adminId: ${adminId}`);
       }
 
@@ -108,43 +118,61 @@ class NotificationService {
       // ✅ Create notification with proper recipient tracking
       const recipients = this.extractRecipients(data);
       
-      const notification = await Notification.create({
-        adminId,
-        title,
-        message,
-        type: actualType,
-        data: {
-          ...data,
-          timestamp: new Date().toISOString()
-        },
-        recipients: recipients.map(r => ({
-          email: r.email,
-          name: r.name,
-          status: 'pending'
-        }))
-      });
-
-      console.log(`📋 Notification record created: ${notification._id}`);
+      let notification = null;
+      
+      // ✅ FIXED: Skip database save for test notifications with string adminId
+      if (adminId !== 'admin') {
+        notification = await Notification.create({
+          adminId,
+          title,
+          message,
+          type: actualType,
+          data: {
+            ...data,
+            timestamp: new Date().toISOString()
+          },
+          recipients: recipients.map(r => ({
+            email: r.email,
+            name: r.name,
+            status: 'pending'
+          }))
+        });
+        console.log(`📋 Notification record created: ${notification._id}`);
+      } else {
+        console.log(`🧪 Test notification - skipping database save`);
+      }
 
       let emailSent = false;
       let pushSent = false;
 
-      // ✅ Email handling with recipient tracking
-      if (admin.email && settings.emailNotifications?.[actualType] !== false) {
+      // ✅ FIXED: Proper email settings check
+      const shouldSendEmail = settings.emailNotifications === true || 
+                             (settings.emailNotifications?.[actualType] === true);
+      
+      console.log(`📧 Email settings check:`, {
+        globalEmailSetting: settings.emailNotifications,
+        typeSpecificSetting: settings.emailNotifications?.[actualType],
+        shouldSendEmail,
+        adminEmail: admin.email
+      });
+      
+      if (admin.email && shouldSendEmail) {
         try {
           console.log(`📧 Sending emails to ${recipients.length} recipients`);
           const emailResults = await this.sendEmailNotification(admin, actualType, title, message, data);
           emailSent = emailResults.length > 0;
 
-          // ✅ Update recipient statuses
-          for (let i = 0; i < notification.recipients.length; i++) {
-            const result = emailResults[i];
-            if (result && result.success) {
-              notification.recipients[i].status = 'sent';
-              notification.recipients[i].sentAt = new Date();
-            } else {
-              notification.recipients[i].status = 'failed';
-              notification.recipients[i].error = result?.error || 'Unknown error';
+          // ✅ Update recipient statuses (only if notification was saved to DB)
+          if (notification) {
+            for (let i = 0; i < notification.recipients.length; i++) {
+              const result = emailResults[i];
+              if (result && result.success) {
+                notification.recipients[i].status = 'sent';
+                notification.recipients[i].sentAt = new Date();
+              } else {
+                notification.recipients[i].status = 'failed';
+                notification.recipients[i].error = result?.error || 'Unknown error';
+              }
             }
           }
 
@@ -152,16 +180,29 @@ class NotificationService {
         } catch (emailError) {
           console.error('❌ Email send failed:', emailError.message);
           
-          // Mark all recipients as failed
-          notification.recipients.forEach(recipient => {
-            recipient.status = 'failed';
-            recipient.error = emailError.message;
-          });
+          // Mark all recipients as failed (only if notification was saved to DB)
+          if (notification) {
+            notification.recipients.forEach(recipient => {
+              recipient.status = 'failed';
+              recipient.error = emailError.message;
+            });
+          }
         }
+      } else {
+        console.log('📧 Email notifications disabled or no admin email');
       }
 
-      // ✅ FIXED: Push notifications with actual implementation
-      if (settings.appNotifications?.[actualType] !== false) {
+      // ✅ FIXED: Proper app notification settings check
+      const shouldSendPush = settings.appNotifications === true || 
+                            (settings.appNotifications?.[actualType] === true);
+
+      console.log(`📱 App settings check:`, {
+        globalAppSetting: settings.appNotifications,
+        typeSpecificSetting: settings.appNotifications?.[actualType],
+        shouldSendPush
+      });
+
+      if (shouldSendPush) {
         try {
           console.log(`📱 Sending push notifications to recipients`);
           const pushResults = await this.sendPushNotification(admin, title, message, data, recipients);
@@ -170,15 +211,19 @@ class NotificationService {
         } catch (pushError) {
           console.error('❌ Push send failed:', pushError.message);
         }
+      } else {
+        console.log('📱 App notifications disabled');
       }
 
-      // ✅ Update notification record
-      notification.emailSent = emailSent;
-      notification.appNotificationSent = pushSent;
-      await notification.save();
+      // ✅ Update notification record (only if it was saved to DB)
+      if (notification) {
+        notification.emailSent = emailSent;
+        notification.appNotificationSent = pushSent;
+        await notification.save();
+      }
 
       return {
-        id: notification._id,
+        id: notification?._id || 'test-notification',
         emailSent,
         pushSent,
         type: actualType,
@@ -452,37 +497,50 @@ class NotificationService {
   /* ✅ Helper: Ensure notification settings exist */
   async ensureSettings(adminId) {
     try {
-      return await NotificationSettings.findOneAndUpdate(
-        { adminId },
-        {
-          $setOnInsert: {
-            emailNotifications: {
-              test_created: true,
-              test_completed: true,
-              result_published: true,
-              student_registered: true,
-              violation_detected: true,
-              system_alert: true,
-              custom_message: true
-            },
-            appNotifications: {
-              test_created: true,
-              test_completed: true,
-              result_published: true,
-              student_registered: true,
-              violation_detected: true,
-              system_alert: true,
-              custom_message: true
+      // First try to get existing settings
+      let settings = await NotificationSettings.findOne({ adminId });
+      
+      // If no admin-specific settings, try to get global settings (from frontend)
+      if (!settings) {
+        settings = await NotificationSettings.findOne({});
+      }
+      
+      // If still no settings, create default ones
+      if (!settings) {
+        settings = await NotificationSettings.findOneAndUpdate(
+          { adminId },
+          {
+            $setOnInsert: {
+              emailNotifications: true, // Global setting
+              appNotifications: true,   // Global setting
+              emailTemplates: {
+                test_assigned: {
+                  subject: 'New Test Assigned - {{testTitle}}',
+                  body: 'Hello {{studentName}}, A new test has been assigned to you...'
+                },
+                result_published: {
+                  subject: 'Test Results Published - {{testTitle}}',
+                  body: 'Hello {{studentName}}, Your test results have been published...'
+                }
+              }
             }
-          }
-        },
-        { upsert: true, new: true }
-      );
+          },
+          { upsert: true, new: true }
+        );
+      }
+      
+      console.log('📧 Retrieved notification settings:', {
+        emailNotifications: settings.emailNotifications,
+        appNotifications: settings.appNotifications
+      });
+      
+      return settings;
     } catch (error) {
-      console.error('❌ Settings error:', error);
+      console.error('❌ Error ensuring settings:', error);
+      // Return default settings as fallback
       return {
-        emailNotifications: { test_created: true, result_published: true },
-        appNotifications: { test_created: true, result_published: true }
+        emailNotifications: true,
+        appNotifications: true
       };
     }
   }

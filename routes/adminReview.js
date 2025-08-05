@@ -47,7 +47,7 @@ router.get('/results/:id/questions', authenticateAdmin, async (req, res) => {
         const result = await Result.findById(req.params.id).select('testId').lean();
         if (!result) return res.status(404).json({ success: false, message: 'Result not found.' });
 
-        const test = await Test.findById(result.testId).select('questions questionsCount').lean();
+        const test = await Test.findById(result.testId).select('questions questionsCount questionPaperURL answerKeyURL').lean();
         if (!test) return res.status(404).json({ success: false, message: 'Associated test not found.' });
 
         let questionsToGrade = [];
@@ -58,7 +58,13 @@ router.get('/results/:id/questions', authenticateAdmin, async (req, res) => {
         }
 
         questionsToGrade.sort((a, b) => a.questionNo - b.questionNo);
-        res.json({ success: true, questions: questionsToGrade.map(q => q.questionNo), maxMarks: questionsToGrade.map(q => q.maxMarks) });
+        res.json({ 
+            success: true, 
+            questions: questionsToGrade.map(q => q.questionNo), 
+            maxMarks: questionsToGrade.map(q => q.maxMarks),
+            questionPaperUrl: test.questionPaperURL || null,
+            answerKeyUrl: test.answerKeyURL || null
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch question data.' });
     }
@@ -66,10 +72,20 @@ router.get('/results/:id/questions', authenticateAdmin, async (req, res) => {
 
 router.get('/review-results/:id/questions', authenticateAdmin, async (req, res) => {
     try {
-        const reviewResult = await ReviewResult.findById(req.params.id).select('questionWiseMarks').lean();
+        const reviewResult = await ReviewResult.findById(req.params.id).select('questionWiseMarks testId').lean();
         if (!reviewResult) return res.status(404).json({ success: false, message: 'Review request not found.' });
+        
+        // Get test details for URLs
+        const test = await Test.findById(reviewResult.testId).select('questionPaperURL answerKeyURL').lean();
+        
         const questionsToGrade = (reviewResult.questionWiseMarks || []).sort((a, b) => a.questionNo - b.questionNo);
-        res.json({ success: true, questions: questionsToGrade.map(q => q.questionNo), maxMarks: questionsToGrade.map(q => q.maxMarks) });
+        res.json({ 
+            success: true, 
+            questions: questionsToGrade.map(q => q.questionNo), 
+            maxMarks: questionsToGrade.map(q => q.maxMarks),
+            questionPaperUrl: test?.questionPaperURL || null,
+            answerKeyUrl: test?.answerKeyURL || null
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch question data.' });
     }

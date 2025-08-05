@@ -5,6 +5,7 @@ import { useAuth }                      from '../../App';
 import axios                            from 'axios';
 import LoadingSpinner                   from '../LoadingSpinner';
 import { toast }                        from 'react-toastify';
+import { enhanceEmbedUrl }              from '../../utils/googleDriveUtils';
 
 export default function QuestionWiseResults() {
   const { resultId } = useParams();
@@ -187,11 +188,13 @@ export default function QuestionWiseResults() {
           </button>
           {showAnswerKey && (
             <iframe
-              src={test.answerKeyURL}
+              src={enhanceEmbedUrl(test.answerKeyURL)}
               title="Answer Key"
               width="100%"
               height="600"
               style={{ border: '1px solid #ccc', marginTop: '1rem' }}
+              sandbox="allow-same-origin allow-scripts"
+              scrolling="yes"
             />
           )}
         </div>

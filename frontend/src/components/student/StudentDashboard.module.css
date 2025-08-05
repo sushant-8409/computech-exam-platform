@@ -1545,3 +1545,323 @@
     }
   }
 }
+
+/* ============================================
+   GOOGLE DRIVE CONNECTION SECTION
+   ============================================ */
+
+.googleDriveSection {
+  background: var(--card-bg);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px var(--shadow-light);
+  transition: all 0.3s ease;
+}
+
+.googleDriveSection.connected {
+  border-color: var(--success-color);
+  background: linear-gradient(135deg, var(--success-light) 0%, var(--card-bg) 100%);
+}
+
+.googleDriveSection.disconnected {
+  border-color: var(--warning-color);
+  background: linear-gradient(135deg, var(--warning-light) 0%, var(--card-bg) 100%);
+}
+
+.googleDriveHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.googleDriveInfo h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.googleDriveInfo p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.statusIcon {
+  font-size: 1.2rem;
+}
+
+.connectGoogleBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(66, 133, 244, 0.3);
+}
+
+.connectGoogleBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4);
+}
+
+.connectGoogleBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.googleIcon {
+  font-size: 1.1rem;
+}
+
+.btnSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.googleDriveDetails {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.googleDriveDetails small {
+  color: var(--success-color);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN FOR GOOGLE DRIVE SECTION
+   ============================================ */
+
+@media (max-width: 768px) {
+  .googleDriveHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .connectGoogleBtn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .googleDriveSection {
+    padding: 1rem;
+  }
+}
+
+/* ============================================
+   DARK MODE STYLES FOR GOOGLE DRIVE SECTION
+   ============================================ */
+
+.dark .googleDriveSection {
+  background: var(--dark-card-bg);
+  border-color: var(--dark-border-color);
+}
+
+.dark .googleDriveSection.connected {
+  border-color: var(--success-color);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, var(--dark-card-bg) 100%);
+}
+
+.dark .googleDriveSection.disconnected {
+  border-color: var(--warning-color);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, var(--dark-card-bg) 100%);
+}
+
+.dark .googleDriveInfo h3 {
+  color: var(--dark-text-primary);
+}
+
+.dark .googleDriveInfo p {
+  color: var(--dark-text-secondary);
+}
+
+.dark .googleDriveDetails {
+  border-top-color: var(--dark-border-light);
+}
+
+/* ============================================
+   PORTALS SECTION
+   ============================================ */
+
+.portalsSection {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px var(--shadow-light);
+  margin-bottom: 24px;
+  border: 1px solid var(--card-border);
+}
+
+.portalsSection h3 {
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.portalsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.portalCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid var(--border-light);
+  transition: all 0.2s ease;
+}
+
+.portalCard:hover {
+  background: var(--card-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow-medium);
+}
+
+.portalIcon {
+  font-size: 32px;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-light);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.portalContent {
+  flex: 1;
+}
+
+.portalContent h4 {
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.portalContent p {
+  margin: 0 0 12px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.portalButton {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.portalButton:hover {
+  background: var(--primary-hover);
+}
+
+/* ============================================
+   DARK MODE - PORTALS SECTION
+   ============================================ */
+
+.dark .portalsSection {
+  background: var(--dark-card-bg);
+  border-color: var(--dark-card-border);
+}
+
+.dark .portalsSection h3 {
+  color: var(--dark-text-primary);
+}
+
+.dark .portalCard {
+  background: var(--dark-bg-tertiary);
+  border-color: var(--dark-border-light);
+}
+
+.dark .portalCard:hover {
+  background: var(--dark-card-hover);
+}
+
+.dark .portalContent h4 {
+  color: var(--dark-text-primary);
+}
+
+.dark .portalContent p {
+  color: var(--dark-text-secondary);
+}
+
+/* ============================================
+   MOBILE RESPONSIVE - PORTALS
+   ============================================ */
+
+@media (max-width: 768px) {
+  .portalsGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .portalCard {
+    flex-direction: column;
+    text-align: center;
+    padding: 16px;
+  }
+  
+  .portalIcon {
+    width: 50px;
+    height: 50px;
+    font-size: 24px;
+  }
+  
+  .portalContent h4 {
+    font-size: 15px;
+  }
+  
+  .portalContent p {
+    font-size: 13px;
+  }
+  
+  .portalButton {
+    padding: 10px 20px;
+    font-size: 13px;
+    width: 100%;
+  }
+}

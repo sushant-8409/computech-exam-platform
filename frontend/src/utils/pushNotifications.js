@@ -29,29 +29,54 @@ class PushNotificationManager {
   // Initialize push notifications
   async initialize() {
     try {
+      console.log('🚀 Initializing push notification manager...');
+      
       if (!this.isSupported()) {
-        console.warn('Push notifications not supported');
+        console.warn('⚠️ Push notifications not supported in this browser');
+        this.isSubscribed = false;
         return false;
       }
 
+      // Reset state
+      this.isSubscribed = false;
+      this.subscription = null;
+
       // Register service worker
       const registration = await navigator.serviceWorker.register('/sw.js');
-      console.log('✅ Service Worker registered:', registration);
+      console.log('✅ Service Worker registered:', registration.scope);
+
+      // Wait for service worker to be ready
+      await navigator.serviceWorker.ready;
+      console.log('✅ Service Worker ready');
 
       // Check existing subscription
       const existingSubscription = await registration.pushManager.getSubscription();
+      
       if (existingSubscription) {
+        console.log('🔍 Found existing push subscription');
         this.subscription = existingSubscription;
         this.isSubscribed = true;
-        console.log('✅ Existing push subscription found');
         
-        // Verify with backend
-        await this.verifySubscription();
+        // Verify with backend (but don't fail if verification fails)
+        try {
+          console.log('🔍 Verifying subscription with backend...');
+          const verificationResult = await this.verifySubscription();
+          console.log('📱 Verification result:', verificationResult);
+        } catch (error) {
+          console.warn('⚠️ Subscription verification failed, but keeping existing subscription:', error.message);
+        }
+      } else {
+        console.log('📭 No existing push subscription found');
+        this.isSubscribed = false;
       }
 
+      console.log(`📱 Push notification initialization complete. Status: ${this.isSubscribed ? 'subscribed' : 'not subscribed'}`);
       return true;
+      
     } catch (error) {
       console.error('❌ Failed to initialize push notifications:', error);
+      this.isSubscribed = false;
+      this.subscription = null;
       return false;
     }
   }
@@ -149,20 +174,35 @@ class PushNotificationManager {
   // Verify subscription with backend
   async verifySubscription() {
     try {
+      console.log('🔍 Verifying push subscription with backend...');
+      
       const response = await fetch('/api/student/push/status', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       
+      if (!response.ok) {
+        console.warn(`⚠️ Push status check failed: ${response.status}`);
+        // Don't change subscription state if verification fails - assume it's still valid
+        return { success: false, subscribed: this.isSubscribed };
+      }
+      
       const result = await response.json();
-      this.isSubscribed = result.success && result.subscribed;
+      console.log('📱 Push status from backend:', result);
+      
+      // Only update subscription state if backend response is successful
+      if (result.success) {
+        this.isSubscribed = result.subscribed;
+        console.log(`✅ Push subscription verified: ${this.isSubscribed ? 'active' : 'inactive'}`);
+      }
       
       return result;
     } catch (error) {
       console.error('❌ Failed to verify subscription:', error);
-      this.isSubscribed = false;
-      return { success: false, subscribed: false };
+      // Don't change subscription state on network errors - assume it's still valid
+      console.log('🔄 Keeping existing subscription state due to verification error');
+      return { success: false, subscribed: this.isSubscribed };
     }
   }
 

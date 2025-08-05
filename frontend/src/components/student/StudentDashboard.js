@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import Header from '../Header';
 import PushNotificationSettings from '../PushNotificationSettings';  // ✅ Import Push Notification Settings
+import StudentNotifications from './StudentNotifications';  // ✅ Import Student Notifications
 import styles from './StudentDashboard.module.css';
 
 const StudentDashboard = () => {
@@ -14,10 +15,13 @@ const StudentDashboard = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [checkingGoogleStatus, setCheckingGoogleStatus] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchStudentData();
+    checkGoogleDriveStatus();
   }, []);
 
   const fetchStudentData = async () => {
@@ -47,6 +51,94 @@ const StudentDashboard = () => {
       setLoading(false);
     }
   };
+
+  const checkGoogleDriveStatus = async () => {
+    setCheckingGoogleStatus(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/student/google-drive-status', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setGoogleConnected(response.data.connected || false);
+    } catch (error) {
+      console.error('Error checking Google Drive status:', error);
+      setGoogleConnected(false);
+    } finally {
+      setCheckingGoogleStatus(false);
+    }
+  };
+
+  const connectGoogleDrive = () => {
+  console.log('🔗 Opening Google OAuth popup...');
+  
+  const token = localStorage.getItem('token');
+  if (!token) {
+    toast.error('❌ Not authenticated. Please login again.');
+    return;
+  }
+  
+  // Use full backend URL to ensure popup goes directly to backend
+  const backendUrl = 'http://localhost:5000';
+  const oauthUrl = `${backendUrl}/auth/google?token=${encodeURIComponent(token)}`;
+  
+  console.log('🔗 Opening OAuth URL:', oauthUrl);
+  
+  const oauthWindow = window.open(
+    oauthUrl, 
+    'googleOAuth', 
+    'width=500,height=600,scrollbars=yes,resizable=yes,left=' + 
+    ((window.screen.width / 2) - 250) + ',top=' + 
+    ((window.screen.height / 2) - 300)
+  );
+  
+  if (!oauthWindow) {
+    toast.error('❌ Popup blocked! Please allow popups for this site.');
+    return;
+  }
+  
+  // Listen for OAuth completion message
+  const handleOAuthMessage = (event) => {
+    console.log('📨 Received message:', event.data);
+    
+    if (event.data && event.data.type === 'OAUTH_SUCCESS') {
+      console.log('✅ OAuth success message received');
+      window.removeEventListener('message', handleOAuthMessage);
+      
+      if (!oauthWindow.closed) {
+        oauthWindow.close();
+      }
+      
+      // Re-check Google Drive status
+      setTimeout(async () => {
+        await checkGoogleDriveStatus();
+        toast.success('✅ Google Drive connected successfully!');
+      }, 1000);
+      
+    } else if (event.data && event.data.type === 'OAUTH_ERROR') {
+      console.error('❌ OAuth error:', event.data.error);
+      window.removeEventListener('message', handleOAuthMessage);
+      
+      if (!oauthWindow.closed) {
+        oauthWindow.close();
+      }
+      
+      toast.error(`❌ Google Drive connection failed: ${event.data.error}`);
+    }
+  };
+  
+  window.addEventListener('message', handleOAuthMessage);
+  
+  // Timeout handling
+  setTimeout(() => {
+    if (!oauthWindow.closed) {
+      console.log('⏰ OAuth timeout');
+      window.removeEventListener('message', handleOAuthMessage);
+      oauthWindow.close();
+      toast.error('❌ OAuth timeout. Please try again.');
+    }
+  }, 5 * 60 * 1000);
+};
+
 
   const categorizeTests = () => {
     if (!Array.isArray(tests) || tests.length === 0) {
@@ -162,6 +254,94 @@ const StudentDashboard = () => {
             <p>📊 Results Ready</p>
             <small>View Scores</small>
           </div>
+        </div>
+
+        {/* ✅ Quick Access Portals */}
+        <div className={styles.portalsSection}>
+          <h3>🌐 Quick Access Portals</h3>
+          <div className={styles.portalsGrid}>
+            <div className={styles.portalCard}>
+              <div className={styles.portalIcon}>🤖</div>
+              <div className={styles.portalContent}>
+                <h4>Computech Chatbot</h4>
+                <p>Get instant help and answers to your questions</p>
+                <button 
+                  className={styles.portalButton}
+                  onClick={() => window.open('https://computechai.netlify.app/', '_blank')}
+                >
+                  Open Chatbot Portal
+                </button>
+              </div>
+            </div>
+            <div className={styles.portalCard}>
+              <div className={styles.portalIcon}>💳</div>
+              <div className={styles.portalContent}>
+                <h4>Fees Payment Portal</h4>
+                <p>Pay your fees securely and track payment history</p>
+                <button 
+                  className={styles.portalButton}
+                  onClick={() => window.open('https://computech-07f0.onrender.com/', '_blank')}
+                >
+                  Open Payment Portal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ✅ Student Notifications */}
+        <StudentNotifications />
+
+        {/* Google Drive Connection Status */}
+        <div className={`${styles.googleDriveSection} ${googleConnected ? styles.connected : styles.disconnected}`}>
+          <div className={styles.googleDriveHeader}>
+            <div className={styles.googleDriveInfo}>
+              <h3>
+                {googleConnected ? (
+                  <>
+                    <span className={styles.statusIcon}>✅</span>
+                    Google Drive Connected
+                  </>
+                ) : (
+                  <>
+                    <span className={styles.statusIcon}>⚠️</span>
+                    Google Drive Not Connected
+                  </>
+                )}
+              </h3>
+              <p>
+                {googleConnected ? (
+                  "Your answer sheets will be uploaded to your Google Drive"
+                ) : (
+                  "Connect Google Drive to upload your answer sheets seamlessly"
+                )}
+              </p>
+            </div>
+            {!googleConnected && (
+              <button 
+                className={styles.connectGoogleBtn}
+                onClick={connectGoogleDrive}
+                disabled={checkingGoogleStatus}
+              >
+                {checkingGoogleStatus ? (
+                  <>
+                    <span className={styles.btnSpinner}></span>
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <span className={styles.googleIcon}>📁</span>
+                    Connect Google Drive
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          {googleConnected && (
+            <div className={styles.googleDriveDetails}>
+              <small>✨ Answer sheet uploads are now automatic and secure!</small>
+            </div>
+          )}
         </div>
 
         {/* Available Tests Section */}

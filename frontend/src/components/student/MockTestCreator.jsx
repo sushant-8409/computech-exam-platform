@@ -449,8 +449,8 @@ const MockTestCreator = () => {
         <div className={styles.mockTestCreator}>
             {generatingTest && <LoadingSpinner text="Generating Your Personalised Test..." />}
             <div className={styles.pageHeader}>
-                <h1>🧪 AI Mock Test Generator</h1>
-                <p>Create unlimited, personalized practice tests for any subject using Google Gemini.</p>
+                <h1>🧪 AI Powered Mock Test Generator</h1>
+                <p>Create unlimited, personalized practice tests for any subject using our own AI technology.</p>
             </div>
             
             

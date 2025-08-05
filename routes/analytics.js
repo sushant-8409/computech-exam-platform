@@ -4,10 +4,12 @@ const router = express.Router();
 const Result = require('../models/Result');
 const Student = require('../models/Student');
 const Test = require('../models/Test');
+const { authenticateAdmin } = require('../middleware/auth');
+
 /* -------------------------------------------------
    GET  /api/admin/analytics
    -------------------------------------------------*/
-router.get('/admin/analytics', async (req, res) => {
+router.get('/admin/analytics', authenticateAdmin, async (req, res) => {
   try {
     console.log('📊  /admin/analytics hit');
 
@@ -139,7 +141,7 @@ router.get('/students/search', async (req, res) => {
 // In your analytics.js router file
 
 // Grade distribution endpoint
-router.get('/admin/analytics/grade-distribution', async (req, res) => {
+router.get('/admin/analytics/grade-distribution', authenticateAdmin, async (req, res) => {
   try {
     const gradeDistribution = await Result.aggregate([
       { $match: { totalMarks: { $gt: 0 }, marksObtained: { $gte: 0 } } },
@@ -197,7 +199,7 @@ router.get('/admin/analytics/grade-distribution', async (req, res) => {
    GET  /api/admin/dashboard/charts
    Monthly submissions and score distribution data
    -------------------------------------------------*/
-router.get('/admin/dashboard/charts', async (req, res) => {
+router.get('/admin/dashboard/charts', authenticateAdmin, async (req, res) => {
   try {
     console.log('📊 /admin/dashboard/charts hit');
 
@@ -300,7 +302,7 @@ router.get('/admin/dashboard/charts', async (req, res) => {
    GET  /api/admin/analytics/subject-performance
    Subject-wise performance data
    -------------------------------------------------*/
-router.get('/admin/analytics/subject-performance', async (req, res) => {
+router.get('/admin/analytics/subject-performance', authenticateAdmin, async (req, res) => {
   try {
     console.log('📚 /admin/analytics/subject-performance hit');
 
@@ -364,7 +366,7 @@ router.get('/admin/analytics/subject-performance', async (req, res) => {
    GET  /api/admin/dashboard/stats
    Dashboard statistics
    -------------------------------------------------*/
-router.get('/admin/dashboard/stats', async (req, res) => {
+router.get('/admin/dashboard/stats', authenticateAdmin, async (req, res) => {
   try {
     console.log('📊 /admin/dashboard/stats hit');
 
@@ -444,7 +446,7 @@ router.get('/admin/dashboard/stats', async (req, res) => {
 });
 
 // Recent activity endpoint
-router.get('/admin/recent-activity', async (req, res) => {
+router.get('/admin/recent-activity', authenticateAdmin, async (req, res) => {
   try {
     const recentResults = await Result.find()
       .populate('studentId', 'name')

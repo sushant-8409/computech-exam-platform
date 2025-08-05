@@ -5046,6 +5046,7 @@ textarea:focus-visible {
   margin-top: 1rem;
   border: 1px solid #ddd;
   border-radius: 4px;
+  overflow: auto; /* Enable scrolling */
 }
 
 /* Responsive tweaks */

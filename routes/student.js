@@ -82,7 +82,7 @@ router.get('/tests', authenticateStudent, async (req, res) => {
    TEST TAKING & SUBMISSION
    ========================================================================== */
 
-<<<<<<< HEAD
+
 /**
  * Fetches the current UTC time from an external API for high accuracy.
  * Falls back to the server's local time if the API is unreachable.
@@ -187,8 +187,7 @@ router.get('/test/:testId/time', authenticateStudent, async (req, res) => {
     }
 });
 
-=======
->>>>>>> parent of d6a5bdd (feat(TestSession): Implement server-authoritative test session start and remaining time retrieval)
+
 router.get('/test/:testId', authenticateStudent, async (req, res) => {
     try {
         const { testId } = req.params;
@@ -282,9 +281,28 @@ router.post('/test/:testId/upload', authenticateStudent, upload.single('answerSh
             return res.status(404).json({ success: false, message: 'Test not found.' });
         }
 
-        // 2. Upload the file to Google Drive
+        // 2. Upload the file to Google Drive using OAuth (Always use admin's drive)
         const fileName = `answersheet_${req.student._id}_${testId}_${Date.now()}.pdf`;
-        const { url, fileId } = await uploadToGDrive(req.file.buffer, fileName, req.file.mimetype);
+        
+        // Always use admin OAuth tokens for centralized file management
+        let uploadResult;
+        const User = require('../models/User');
+        const adminUser = await User.findOne({ role: 'admin', googleConnected: true });
+        
+        if (adminUser && adminUser.googleTokens && adminUser.googleTokens.refresh_token) {
+            const oauthDrive = require('../services/oauthDrive');
+            console.log('📁 Uploading to admin\'s Google Drive:', adminUser.email);
+            uploadResult = await oauthDrive.uploadToGDrive(adminUser.googleTokens, req.file.buffer, fileName, req.file.mimetype);
+        } else {
+            // No admin OAuth tokens available - system not configured
+            return res.status(500).json({
+                success: false,
+                message: 'Google Drive not configured. Please contact administrator to set up Google OAuth.',
+                error: 'GOOGLE_OAUTH_NOT_CONFIGURED'
+            });
+        }
+        
+        const { url, fileId } = uploadResult;
 
         // 3. Update the result, providing all required fields for an upsert operation
         const result = await Result.findOneAndUpdate(
@@ -488,6 +506,88 @@ router.post('/push/subscribe', authenticateStudent, async (req, res) => {
     }
 });
 
+// ✅ NEW: Check push notification status
+router.get('/push/status', authenticateStudent, async (req, res) => {
+    try {
+        const PushSubscription = require('../models/PushSubscription');
+        
+        // Check if student has an active push subscription
+        // ✅ FIXED: Use 'userId' not 'studentId' to match the model
+        const subscription = await PushSubscription.findOne({ 
+            userId: req.student._id,
+            active: true 
+        });
+
+        console.log(`📱 Push status check for student ${req.student.email}: ${subscription ? 'subscribed' : 'not subscribed'}`);
+
+        res.json({
+            success: true,
+            subscribed: !!subscription,
+            userId: req.student._id,
+            email: req.student.email
+        });
+
+    } catch (error) {
+        console.error('❌ Error checking push status:', error);
+        res.status(500).json({ 
+            success: false, 
+            subscribed: false,
+            message: 'Failed to check push notification status'
+        });
+    }
+});
+
+// ✅ NEW: Unsubscribe from push notifications
+router.post('/push/unsubscribe', authenticateStudent, async (req, res) => {
+    try {
+        const PushSubscription = require('../models/PushSubscription');
+        
+        // Deactivate all push subscriptions for this student
+        // ✅ FIXED: Use 'userId' not 'studentId' to match the model
+        await PushSubscription.updateMany(
+            { userId: req.student._id },
+            { $set: { active: false } }
+        );
+
+        console.log(`📱 Push unsubscribe for student ${req.student.email}`);
+
+        res.json({
+            success: true,
+            message: 'Successfully unsubscribed from push notifications'
+        });
+
+    } catch (error) {
+        console.error('❌ Error unsubscribing from push notifications:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to unsubscribe from push notifications'
+        });
+    }
+});
+
+// Google Drive connection status
+router.get('/google-drive-status', authenticateStudent, async (req, res) => {
+    try {
+        const Student = require('../models/Student');
+        const student = await Student.findById(req.student._id);
+        
+        const connected = !!(student.googleTokens && student.googleTokens.refresh_token);
+        
+        res.json({ 
+            success: true,
+            connected: connected,
+            hasTokens: !!student.googleConnected
+        });
+    } catch (error) {
+        console.error('Error checking Google Drive status:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to check Google Drive status',
+            connected: false
+        });
+    }
+});
+
 router.get('/qr', authenticateStudent, async (req, res) => {
     const { data } = req.query;
     if (!data) return res.status(400).send('QR code data is required.');
@@ -500,40 +600,56 @@ router.get('/qr', authenticateStudent, async (req, res) => {
     }
 });
 
-// In routes/student.js
-
-router.get('/results/:resultId', authenticateStudent, async (req, res) => {
+// ✅ NEW: Get student notifications
+router.get('/notifications', authenticateStudent, async (req, res) => {
     try {
-        const { resultId } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(resultId)) {
-            return res.status(400).json({ success: false, message: 'Invalid Result ID format.' });
-        }
+        console.log('📨 Student notifications request from:', req.student.email);
         
-        const result = await Result.findById(resultId)
-            .populate({
-                path: 'testId',
-                // ✅ ACTION: Add 'questionsCount' to this line
-                select: 'title subject totalMarks passingMarks questionPaperURL answerKeyURL answerKeyVisible questionsCount'
-            })
-            .lean();
+        const Notification = require('../models/Notification');
+        
+        // Find notifications that include this student's email in recipients
+        const notifications = await Notification.find({
+            'recipients.email': req.student.email,
+            createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Last 30 days
+        })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .select('title message type createdAt emailSent appNotificationSent recipients');
 
-        // ... rest of the function remains the same
+        console.log(`📋 Found ${notifications.length} notifications for student`);
 
-        if (!result || !result.studentId.equals(req.student._id)) {
-            return res.status(404).json({ success: false, message: 'Result not found or access denied.' });
-        }
+        // Filter to only include relevant recipient data
+        const studentNotifications = notifications.map(notification => {
+            const studentRecipient = notification.recipients.find(r => r.email === req.student.email);
+            return {
+                _id: notification._id,
+                title: notification.title,
+                message: notification.message,
+                type: notification.type,
+                createdAt: notification.createdAt,
+                emailSent: notification.emailSent,
+                appNotificationSent: notification.appNotificationSent,
+                status: studentRecipient?.status || 'unknown',
+                sentAt: studentRecipient?.sentAt || null
+            };
+        });
 
-        const { testId: testData, ...resultFields } = result;
+        console.log('✅ Sending student notifications response');
         res.json({
             success: true,
-            result: resultFields,
-            test: testData,
-            student: { name: req.student.name, class: req.student.class, school: req.student.school }
+            notifications: studentNotifications,
+            count: studentNotifications.length
         });
 
     } catch (error) {
-        console.error('Get Detailed Result Error:', error);
-        res.status(500).json({ success: false, message: 'Failed to fetch result details.' });
+        console.error('❌ Error fetching student notifications:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch notifications',
+            error: error.message,
+            notifications: [] 
+        });
     }
 });
+
 module.exports = router;

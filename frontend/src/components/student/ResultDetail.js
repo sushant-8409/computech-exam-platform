@@ -7,6 +7,8 @@ import ErrorMessage from '../ErrorMessage';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import logo from '../../assets/logo192.png';
+import { enhanceEmbedUrl } from '../../utils/googleDriveUtils';
+import { useAuth } from '../../App';
 
 const StatusBadge = ({ status }) => {
   const statusLabels = {
@@ -35,9 +37,10 @@ const DrivePdf = ({ src, title }) => (
   <div className={styles.driveWrapper}>
     <iframe
       sandbox="allow-same-origin allow-scripts"   /* no pop-ups */
-      src={`${src}#toolbar=0&navpanes=0`}         /* hide Drive toolbar */
+      src={enhanceEmbedUrl(src)}                   /* use enhanced embed URL */
       title={title}
       className={styles.driveIframe}
+      scrolling="yes"
     />
     <div className={styles.driveOverlay} />
   </div>
@@ -54,6 +57,7 @@ const getGrade = (percentage) => {
 
 const ResultDetail = () => {
   const { resultId } = useParams();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -72,8 +76,12 @@ const ResultDetail = () => {
   useEffect(() => {
     const fetchResult = async () => {
       try {
-        // ✅ UPDATED: Call the new, consolidated endpoint
-        const { data } = await axios.get(`/api/student/results/${resultId}`);
+        // Use admin endpoint if user is admin, otherwise use student endpoint
+        const apiEndpoint = user?.role === 'admin' 
+          ? `/api/admin/result/${resultId}`
+          : `/api/student/results/${resultId}`;
+        
+        const { data } = await axios.get(apiEndpoint);
         if (!data.success) throw new Error(data.message);
         
         // ✅ UPDATED: Set state from the new, clean data structure
@@ -89,7 +97,7 @@ const ResultDetail = () => {
       }
     };
     fetchResult();
-  }, [resultId]);
+  }, [resultId, user?.role]);
 
 // ... (the rest of the component code, including PDF generation, should now work correctly)
 

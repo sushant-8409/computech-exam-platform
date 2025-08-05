@@ -209,3 +209,100 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Google Drive Warning Banner */
+.google-drive-warning-banner {
+  background: linear-gradient(90deg, #dc3545, #c82333);
+  color: white;
+  padding: 0.75rem 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 101;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  animation: slideDown 0.3s ease-out;
+}
+
+.gdrive-warning-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.gdrive-icon {
+  font-size: 1.25rem;
+}
+
+.gdrive-text {
+  text-align: center;
+  flex: 1;
+}
+
+.gdrive-text strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.gdrive-text small {
+  display: block;
+  opacity: 0.9;
+  font-size: 0.875rem;
+}
+
+.btn-connect-gdrive-small {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-connect-gdrive-small:hover:not(:disabled) {
+  background: rgba(255,255,255,0.3);
+  border-color: rgba(255,255,255,0.5);
+  transform: translateY(-1px);
+}
+
+.btn-connect-gdrive-small:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive design for warning banners */
+@media (max-width: 768px) {
+  .gdrive-warning-content,
+  .offline-content {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+  
+  .gdrive-text,
+  .offline-text {
+    text-align: center;
+  }
+  
+  .btn-connect-gdrive-small {
+    width: 100%;
+    max-width: 200px;
+  }
+}
