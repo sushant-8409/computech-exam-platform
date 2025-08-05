@@ -64,22 +64,67 @@ html.dark {
 }
 
 .pageHeader {
-  text-align: center;
+  background: linear-gradient(135deg, var(--c-primary), var(--c-secondary));
+  color: var(--text-on-primary);
+  padding: 2rem var(--spacing-lg);
+  border-radius: var(--radius-lg);
   margin-bottom: 2rem;
+  box-shadow: var(--shadow-md);
   animation: fadeInDown 0.5s ease-out;
 }
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+}
+
+.headerText {
+  flex: 1;
+  text-align: left;
+}
+
 .pageHeader h1 {
-  color: var(--c-primary);
+  color: var(--text-on-primary);
   font-size: clamp(1.8rem, 5vw, 2.5rem);
   font-weight: 700;
+  margin: 0 0 0.5rem 0;
 }
 .pageHeader p {
-  color: var(--text-muted);
+  color: var(--text-on-primary);
   font-size: clamp(1rem, 2.5vw, 1.1rem);
-  margin-top: 0.5rem;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0;
+  opacity: 0.9;
+}
+
+.quickStats {
+  display: flex;
+  gap: 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(10px);
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  color: var(--text-on-primary);
+}
+
+.statLabel {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  font-weight: 500;
 }
 
 .contentArea {
@@ -270,6 +315,41 @@ html.dark {
 /* --- 7. History Sidebar --- */
 .historySection { animation: fadeInRight 0.5s ease-out; }
 @media (min-width: 1024px) { .historySection .card { position: sticky; top: 2rem; } }
+
+.historyHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-md);
+}
+
+.historyHeader > div {
+  flex: 1;
+}
+
+.analyticsBtn {
+  background: linear-gradient(135deg, var(--c-primary), var(--c-secondary));
+  color: var(--text-on-primary);
+  border: none;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+}
+
+.analyticsBtn:hover {
+  background: linear-gradient(135deg, var(--c-primary-dark), var(--c-primary));
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
 .historyList { max-height: 65vh; overflow-y: auto; padding-right: 0.5rem; }
 .historyItem {
   display: flex; justify-content: space-between; align-items: center; padding: 1rem;
@@ -279,9 +359,27 @@ html.dark {
 .historyItem:hover { background-color: var(--bg-inset); }
 .historyInfo h4 { color: var(--c-primary); margin: 0 0 0.25rem 0; font-size: 1rem; }
 .historyInfo p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
-.historyScore { text-align: right; }
+.historyScore { text-align: right; display: flex; flex-direction: column; gap: 4px; }
 .historyScore .score { font-size: 1.2rem; font-weight: bold; color: var(--text-main); display: block; }
 .historyScore .percentage { color: var(--text-muted); font-size: 0.9rem; }
+
+.statusBadge {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.statusBadge.completed {
+  background: rgba(46, 204, 113, 0.1);
+  color: var(--c-success);
+}
+
+.statusBadge.pending_evaluation {
+  background: rgba(243, 156, 18, 0.1);
+  color: var(--c-warning);
+}
 
 
 /* --- 8. Loading & Animations --- */
@@ -308,6 +406,34 @@ html.dark {
   .mockTestCreator { padding: 1rem; }
   .card, .testInterface, .resultsContainer, .evaluationContainer, .previewCard { padding: 1.5rem; }
   .testHeader { flex-direction: column; gap: 1rem; }
+  
+  /* Mobile adjustments for new header */
+  .headerContent {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+  
+  .headerText {
+    text-align: center;
+  }
+  
+  .quickStats {
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  
+  .statValue {
+    font-size: 1.2rem;
+  }
+  
+  .statLabel {
+    font-size: 0.8rem;
+  }
+  
+  .pageHeader {
+    padding: 1.5rem 1rem;
+  }
 }
 
 /* --- 10. Warning/Profile Incomplete Card --- */

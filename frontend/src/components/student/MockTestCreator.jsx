@@ -3,6 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import styles from './MockTestCreator.module.css';
 import { useNavigate } from 'react-router-dom';
+import MockTestAnalytics from './MockTestAnalytics';
 //==================================================================
 // 1. HELPER & DISPLAY COMPONENTS
 // These are the small, reusable building blocks for the main UI.
@@ -15,24 +16,41 @@ const LoadingSpinner = ({ text }) => (
     </div>
 );
 
-const TestHistory = ({ history, onResultClick }) => (
+const TestHistory = ({ history, onResultClick, onAnalyticsClick }) => (
     <div className={styles.historySection}>
         <div className={styles.card}>
-            <h3>Test History</h3>
-            <p className={styles.historySubtext}>Click on a past result to view its details.</p>
+            <div className={styles.historyHeader}>
+                <div>
+                    <h3>Test History</h3>
+                    <p className={styles.historySubtext}>Click on a past result to view its details.</p>
+                </div>
+                {history.length > 0 && (
+                    <button 
+                        className={styles.analyticsBtn}
+                        onClick={onAnalyticsClick}
+                        title="View detailed analytics"
+                    >
+                        📊 Analytics
+                    </button>
+                )}
+            </div>
             {history.length > 0 ? (
                 <div className={styles.historyList}>
                     {history.map(item => (
                         <div key={item._id} className={styles.historyItem} onClick={() => onResultClick(item)} title="Click to view details">
                             <div className={styles.historyInfo}>
                                 <h4>{item.testTitle}</h4>
-                                <p><strong>Subject:</strong> {item.subject} | <strong>Date:</strong> {new Date(item.submittedAt).toLocaleDateString()}</p>
+                                <p><strong>Subject:</strong> {item.subject} | <strong>Date:</strong> {new Date(item.submittedAt || item.evaluatedAt).toLocaleDateString()}</p>
+                                <p><strong>Type:</strong> {item.questionType} | <strong>Time:</strong> {Math.round((item.timeTaken || 0) / 60)} min</p>
                             </div>
                             <div className={styles.historyScore}>
                                 <span className={styles.score}>
                                     {item.status === 'pending_evaluation' ? 'Pending Eval' : `${item.marksObtained} / ${item.totalMarks}`}
                                 </span>
                                 {item.status !== 'pending_evaluation' && <span className={styles.percentage}>{item.percentage}%</span>}
+                                <span className={`${styles.statusBadge} ${styles[item.status] || styles.completed}`}>
+                                    {item.status === 'pending_evaluation' ? '⏳ Pending' : '✅ Completed'}
+                                </span>
                             </div>
                         </div>
                     ))}
@@ -132,7 +150,7 @@ const SubjectiveEvaluationForm = ({ test, result, onEvaluationComplete }) => {
 /**
  * Component for the initial form where the user creates a test.
  */
-const TestCreationForm = ({ studentData, testHistory, onGenerate, onHistoryClick }) => {
+const TestCreationForm = ({ studentData, testHistory, onGenerate, onHistoryClick, onAnalyticsClick }) => {
     const [formData, setFormData] = useState({
         subject: '', chapters: '', timeLimit: 60, numberOfQuestions: 10,
         questionType: 'mcq', difficultyLevel: 'medium'
@@ -143,11 +161,40 @@ const TestCreationForm = ({ studentData, testHistory, onGenerate, onHistoryClick
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Auto-select subject based on student's class
+    // Auto-select subject based on student's name and class
     const filteredSubjects = useMemo(() => {
         if (!studentData?.class) return [];
+        
+        const allSubjects = [
+            'Computer Science',
+            'Computer Application',
+            'Mathematics',
+            'Physics',
+            'English Literature',
+            'English Language',
+            'Biology',
+            'History',
+            'Geography',
+            'Economic Applications',
+            'Chemistry'
+        ];
+        
+        const studentName = studentData?.name || studentData?.firstName || '';
         const studentClass = parseInt(String(studentData.class).replace(/\D/g, ''), 10);
-        if (studentClass <= 10) return ['Computer Application'];
+        
+        // Special case for Nomaan: show all subjects except Computer Science and Computer Application
+        if (studentName.toLowerCase().includes('nomaan')) {
+            return allSubjects.filter(subject => 
+                subject !== 'Computer Science' && subject !== 'Computer Application'
+            );
+        }
+        
+        // Class 9 or 10: show Computer Application only
+        if (studentClass === 9 || studentClass === 10) {
+            return ['Computer Application'];
+        }
+        
+        // Other classes: show Computer Science only
         return ['Computer Science'];
     }, [studentData]);
     
@@ -201,7 +248,7 @@ const TestCreationForm = ({ studentData, testHistory, onGenerate, onHistoryClick
                     <button className={styles.btnPrimary} onClick={() => onGenerate(formData)}>Generate Mock Test</button>
                 </div>
             </div>
-            <TestHistory history={testHistory} onResultClick={onHistoryClick} />
+            <TestHistory history={testHistory} onResultClick={onHistoryClick} onAnalyticsClick={onAnalyticsClick} />
         </div>
     );
 };
@@ -341,6 +388,7 @@ const MockTestCreator = () => {
     const [testHistory, setTestHistory] = useState([]);
     const [generatedTest, setGeneratedTest] = useState(null);
     const [testResult, setTestResult] = useState(null);
+    const [showAnalytics, setShowAnalytics] = useState(false);
     const navigate = useNavigate();
     const fetchInitialData = useCallback(async () => {
         try {
@@ -413,6 +461,10 @@ const MockTestCreator = () => {
         setTestResult(result);
         setViewMode('RESULTS');
     };
+
+    const handleShowAnalytics = () => {
+        setShowAnalytics(true);
+    };
     const renderContent = () => {
         if (loading) return <LoadingSpinner text="Fetching Your Profile..." />;
         if (!studentData) return <div className={styles.card}><p>Could not load student data.</p></div>;
@@ -439,7 +491,7 @@ const MockTestCreator = () => {
                         />;
             case 'FORM':
             default:
-                return <TestCreationForm studentData={studentData} testHistory={testHistory} onGenerate={handleGenerateTest} onHistoryClick={handleViewHistory} />;
+                return <TestCreationForm studentData={studentData} testHistory={testHistory} onGenerate={handleGenerateTest} onHistoryClick={handleViewHistory} onAnalyticsClick={handleShowAnalytics} />;
         }
       };
 
@@ -449,14 +501,56 @@ const MockTestCreator = () => {
         <div className={styles.mockTestCreator}>
             {generatingTest && <LoadingSpinner text="Generating Your Personalised Test..." />}
             <div className={styles.pageHeader}>
-                <h1>🧪 AI Powered Mock Test Generator</h1>
-                <p>Create unlimited, personalized practice tests for any subject using our own AI technology.</p>
+                <div className={styles.headerContent}>
+                    <div className={styles.headerText}>
+                        <h1>🧪 AI Powered Mock Test Generator</h1>
+                        <p>Create unlimited, personalized practice tests for any subject using our own AI technology.</p>
+                    </div>
+                    {testHistory.length > 0 && (
+                        <div className={styles.quickStats}>
+                            <div className={styles.statItem}>
+                                <span className={styles.statValue}>{testHistory.length}</span>
+                                <span className={styles.statLabel}>Tests Taken</span>
+                            </div>
+                            <div className={styles.statItem}>
+                                <span className={styles.statValue}>
+                                    {testHistory.filter(t => t.status === 'completed').length > 0
+                                        ? Math.round(
+                                            testHistory
+                                                .filter(t => t.status === 'completed')
+                                                .reduce((sum, t) => sum + t.percentage, 0) /
+                                            testHistory.filter(t => t.status === 'completed').length
+                                        ) + '%'
+                                        : '0%'
+                                    }
+                                </span>
+                                <span className={styles.statLabel}>Avg Score</span>
+                            </div>
+                            <div className={styles.statItem}>
+                                <span className={styles.statValue}>
+                                    {testHistory.filter(t => t.status === 'completed').length > 0
+                                        ? Math.max(...testHistory.filter(t => t.status === 'completed').map(t => t.percentage)) + '%'
+                                        : '0%'
+                                    }
+                                </span>
+                                <span className={styles.statLabel}>Best Score</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
             
             
             <div className={styles.contentArea}>
                 {renderContent()}
             </div>
+
+            {/* Mock Test Analytics Modal */}
+            <MockTestAnalytics 
+                mockTestResults={testHistory}
+                isVisible={showAnalytics}
+                onClose={() => setShowAnalytics(false)}
+            />
         </div>
     );
 };
