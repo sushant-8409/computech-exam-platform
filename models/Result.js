@@ -85,7 +85,15 @@ const resultSchema = new mongoose.Schema({
     type: String, 
     enum: ['pending', 'reviewed', 'published', 'under review'], 
     default: 'pending' 
-  }
+  },
+  
+  // Manual entry fields
+  isManualEntry: { type: Boolean, default: false },
+  enteredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  answerSheetURL: { type: String },
+  remarks: { type: String, default: '' },
+  grade: { type: String },
+  percentage: { type: Number }
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
@@ -112,12 +120,12 @@ resultSchema.pre('save', async function(next) {
   next();
 });
 
-// ✅ ADDED: Calculate percentage virtual
-resultSchema.virtual('percentage').get(function() {
-  if (this.totalMarks && this.totalMarks > 0) {
-    return Math.round((this.marksObtained / this.totalMarks) * 100 * 100) / 100; // Round to 2 decimals
+// Pre-save middleware to calculate percentage
+resultSchema.pre('save', function(next) {
+  if (this.totalMarks && this.totalMarks > 0 && this.marksObtained !== undefined) {
+    this.percentage = Math.round((this.marksObtained / this.totalMarks) * 100 * 100) / 100; // Round to 2 decimals
   }
-  return 0;
+  next();
 });
 
 // Existing virtuals

@@ -1648,18 +1648,34 @@ const TestInterface = () => {
               title="Question Paper"
               className="pdf-viewer"
               style={{ width: '100%', height: '100%', border: 0 }}
-              sandbox="allow-same-origin allow-scripts"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
               scrolling="yes"
-              onError={(e) => {
-                console.error('PDF load error:', e);
-                toast.error('Failed to load PDF. Retrying...');
-                fetchSignedPdfUrl(); // Retry getting signed URL
-              }}
-              onLoad={() => {
-                console.log('PDF loaded successfully');
-              }}
-              allow="autoplay"
+              referrerPolicy="no-referrer-when-downgrade"
+              allow="fullscreen autoplay"
             />
+            {/* Mobile Fallback Button */}
+            <div style={{
+              position: 'absolute',
+              bottom: 10,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 10
+            }}>
+              <button
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+                onClick={() => window.open(pdfUrl, '_blank', 'noopener,noreferrer')}
+              >
+                📄 Open in New Tab
+              </button>
+            </div>
             {/* Overlay to block top-right popout button */}
             <div
               style={{
@@ -1756,9 +1772,17 @@ const TestInterface = () => {
                     className="pdf-viewer-better"
                     width="100%"
                     height="100%"
-                    sandbox="allow-same-origin allow-scripts"
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
                     scrolling="yes"
-                    onError={() => setPdfError(true)}
+                    referrerPolicy="no-referrer-when-downgrade"
+                    allow="fullscreen"
+                    onError={() => {
+                      setPdfError(true);
+                      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                      if (isMobile) {
+                        toast.info('📱 If content is blocked on mobile, try opening in a new tab');
+                      }
+                    }}
                     onLoad={() => setPdfError(false)}
                   />
                   {/* Popout button blocker overlay */}

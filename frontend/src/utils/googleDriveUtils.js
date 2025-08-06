@@ -37,17 +37,29 @@ export const convertToEmbedUrl = (url) => {
 
 /**
  * Adds additional parameters to Google Drive embed URLs to improve viewing experience
+ * Enhanced for mobile device support
  */
 export const enhanceEmbedUrl = (url) => {
   if (!url) return url;
   
   const embedUrl = convertToEmbedUrl(url);
   
+  // Check if device is mobile
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
   // Add parameters to improve viewing experience
   const urlObj = new URL(embedUrl);
   
-  // Enable scrolling and remove unnecessary UI elements for better viewing
-  urlObj.hash = 'toolbar=0&navpanes=0&scrollbar=1';
+  if (isMobile) {
+    // Mobile-optimized parameters
+    urlObj.searchParams.set('embedded', 'true');
+    urlObj.searchParams.set('chrome', 'false');
+    urlObj.searchParams.set('dov', '1'); // Document overview
+    urlObj.searchParams.set('rm', 'minimal'); // Reduce UI elements
+  } else {
+    // Desktop parameters
+    urlObj.hash = 'toolbar=0&navpanes=0&scrollbar=1';
+  }
   
   return urlObj.toString();
 };
@@ -87,4 +99,41 @@ export const createDownloadUrl = (url) => {
 export const isGoogleDriveUrl = (url) => {
   if (!url) return false;
   return url.includes('drive.google.com') || url.includes('docs.google.com');
+};
+
+/**
+ * Detects if the current device is mobile
+ */
+export const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
+/**
+ * Creates alternative viewing options for mobile devices when iframe is blocked
+ */
+export const getMobileAlternatives = (url) => {
+  if (!url) return [];
+  
+  const alternatives = [];
+  
+  // Direct Google Drive view
+  alternatives.push({
+    label: 'Open in Google Drive',
+    url: url,
+    description: 'View in Google Drive app or browser'
+  });
+  
+  // Try to create a direct download link
+  if (isGoogleDriveUrl(url)) {
+    const downloadUrl = createDownloadUrl(url);
+    if (downloadUrl !== url) {
+      alternatives.push({
+        label: 'Download PDF',
+        url: downloadUrl,
+        description: 'Download to view offline'
+      });
+    }
+  }
+  
+  return alternatives;
 };

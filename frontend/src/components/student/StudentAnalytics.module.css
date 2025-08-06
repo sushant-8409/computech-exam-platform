@@ -415,11 +415,27 @@
   border-radius: 12px;
   transition: all 0.3s ease;
   border: 1px solid var(--border-light);
+  position: relative;
 }
 
 .subjectCard:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px var(--shadow-light);
+}
+
+.subjectCard.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.subjectCard.clickable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px var(--shadow-medium);
+  border-color: var(--primary-color);
+}
+
+.subjectCard.clickable:active {
+  transform: translateY(-2px);
 }
 
 .subjectHeader {
@@ -491,6 +507,29 @@
   background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
   border-radius: 3px;
   transition: width 0.6s ease;
+}
+
+.clickHint {
+  margin: 0.5rem 0 1rem 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  text-align: center;
+}
+
+.clickIndicator {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.75rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  font-size: 0.8rem;
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.subjectCard.clickable:hover .clickIndicator {
+  opacity: 1;
 }
 
 /* ============================================

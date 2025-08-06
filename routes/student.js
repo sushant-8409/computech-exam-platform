@@ -355,17 +355,57 @@ router.get('/results/:resultId', authenticateStudent, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid Result ID format.' });
         }
         const result = await Result.findById(resultId)
-            .populate({ path: 'testId', select: 'title subject totalMarks passingMarks questionsCount questionPaperURL answerKeyURL answerKeyVisible' })
+            .populate({ 
+                path: 'testId', 
+                select: 'title subject totalMarks passingMarks questionsCount duration timeLimit questions totalQuestions questionPaperURL answerKeyURL answerKeyVisible testType type class board school' 
+            })
+            .populate({ path: 'studentId', select: 'name class board school rollNo' })
             .lean();
-        if (!result || !result.studentId.equals(req.student._id)) {
+        if (!result || result.studentId._id.toString() !== req.student._id.toString()) {
             return res.status(404).json({ success: false, message: 'Result not found or access denied.' });
         }
-        const { testId: testData, studentId: studentData, ...resultFields } = result;
+        const { testId: testData, studentId: populatedStudentData, ...resultFields } = result;
+        
+        console.log('📊 Result API Debug:', {
+            requestedBy: req.student._id,
+            studentName: req.student.name,
+            testData: testData ? {
+                title: testData.title,
+                subject: testData.subject,
+                duration: testData.duration,
+                timeLimit: testData.timeLimit,
+                questions: testData.questions,
+                totalQuestions: testData.totalQuestions,
+                questionsCount: testData.questionsCount,
+                testType: testData.testType,
+                type: testData.type
+            } : null,
+            resultData: {
+                totalMarks: resultFields.totalMarks,
+                marksObtained: resultFields.marksObtained,
+                totalQuestions: resultFields.totalQuestions
+            },
+            studentData: {
+                name: req.student.name,
+                class: req.student.class,
+                board: req.student.board,
+                school: req.student.school,
+                rollNo: req.student.rollNo
+            },
+            populatedStudentData
+        });
+        
         res.json({
             success: true,
-            result: resultFields,
+            result: { ...resultFields, studentId: populatedStudentData },
             test: testData,
-            student: { name: req.student.name, class: req.student.class, school: req.student.school }
+            student: { 
+                name: req.student.name, 
+                class: req.student.class, 
+                board: req.student.board,
+                school: req.student.school,
+                rollNo: req.student.rollNo
+            }
         });
     } catch (error) {
         console.error('Get Detailed Result Error:', error);

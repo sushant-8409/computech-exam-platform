@@ -38,13 +38,35 @@ const authenticateStudent = async (req, res, next) => {
   }
 };
 const authenticateAdmin = (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ success:false, message:'No token' });
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  if (decoded.role !== 'admin') {
-    return res.status(403).json({ success:false, message:'Admins only' });
+  try {
+    console.log('🔐 Admin authenticate middleware called');
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      console.log('❌ No token provided');
+      return res.status(401).json({ success: false, message: 'No token' });
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('✅ Admin token decoded:', { role: decoded.role, email: decoded.email });
+    
+    if (decoded.role !== 'admin') {
+      console.log('❌ Not an admin token');
+      return res.status(403).json({ success: false, message: 'Admins only' });
+    }
+    
+    req.user = { 
+      id: 'admin', 
+      _id: 'admin',
+      role: 'admin', 
+      email: decoded.email,
+      name: 'Administrator' // Add name field
+    };
+    
+    console.log('✅ Admin authenticated:', req.user);
+    next();
+  } catch (error) {
+    console.error('❌ Admin authentication error:', error.message);
+    res.status(401).json({ success: false, message: 'Invalid token' });
   }
-  req.user = { id:'admin', role:'admin', email: decoded.email };
-  next();
 };
 module.exports = { authenticateStudent,authenticateAdmin };

@@ -55,7 +55,12 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    // Initialize dark mode from localStorage or default to false
+    const savedDarkMode = localStorage.getItem('admin-dark-mode');
+    return savedDarkMode ? JSON.parse(savedDarkMode) : false;
+  });
   const [selectedResult, setSelectedResult] = useState(null);
   const [isUploaded, setIsUploaded] = useState(false);
   const fileInputRef = useRef(null);
@@ -83,6 +88,37 @@ const AdminDashboard = () => {
     }
     return true;
   };
+
+  // Handle mobile menu and body scroll
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [mobileMenuOpen]);
+
+  // Save dark mode preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('admin-dark-mode', JSON.stringify(darkMode));
+  }, [darkMode]);
+
+  // Close mobile menu on window resize if screen becomes larger
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768 && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [mobileMenuOpen]);
 
   const checkGDriveStatus = async () => {
     try {
@@ -2576,11 +2612,11 @@ const AdminDashboard = () => {
                 : 'None'}
             </td>
             <td>
-              {r.answerSheetUrl ? (
+              {r.answerSheetURL ? (
                 <button
                   className="btn btn-sm btn-outline"
                   onClick={() =>
-                    window.open(r.answerSheetUrl, '_blank')
+                    window.open(r.answerSheetURL, '_blank')
                   }
                 >
                   📄 View Sheet
@@ -2892,9 +2928,17 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className={`admin-dashboard ${darkMode ? 'dark' : 'light'} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`admin-dashboard ${darkMode ? 'dark' : 'light'} ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileMenuOpen ? 'mobile-menu-open' : ''}`}>
+      {/* Mobile Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="mobile-sidebar-overlay" 
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo">
             <span className="logo-icon">🎓</span>
@@ -2906,6 +2950,13 @@ const AdminDashboard = () => {
           >
             {sidebarCollapsed ? '→' : '←'}
           </button>
+          {/* Mobile Close Button */}
+          <button
+            className="mobile-close-btn"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            ✕
+          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -2913,14 +2964,20 @@ const AdminDashboard = () => {
             <span className="nav-section-title">Main</span>
             <button
               className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => {
+                setActiveTab('dashboard');
+                setMobileMenuOpen(false);
+              }}
             >
               <span className="nav-icon">📊</span>
               <span className="nav-text">Dashboard</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
-              onClick={() => navigate('/admin/analytics')}
+              onClick={() => {
+                navigate('/admin/analytics');
+                setMobileMenuOpen(false);
+              }}
             >
               <span className="nav-icon">📈</span>
               <span className="nav-text">Analytics</span>
@@ -2931,31 +2988,53 @@ const AdminDashboard = () => {
             <span className="nav-section-title">Management</span>
             <button
               className={`nav-item ${activeTab === 'create-test' ? 'active' : ''}`}
-              onClick={() => setActiveTab('create-test')}
+              onClick={() => {
+                setActiveTab('create-test');
+                setMobileMenuOpen(false);
+              }}
             >
               <span className="nav-icon">➕</span>
               <span className="nav-text">Create Test</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'tests' ? 'active' : ''}`}
-              onClick={() => setActiveTab('tests')}
+              onClick={() => {
+                setActiveTab('tests');
+                setMobileMenuOpen(false);
+              }}
             >
               <span className="nav-icon">📝</span>
               <span className="nav-text">Tests</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
-              onClick={() => setActiveTab('students')}
+              onClick={() => {
+                setActiveTab('students');
+                setMobileMenuOpen(false);
+              }}
             >
               <span className="nav-icon">👥</span>
               <span className="nav-text">Students</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'results' ? 'active' : ''}`}
-              onClick={() => setActiveTab('results')}
+              onClick={() => {
+                setActiveTab('results');
+                setMobileMenuOpen(false);
+              }}
             >
               <span className="nav-icon">📊</span>
               <span className="nav-text">Results</span>
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'manual-entry' ? 'active' : ''}`}
+              onClick={() => {
+                navigate('/admin/manual-entry');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <span className="nav-icon">📋</span>
+              <span className="nav-text">Manual Entry</span>
             </button>
           </div>
 
@@ -2963,14 +3042,20 @@ const AdminDashboard = () => {
             <span className="nav-section-title">System</span>
             <button
               className={`nav-item ${activeTab === 'notifications' ? 'active' : ''}`}
-              onClick={() => setActiveTab('notifications')}
+              onClick={() => {
+                setActiveTab('notifications');
+                setMobileMenuOpen(false);
+              }}
             >
               <span className="nav-icon">📢</span>
               <span className="nav-text">Notifications</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => setActiveTab('settings')}
+              onClick={() => {
+                setActiveTab('settings');
+                setMobileMenuOpen(false);
+              }}
             >
               <span className="nav-icon">⚙️</span>
               <span className="nav-text">Settings</span>
@@ -2979,6 +3064,26 @@ const AdminDashboard = () => {
         </nav>
 
         <div className="sidebar-footer">
+          {/* Mobile Theme Toggle */}
+          <div className="mobile-theme-toggle">
+            <button
+              className="theme-toggle-mobile"
+              onClick={() => {
+                setDarkMode(!darkMode);
+                setMobileMenuOpen(false);
+              }}
+              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              <span className="theme-icon">{darkMode ? '☀️' : '🌙'}</span>
+              <span className="theme-text">
+                {darkMode ? 'Light Mode' : 'Dark Mode'}
+              </span>
+              <span className="theme-status">
+                {darkMode ? '(Active: Dark)' : '(Active: Light)'}
+              </span>
+            </button>
+          </div>
+
           <div className="user-profile">
             <div className="user-avatar">
               {user?.name?.charAt(0)?.toUpperCase() || 'A'}
@@ -2998,7 +3103,7 @@ const AdminDashboard = () => {
           <div className="header-left">
             <button
               className="mobile-menu-toggle"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               ☰
             </button>
@@ -3017,7 +3122,10 @@ const AdminDashboard = () => {
           <div className="header-right">
             <button
               className={`header-btn notification-btn ${activeTab === 'notifications' ? 'active' : ''}`}
-              onClick={() => setActiveTab('notifications')}
+              onClick={() => {
+                setActiveTab('notifications');
+                setMobileMenuOpen(false);
+              }}
               title="View Notifications"
             >
               🔔
@@ -3026,7 +3134,10 @@ const AdminDashboard = () => {
 
             <button
               className="header-btn theme-toggle"
-              onClick={() => setDarkMode(!darkMode)}
+              onClick={() => {
+                setDarkMode(!darkMode);
+                setMobileMenuOpen(false);
+              }}
               title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {darkMode ? '☀️' : '🌙'}

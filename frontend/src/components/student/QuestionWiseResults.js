@@ -187,15 +187,46 @@ export default function QuestionWiseResults() {
             {showAnswerKey ? 'Hide' : 'View'} Answer Key
           </button>
           {showAnswerKey && (
-            <iframe
-              src={enhanceEmbedUrl(test.answerKeyURL)}
-              title="Answer Key"
-              width="100%"
-              height="600"
-              style={{ border: '1px solid #ccc', marginTop: '1rem' }}
-              sandbox="allow-same-origin allow-scripts"
-              scrolling="yes"
-            />
+            <div style={{ position: 'relative' }}>
+              <iframe
+                src={enhanceEmbedUrl(test.answerKeyURL)}
+                title="Answer Key"
+                width="100%"
+                height="600"
+                style={{ border: '1px solid #ccc', marginTop: '1rem' }}
+                sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                scrolling="yes"
+                referrerPolicy="no-referrer-when-downgrade"
+                allow="fullscreen"
+                onError={() => {
+                  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                  if (isMobile) {
+                    console.warn('Mobile device detected - Answer Key iframe may be blocked');
+                  }
+                }}
+              />
+              <div style={{
+                position: 'absolute',
+                top: 15,
+                right: 10,
+                zIndex: 10
+              }}>
+                <button
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => window.open(test.answerKeyURL, '_blank', 'noopener,noreferrer')}
+                >
+                  📄 Open in Tab
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

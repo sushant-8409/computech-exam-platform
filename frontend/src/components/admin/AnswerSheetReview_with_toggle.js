@@ -49,12 +49,12 @@ export default function AnswerSheetReview() {
     
     switch (viewMode) {
       case 'questionPaper':
-        return active.questionPaperUrl;
+        return active.questionPaperURL;
       case 'answerKey':
-        return active.answerKeyUrl;
+        return active.answerKeyURL;
       case 'answerSheet':
       default:
-        return active.answerSheetUrl;
+        return active.answerSheetURL;
     }
   };
 
@@ -215,7 +215,7 @@ export default function AnswerSheetReview() {
             <button 
               className={`${styles.toggleButton} ${viewMode === 'answerKey' ? styles.active : ''}`}
               onClick={() => setViewMode('answerKey')}
-              disabled={!active.answerKeyUrl}
+              disabled={!active.answerKeyURL}
             >
               Answer Key
             </button>

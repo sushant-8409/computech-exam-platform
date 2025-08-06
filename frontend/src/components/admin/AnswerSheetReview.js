@@ -53,12 +53,12 @@ export default function AnswerSheetReview() {
     
     switch (viewMode) {
       case 'questionPaper':
-        return active.questionPaperUrl;
+        return active.questionPaperURL;
       case 'answerKey':
-        return active.answerKeyUrl;
+        return active.answerKeyURL;
       case 'answerSheet':
       default:
-        return active.answerSheetUrl;
+        return active.answerSheetURL;
     }
   };
 
@@ -95,8 +95,8 @@ export default function AnswerSheetReview() {
       // Update active object with test URLs from backend
       setActive(prev => ({
         ...prev,
-        questionPaperUrl: data.questionPaperUrl,
-        answerKeyUrl: data.answerKeyUrl
+        questionPaperURL: data.questionPaperURL,
+        answerKeyURL: data.answerKeyURL
       }));
 
       const gridMarks = [], gridRemarks = [];
@@ -226,7 +226,7 @@ export default function AnswerSheetReview() {
             <button 
               className={`${styles.toggleButton} ${viewMode === 'answerKey' ? styles.active : ''}`}
               onClick={() => setViewMode('answerKey')}
-              disabled={!active.answerKeyUrl}
+              disabled={!active.answerKeyURL}
             >
               Answer Key
             </button>
@@ -238,8 +238,16 @@ export default function AnswerSheetReview() {
                 <iframe 
                   title={getCurrentTitle()} 
                   src={enhanceEmbedUrl(getCurrentUrl())}
-                  sandbox="allow-same-origin allow-scripts"
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
                   scrolling="yes"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  allow="fullscreen"
+                  onError={() => {
+                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    if (isMobile) {
+                      console.warn('Mobile device detected - iframe may be blocked');
+                    }
+                  }}
                 />
               ) : (
                 <div className={styles.nosheet}>No {getCurrentTitle()} URL Available</div>

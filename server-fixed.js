@@ -74,8 +74,6 @@ app.use('/api', require('./routes/security')); // Security violation tracking
 // app.use(require('./routes/upload.routes')); // Temporarily commented out to debug
 // Registering all admin routes sequentially as in the original file
 app.use('/api/admin', require('./routes/admin'));
-app.use('/api/admin', require('./routes/manualTestEntry')); // Manual test entry routes
-app.use('/api/admin', require('./routes/googleSetup')); // Google setup helper
 app.use('/api/admin', require('./routes/adminReviewResults')); // Restored this route
 app.use('/api/admin', require('./routes/reviewRoutes'));    // Restored this route
 app.use('/api/admin', require('./routes/adminReview')); 
@@ -84,11 +82,6 @@ app.use('/api/admin', require('./routes/adminReview'));
 
 
 // ================== Serve React Frontend ==================
-// Serve uploaded files from tmp directory
-app.use('/tmp', express.static(path.join(__dirname, 'tmp'), {
-  maxAge: '1h' // Cache uploaded files for 1 hour
-}));
-
 app.use(express.static(path.join(__dirname, 'frontend', 'build'), {
   maxAge: '1d' // Cache static files for 1 day
 }));

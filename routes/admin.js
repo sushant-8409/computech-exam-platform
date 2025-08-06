@@ -7,6 +7,7 @@ const moment = require('moment-timezone');
 const nowIST = moment().tz('Asia/Kolkata').toDate();
 const testController = require('../controllers/testController'); // Adjust path as neede
 const studentController = require('../controllers/StudentController');
+const manualTestEntryRoutes = require('./manualTestEntry');
 // Adjust path as needed
 const Notification = require('../models/Notification');
 const NotificationSettings = require('../models/NotificationSettings');
@@ -1530,6 +1531,9 @@ router.post('/test-notification', authenticateAdmin, async (req, res) => {
     });
   }
 });
+
+// Mount manual test entry routes
+router.use('/', manualTestEntryRoutes);
 
 console.log('📝 Admin routes module loaded successfully');
 

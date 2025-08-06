@@ -7,6 +7,7 @@ const testSchema = new mongoose.Schema({
   subject: { type: String, required: true },
   class: { type: String, required: true },
   board: { type: String, required: true },
+  school: { type: String },
   duration: { type: Number, required: true },
   totalMarks: { type: Number, required: true },
   passingMarks: { type: Number, required: true },
@@ -23,6 +24,13 @@ const testSchema = new mongoose.Schema({
     ref: 'Student',
     default: []
     },
+
+  // Manual entry fields
+  isManualEntry: { type: Boolean, default: false },
+  testType: { type: String, enum: ['online', 'offline', 'hybrid'], default: 'online' },
+  testDate: { type: Date },
+  instructions: { type: String, default: '' },
+  status: { type: String, enum: ['draft', 'published', 'archived'], default: 'draft' },
 
   // Additional fields
   proctoringSettings: {

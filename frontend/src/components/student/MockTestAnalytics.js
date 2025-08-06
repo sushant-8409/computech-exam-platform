@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useTheme } from '../../App';
+import { useAuth, useTheme } from '../../App';
 import { toast } from 'react-toastify';
 import { Line, Bar, Doughnut, Radar } from 'react-chartjs-2';
 import {
@@ -33,6 +33,7 @@ ChartJS.register(
 );
 
 const MockTestAnalytics = ({ mockTestResults = [], isVisible, onClose }) => {
+  const { user } = useAuth();
   const { darkMode } = useTheme();
   const [loading, setLoading] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
@@ -374,170 +375,534 @@ const MockTestAnalytics = ({ mockTestResults = [], isVisible, onClose }) => {
     },
   };
 
-  // Download PDF function
+  // Download PDF function with formal institutional design
   const downloadPerformancePDF = async () => {
     setDownloadingPDF(true);
     try {
+      console.log('Starting Mock Test PDF generation with data:', {
+        studentInfo: user,
+        analytics,
+        mockTestResults: mockTestResults?.length,
+        subjectPerformance: analytics.subjectPerformance
+      });
+
+      if (!user || !analytics || analytics.totalTests === 0) {
+        console.error('Missing required data for PDF generation:', {
+          user: !!user,
+          analytics: !!analytics,
+          totalTests: analytics?.totalTests
+        });
+        throw new Error('Missing required data or no mock test results for PDF generation');
+      }
+
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       
-      // Header
-      pdf.setFontSize(20);
-      pdf.setTextColor(59, 130, 246);
-      pdf.text('CompuTech Mock Test Analytics Report', pageWidth / 2, 20, { align: 'center' });
+      // Formal Header Design
+      // Header border
+      pdf.setDrawColor(0, 51, 102); // Dark blue
+      pdf.setLineWidth(3);
+      pdf.rect(10, 10, pageWidth - 20, 50);
       
+      // Institution letterhead background
+      pdf.setFillColor(245, 247, 250); // Light gray background
+      pdf.rect(12, 12, pageWidth - 24, 46, 'F');
+      
+      // Main institution logo area
+      pdf.setFillColor(0, 51, 102); // Dark blue header bar
+      pdf.rect(12, 12, pageWidth - 24, 15, 'F');
+      
+      // Institution name
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(18);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('COMPUTECH EDUCATIONAL INSTITUTE', pageWidth / 2, 22, { align: 'center' });
+      
+      // Sub-header
+      pdf.setFontSize(10);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('Excellence in Mock Test Assessment & Performance Analytics', pageWidth / 2, 26, { align: 'center' });
+      
+      // Report title
+      pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(16);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text('Mock Test Performance Analytics Report', pageWidth / 2, 30, { align: 'center' });
+      pdf.setTextColor(0, 51, 102);
+      pdf.text('MOCK TEST PERFORMANCE ANALYTICS REPORT', pageWidth / 2, 38, { align: 'center' });
       
+      // Academic session info
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      const currentDate = new Date();
+      const academicYear = `${currentDate.getFullYear()}-${currentDate.getFullYear() + 1}`;
+      pdf.text(`Academic Session: ${academicYear}`, pageWidth / 2, 45, { align: 'center' });
+      pdf.text(`Report Generated: ${currentDate.toLocaleDateString('en-GB')} at ${currentDate.toLocaleTimeString('en-GB')}`, pageWidth / 2, 50, { align: 'center' });
+      
+      // Student Information Section
+      let yPosition = 75;
+      pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12);
-      pdf.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
+      pdf.setTextColor(0, 51, 102);
+      pdf.text('STUDENT INFORMATION', 20, yPosition);
       
-      // Line separator
-      pdf.setDrawColor(59, 130, 246);
-      pdf.line(20, 50, pageWidth - 20, 50);
+      // Student info table
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setLineWidth(0.5);
       
-      let yPosition = 60;
+      // Enhanced fallback logic for student information
+      const studentName = user?.name || 'Student Name Not Available';
+      const registrationNumber = user?.registrationNumber || 
+                                user?.rollNo || 
+                                user?._id?.slice(-8) || 
+                                'REG-NOT-AVAILABLE';
       
-      // Overall Statistics
-      pdf.setFontSize(14);
-      pdf.setTextColor(59, 130, 246);
-      pdf.text('📊 Overall Mock Test Performance Statistics', 20, yPosition);
-      yPosition += 10;
+      // Try to get additional info from mock test results if available
+      const firstResultWithStudent = mockTestResults.find(r => r.studentId);
+      const studentClass = user?.class || 
+                          firstResultWithStudent?.studentId?.class || 
+                          'Class Not Available';
       
-      pdf.setFontSize(11);
-      pdf.setTextColor(0, 0, 0);
+      const studentBoard = user?.board || 
+                          firstResultWithStudent?.studentId?.board || 
+                          'Board Not Available';
       
-      const stats = [
-        `Total Mock Tests Completed: ${analytics.totalTests}`,
-        `Average Score: ${analytics.averageScore.toFixed(1)}%`,
-        `Highest Score: ${analytics.highestScore.toFixed(1)}%`,
-        `Lowest Score: ${analytics.lowestScore.toFixed(1)}%`,
-        `Passing Rate: ${analytics.passingRate.toFixed(1)}%`,
-        `Completion Rate: ${analytics.completionRate.toFixed(1)}%`,
-        `Average Time Taken: ${analytics.avgTimeTaken.toFixed(1)} minutes`,
-        `Performance Trend: ${analytics.improvementTrend >= 0 ? '+' : ''}${analytics.improvementTrend.toFixed(1)}%`
-      ];
+      const studentSchool = user?.school || 
+                           firstResultWithStudent?.studentId?.school || 
+                           'School Not Available';
       
-      stats.forEach(stat => {
-        pdf.text(`• ${stat}`, 25, yPosition);
-        yPosition += 6;
+      console.log('Student info debug for mock tests:', {
+        userAuth: { class: user?.class, board: user?.board, school: user?.school },
+        firstResultStudent: firstResultWithStudent?.studentId,
+        finalValues: {
+          class: studentClass,
+          board: studentBoard,
+          school: studentSchool
+        }
       });
       
-      yPosition += 10;
+      const infoData = [
+        ['Student Name:', studentName],
+        ['Registration Number:', registrationNumber],
+        ['Class/Grade:', studentClass],
+        ['Board/Curriculum:', studentBoard],
+        ['School:', studentSchool],
+        ['Assessment Period:', `${new Date(mockTestResults[mockTestResults.length - 1]?.submittedAt || mockTestResults[mockTestResults.length - 1]?.evaluatedAt || new Date()).toLocaleDateString('en-GB')} to ${new Date().toLocaleDateString('en-GB')}`]
+      ];
       
-      // Subject Performance
+      yPosition += 8;
+      infoData.forEach((row, index) => {
+        const rowY = yPosition + (index * 7);
+        // Row background
+        if (index % 2 === 0) {
+          pdf.setFillColor(248, 250, 252);
+          pdf.rect(20, rowY - 2, pageWidth - 40, 6, 'F');
+        }
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.setTextColor(60, 60, 60);
+        pdf.text(row[0], 25, rowY + 2);
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(20, 20, 20);
+        pdf.text(row[1], 80, rowY + 2);
+      });
+      
+      yPosition += 50;
+      
+      // Mock Test Assessment Details Section
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(12);
+      pdf.setTextColor(0, 51, 102);
+      pdf.text('MOCK TEST ASSESSMENT DETAILS', 20, yPosition);
+      
+      // Get most common or representative values from mock test results
+      const completedTests = mockTestResults.filter(r => r.status === 'completed');
+      const avgDuration = completedTests.length > 0 
+        ? Math.round(completedTests.reduce((sum, test) => sum + (test.timeTaken || test.duration || 0), 0) / completedTests.length / 60)
+        : 0;
+      
+      const avgQuestions = completedTests.length > 0 
+        ? Math.round(completedTests.reduce((sum, test) => sum + (test.totalQuestions || test.questionCount || 0), 0) / completedTests.length)
+        : 0;
+      
+      // Get the most common subject
+      const subjectCounts = {};
+      completedTests.forEach(test => {
+        if (test.subject) {
+          subjectCounts[test.subject] = (subjectCounts[test.subject] || 0) + 1;
+        }
+      });
+      const mostCommonSubject = Object.keys(subjectCounts).length > 0 
+        ? Object.keys(subjectCounts).reduce((a, b) => subjectCounts[a] > subjectCounts[b] ? a : b)
+        : Object.keys(analytics.subjectPerformance)[0] || 'Mock Test Assessment';
+      
+      // Assessment info table
+      const examData = [
+        ['Assessment Type:', 'Mock Test Series'],
+        ['Primary Subject:', mostCommonSubject],
+        ['Average Duration:', avgDuration > 0 ? `${avgDuration} minutes` : 'Variable Duration'],
+        ['Average Questions:', avgQuestions > 0 ? avgQuestions.toString() : 'Variable Count'],
+        ['Test Format:', 'Standardized Mock Assessment'],
+        ['Total Tests Taken:', analytics.totalTests.toString()]
+      ];
+      
+      yPosition += 8;
+      examData.forEach((row, index) => {
+        const rowY = yPosition + (index * 7);
+        // Row background
+        if (index % 2 === 0) {
+          pdf.setFillColor(248, 250, 252);
+          pdf.rect(20, rowY - 2, pageWidth - 40, 6, 'F');
+        }
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.setTextColor(60, 60, 60);
+        pdf.text(row[0], 25, rowY + 2);
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(20, 20, 20);
+        pdf.text(row[1], 80, rowY + 2);
+      });
+      
+      yPosition += 50;
+      
+      // Overall Performance Summary Section
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(12);
+      pdf.setTextColor(0, 51, 102);
+      pdf.text('OVERALL MOCK TEST PERFORMANCE SUMMARY', 20, yPosition);
+      
+      // Performance summary table
+      yPosition += 10;
+      const summaryData = [
+        ['Total Mock Tests Completed', analytics.totalTests.toString()],
+        ['Overall Average Score', `${analytics.averageScore.toFixed(1)}%`],
+        ['Highest Achievement', `${analytics.highestScore.toFixed(1)}%`],
+        ['Lowest Score Recorded', `${analytics.lowestScore.toFixed(1)}%`],
+        ['Success Rate (≥40%)', `${analytics.passingRate.toFixed(1)}%`],
+        ['Completion Rate', `${analytics.completionRate.toFixed(1)}%`],
+        ['Average Time Per Test', `${analytics.avgTimeTaken.toFixed(1)} minutes`],
+        ['Performance Trajectory', `${analytics.improvementTrend >= 0 ? '+' : ''}${analytics.improvementTrend.toFixed(1)}%`]
+      ];
+      
+      // Table border
+      pdf.setDrawColor(0, 51, 102);
+      pdf.setLineWidth(1);
+      pdf.rect(20, yPosition - 3, pageWidth - 40, (summaryData.length * 8) + 6);
+      
+      // Table header
+      pdf.setFillColor(0, 51, 102);
+      pdf.rect(20, yPosition - 3, pageWidth - 40, 8, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text('Performance Metric', 25, yPosition + 2);
+      pdf.text('Value', pageWidth - 60, yPosition + 2);
+      
+      yPosition += 8;
+      summaryData.forEach((row, index) => {
+        const rowY = yPosition + (index * 8);
+        
+        // Alternating row colors
+        if (index % 2 === 0) {
+          pdf.setFillColor(248, 250, 252);
+          pdf.rect(20, rowY - 3, pageWidth - 40, 8, 'F');
+        }
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.setTextColor(40, 40, 40);
+        pdf.text(row[0], 25, rowY + 2);
+        
+        // Color-code performance values
+        const value = parseFloat(row[1]);
+        if (!isNaN(value)) {
+          if (row[0].includes('Average') || row[0].includes('Highest') || row[0].includes('Success') || row[0].includes('Completion')) {
+            if (value >= 80) {
+              pdf.setTextColor(34, 139, 34);  // Green for excellent
+            } else if (value >= 60) {
+              pdf.setTextColor(255, 140, 0);  // Orange for good
+            } else {
+              pdf.setTextColor(220, 20, 60);  // Red for needs improvement
+            }
+          } else {
+            pdf.setTextColor(40, 40, 40);
+          }
+        } else {
+          pdf.setTextColor(40, 40, 40);
+        }
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(row[1], pageWidth - 60, rowY + 2);
+      });
+      
+      yPosition += summaryData.length * 8 + 15;
+      
+      // Subject-wise Performance Analysis
       if (Object.keys(analytics.subjectPerformance).length > 0) {
-        pdf.setFontSize(14);
-        pdf.setTextColor(59, 130, 246);
-        pdf.text('📚 Subject-wise Performance', 20, yPosition);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.setTextColor(0, 51, 102);
+        pdf.text('SUBJECT-WISE MOCK TEST PERFORMANCE ANALYSIS', 20, yPosition);
+        
         yPosition += 10;
         
-        pdf.setFontSize(11);
-        pdf.setTextColor(0, 0, 0);
+        // Subject performance table
+        const subjectEntries = Object.entries(analytics.subjectPerformance);
+        const tableHeight = (subjectEntries.length + 1) * 10 + 6;
         
-        Object.entries(analytics.subjectPerformance).forEach(([subject, data]) => {
-          pdf.text(`• ${subject}: ${data.average.toFixed(1)}% (${data.scores.length} tests, avg ${data.avgTime.toFixed(1)} min)`, 25, yPosition);
-          yPosition += 6;
+        // Check if we need a new page
+        if (yPosition + tableHeight > pageHeight - 30) {
+          pdf.addPage();
+          yPosition = 30;
+        }
+        
+        // Table border
+        pdf.setDrawColor(0, 51, 102);
+        pdf.setLineWidth(1);
+        pdf.rect(20, yPosition - 3, pageWidth - 40, tableHeight);
+        
+        // Table headers
+        pdf.setFillColor(0, 51, 102);
+        pdf.rect(20, yPosition - 3, pageWidth - 40, 10, 'F');
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.setTextColor(255, 255, 255);
+        pdf.text('Subject', 25, yPosition + 3);
+        pdf.text('Tests', 80, yPosition + 3);
+        pdf.text('Average %', 110, yPosition + 3);
+        pdf.text('Avg Time', 140, yPosition + 3);
+        pdf.text('Grade', 170, yPosition + 3);
+        
+        yPosition += 10;
+        
+        subjectEntries.forEach(([subject, data], index) => {
+          const rowY = yPosition + (index * 10);
           
-          if (yPosition > pageHeight - 30) {
-            pdf.addPage();
-            yPosition = 20;
+          // Alternating row colors
+          if (index % 2 === 0) {
+            pdf.setFillColor(248, 250, 252);
+            pdf.rect(20, rowY - 3, pageWidth - 40, 10, 'F');
           }
+          
+          // Subject name
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(9);
+          pdf.setTextColor(40, 40, 40);
+          const truncatedSubject = subject.length > 12 ? subject.substring(0, 12) + '...' : subject;
+          pdf.text(truncatedSubject, 25, rowY + 3);
+          
+          // Tests count
+          pdf.text(data.scores.length.toString(), 85, rowY + 3);
+          
+          // Average with color coding
+          const avgScore = data.average;
+          if (avgScore >= 80) {
+            pdf.setTextColor(34, 139, 34);  // Green
+          } else if (avgScore >= 60) {
+            pdf.setTextColor(255, 140, 0);  // Orange
+          } else if (avgScore >= 40) {
+            pdf.setTextColor(255, 193, 7);  // Yellow
+          } else {
+            pdf.setTextColor(220, 20, 60);  // Red
+          }
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(avgScore.toFixed(1), 115, rowY + 3);
+          
+          // Average time
+          pdf.setTextColor(40, 40, 40);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`${data.avgTime.toFixed(1)}m`, 145, rowY + 3);
+          
+          // Grade calculation and color coding
+          const grade = avgScore >= 90 ? 'A+' :
+                       avgScore >= 80 ? 'A' :
+                       avgScore >= 70 ? 'B+' :
+                       avgScore >= 60 ? 'B' :
+                       avgScore >= 50 ? 'C+' :
+                       avgScore >= 40 ? 'C' : 'F';
+          
+          if (grade.startsWith('A')) {
+            pdf.setTextColor(34, 139, 34);   // Green
+          } else if (grade.startsWith('B')) {
+            pdf.setTextColor(255, 140, 0);   // Orange
+          } else if (grade.startsWith('C')) {
+            pdf.setTextColor(255, 193, 7);   // Yellow
+          } else {
+            pdf.setTextColor(220, 20, 60);   // Red
+          }
+          pdf.text(grade, 175, rowY + 3);
         });
         
-        yPosition += 10;
+        yPosition += subjectEntries.length * 10 + 15;
       }
-
-      // Question Type Performance
+      
+      // Question Type Performance (if available)
       if (Object.keys(analytics.questionTypePerformance).length > 0) {
-        pdf.setFontSize(14);
-        pdf.setTextColor(59, 130, 246);
-        pdf.text('🎯 Question Type Performance', 20, yPosition);
-        yPosition += 10;
+        // Check if we need a new page
+        if (yPosition > pageHeight - 80) {
+          pdf.addPage();
+          yPosition = 30;
+        }
         
-        pdf.setFontSize(11);
-        pdf.setTextColor(0, 0, 0);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.setTextColor(0, 51, 102);
+        pdf.text('QUESTION TYPE PERFORMANCE ANALYSIS', 20, yPosition);
+        yPosition += 15;
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.setTextColor(40, 40, 40);
         
         Object.entries(analytics.questionTypePerformance).forEach(([type, data]) => {
           const typeNames = {
             'mcq': 'Multiple Choice Questions',
             'subjective': 'Subjective Questions', 
-            'coding': 'Coding Problems'
+            'coding': 'Coding Problems',
+            'true-false': 'True/False Questions',
+            'fill-blank': 'Fill in the Blanks'
           };
-          pdf.text(`• ${typeNames[type] || type}: ${data.average.toFixed(1)}% (${data.count} tests)`, 25, yPosition);
+          pdf.text(`• ${typeNames[type] || type}: ${data.average.toFixed(1)}% (${data.count} occurrences)`, 25, yPosition);
           yPosition += 6;
         });
         
         yPosition += 10;
       }
       
-      // Strengths and Weaknesses
+      // Academic Performance Analysis
       if (analytics.strengths.length > 0 || analytics.weaknesses.length > 0) {
-        pdf.setFontSize(14);
-        pdf.setTextColor(16, 185, 129);
-        pdf.text('💪 Strengths', 20, yPosition);
-        yPosition += 8;
+        // Check if we need a new page
+        if (yPosition > pageHeight - 80) {
+          pdf.addPage();
+          yPosition = 30;
+        }
         
-        pdf.setFontSize(11);
-        pdf.setTextColor(0, 0, 0);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.setTextColor(0, 51, 102);
+        pdf.text('MOCK TEST PERFORMANCE ANALYSIS', 20, yPosition);
+        yPosition += 15;
         
-        analytics.strengths.slice(0, 3).forEach(strength => {
-          pdf.text(`• ${strength.subject}: ${strength.score}%`, 25, yPosition);
-          yPosition += 6;
-        });
-        
-        yPosition += 5;
-        
-        if (analytics.weaknesses.length > 0) {
-          pdf.setFontSize(14);
-          pdf.setTextColor(239, 68, 68);
-          pdf.text('🎯 Areas for Improvement', 20, yPosition);
+        // Strengths Section
+        if (analytics.strengths.length > 0) {
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(11);
+          pdf.setTextColor(34, 139, 34);
+          pdf.text('AREAS OF STRENGTH:', 25, yPosition);
           yPosition += 8;
           
-          pdf.setFontSize(11);
-          pdf.setTextColor(0, 0, 0);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(10);
+          pdf.setTextColor(40, 40, 40);
           
-          analytics.weaknesses.slice(0, 3).forEach(weakness => {
-            pdf.text(`• ${weakness.subject}: ${weakness.score}%`, 25, yPosition);
+          analytics.strengths.slice(0, 3).forEach((strength, index) => {
+            pdf.text(`${index + 1}. ${strength.subject}: Outstanding performance with ${strength.score}% average`, 30, yPosition);
             yPosition += 6;
           });
+          yPosition += 5;
+        }
+        
+        // Areas for Improvement Section
+        if (analytics.weaknesses.length > 0) {
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(11);
+          pdf.setTextColor(220, 20, 60);
+          pdf.text('AREAS FOR IMPROVEMENT:', 25, yPosition);
+          yPosition += 8;
+          
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(10);
+          pdf.setTextColor(40, 40, 40);
+          
+          analytics.weaknesses.slice(0, 3).forEach((weakness, index) => {
+            pdf.text(`${index + 1}. ${weakness.subject}: Focus needed - ${weakness.score}% average`, 30, yPosition);
+            yPosition += 6;
+          });
+          yPosition += 10;
         }
       }
       
-      // Grade Distribution
-      if (Object.keys(analytics.gradeDistribution).some(grade => analytics.gradeDistribution[grade] > 0)) {
-        yPosition += 10;
-        pdf.setFontSize(14);
-        pdf.setTextColor(59, 130, 246);
-        pdf.text('🏆 Grade Distribution', 20, yPosition);
-        yPosition += 8;
-        
-        pdf.setFontSize(11);
-        pdf.setTextColor(0, 0, 0);
-        
-        Object.entries(analytics.gradeDistribution).forEach(([grade, count]) => {
-          if (count > 0) {
-            pdf.text(`• ${grade}: ${count} tests`, 25, yPosition);
-            yPosition += 6;
-          }
-        });
+      // Grade Distribution Analysis
+      if (yPosition > pageHeight - 60) {
+        pdf.addPage();
+        yPosition = 30;
       }
       
-      // Footer
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(12);
+      pdf.setTextColor(0, 51, 102);
+      pdf.text('MOCK TEST GRADE DISTRIBUTION SUMMARY', 20, yPosition);
+      yPosition += 10;
+      
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(40, 40, 40);
+      
+      const gradeEntries = Object.entries(analytics.gradeDistribution).filter(([_, count]) => count > 0);
+      if (gradeEntries.length > 0) {
+        gradeEntries.forEach(([grade, count]) => {
+          const percentage = ((count / analytics.totalTests) * 100).toFixed(1);
+          pdf.text(`• Grade ${grade}: ${count} tests (${percentage}%)`, 25, yPosition);
+          yPosition += 6;
+        });
+      } else {
+        pdf.text('• No completed mock tests available for grade distribution', 25, yPosition);
+        yPosition += 6;
+      }
+      
+      // Official Footer
+      yPosition = pageHeight - 40;
+      
+      // Footer border
+      pdf.setDrawColor(0, 51, 102);
+      pdf.setLineWidth(1);
+      pdf.line(20, yPosition, pageWidth - 20, yPosition);
+      
+      // Footer content
+      pdf.setFont('helvetica', 'italic');
       pdf.setFontSize(8);
-      pdf.setTextColor(128, 128, 128);
-      pdf.text('Generated by CompuTech Exam Platform - Mock Test Analytics', pageWidth / 2, pageHeight - 10, { align: 'center' });
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('This mock test report is computer-generated and contains confidential academic information.', 20, yPosition + 8);
+      pdf.text('For queries regarding this report, please contact the Academic Office.', 20, yPosition + 14);
       
-      // Save PDF
-      pdf.save(`Mock_Test_Performance_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(0, 51, 102);
+      pdf.text('COMPUTECH EDUCATIONAL INSTITUTE', pageWidth / 2, yPosition + 25, { align: 'center' });
       
-      toast.success('📄 Mock test performance report downloaded successfully!');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 100, 100);
       
+      // Split contact info into two lines for better readability
+      pdf.text('📞 Contact: +91 8100648132 | 📧 Email: computechmailer@gmail.com', pageWidth / 2, yPosition + 30, { align: 'right' });
+      pdf.text('🌐 Website: https://computech-07f0.onrender.com', pageWidth / 2, yPosition + 35, { align: 'right' });
+      
+      // Save PDF with formal naming
+      const dateStamp = new Date().toISOString().split('T')[0];
+      const fileName = `${user?.name?.replace(/\s+/g, '_') || 'Student'}_Mock_Test_Report_${dateStamp}.pdf`;
+      
+      console.log('Saving Mock Test PDF with filename:', fileName);
+      pdf.save(fileName);
+      
+      toast.success('📄 Formal mock test analytics report downloaded successfully!');
+      console.log('Mock Test PDF generation completed successfully');
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('Failed to generate PDF report');
+      console.error('Error generating formal mock test analytics report:', error);
+      console.error('Error stack:', error.stack);
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        userData: !!user,
+        analyticsData: !!analytics,
+        totalTests: analytics?.totalTests || 0
+      });
+      toast.error(`Failed to generate mock test analytics report: ${error.message || 'Unknown error'}`);
     } finally {
       setDownloadingPDF(false);
     }

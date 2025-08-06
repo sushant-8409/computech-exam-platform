@@ -15,6 +15,7 @@ import AnswerSheetReview from './components/admin/AnswerSheetReview';
 import EditTestPage from './components/admin/EditTestPage';
 import StudentDetail from './components/admin/StudentDetail';
 import EditStudentPage from './components/admin/EditStudentPage';
+import ManualTestEntry from './components/admin/ManualTestEntry';
 import StudentDashboard from './components/student/StudentDashboard';
 import TestInterface from './components/student/TestInterface';
 import ResultDetail from './components/student/ResultDetail';
@@ -427,6 +428,7 @@ export default function App() {
                 <Route path="tests" element={<AdminDashboard />} />
                 <Route path="tests/edit/:id" element={<EditTestPage />} />
                 <Route path="answer-review" element={<AnswerSheetReview />} />
+                <Route path="manual-entry" element={<ManualTestEntry />} />
                 <Route path="students/:id" element={<StudentDetail />} />
                 <Route path="students/edit/:id" element={<EditStudentPage />} />
                 <Route path="analytics" element={<Analytics />} /> 

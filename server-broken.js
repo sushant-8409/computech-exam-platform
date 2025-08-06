@@ -1,5 +1,15 @@
-const express = require('express');
-const mongoose = require('mongoose');
+const express = require('exp// Set Content-Security-Policy for iframes with mobile support
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', 
+    "frame-src 'self' drive.google.com docs.google.com *.google.com *.googleapis.com; " +
+    "frame-ancestors 'self'; " +
+    "object-src 'none';"
+  );
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
+  next();
+});
+const session = require('express-session');ongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
@@ -37,6 +47,10 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
   next();
 });
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "frame-src 'self' drive.google.com docs.google.com");
+  next();
+});
 const session = require('express-session');
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret',
@@ -52,13 +66,13 @@ app.use(session({
 
 // Conditional logging for development
 if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
+  app.use((req, res, next) => {
     // Prevents logging requests for static assets to keep the console clean
-    if (!req.path.startsWith('/static') && !req.path.endsWith('.js') && !req.path.endsWith('.css')) {
-      console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-    }
-    next();
-  });
+    if (!req.path.startsWith('/static') && !req.path.endsWith('.js') && !req.path.endsWith('.css')) {
+      console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    }
+    next();
+  });
 }
 
 // ================== API Routes ==================
@@ -74,8 +88,6 @@ app.use('/api', require('./routes/security')); // Security violation tracking
 // app.use(require('./routes/upload.routes')); // Temporarily commented out to debug
 // Registering all admin routes sequentially as in the original file
 app.use('/api/admin', require('./routes/admin'));
-app.use('/api/admin', require('./routes/manualTestEntry')); // Manual test entry routes
-app.use('/api/admin', require('./routes/googleSetup')); // Google setup helper
 app.use('/api/admin', require('./routes/adminReviewResults')); // Restored this route
 app.use('/api/admin', require('./routes/reviewRoutes'));    // Restored this route
 app.use('/api/admin', require('./routes/adminReview')); 
@@ -84,54 +96,39 @@ app.use('/api/admin', require('./routes/adminReview'));
 
 
 // ================== Serve React Frontend ==================
-// Serve uploaded files from tmp directory
-app.use('/tmp', express.static(path.join(__dirname, 'tmp'), {
-  maxAge: '1h' // Cache uploaded files for 1 hour
-}));
-
 app.use(express.static(path.join(__dirname, 'frontend', 'build'), {
-  maxAge: '1d' // Cache static files for 1 day
+  maxAge: '1d' // Cache static files for 1 day
 }));
 
 // Fallback to the React app for any route not caught by the API
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
+  res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
 });
 
 // ================== Global Error Handler ==================
 app.use((error, req, res, next) => {
-  console.error('🔥 Global Server Error:', error.message);
-  res.status(500).json({
-    success: false,
-    message: process.env.NODE_ENV === 'development' ? error.message : 'An internal server error occurred.'
-  });
+  console.error('🔥 Global Server Error:', error.message);
+  res.status(500).json({
+    success: false,
+    message: process.env.NODE_ENV === 'development' ? error.message : 'An internal server error occurred.'
+  });
 });
 
 // ================== Server Startup ==================
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
-  try {
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
-    
-    const server = app.listen(PORT, () => {
-      console.log(`🚀 Server running on PORT ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-    });
-
-    // Graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('⏰ SIGTERM received, shutting down gracefully');
-      server.close(() => {
-        console.log('💤 Process terminated');
-        process.exit(0);
-      });
-    });
-
-  } catch (error) {
-    console.error('❌ Failed to start server:', error.message);
-    process.exit(1);
-  }
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✅ Connected to MongoDB');
+    
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('❌ Server startup failed:', error);
+    process.exit(1); // Exit the process if the database connection fails
+  }
 };
 
 startServer();
