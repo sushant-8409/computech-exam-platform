@@ -22,7 +22,8 @@ router.get('/results-for-review', authenticateAdmin, async (req, res) => {
             _id: row._id, reviewMode, status: row.status,
             studentName: row.studentId?.name || 'N/A',
             testTitle: row.testId?.title || row.testTitle || 'N/A',
-            answerSheetUrl: row.answerSheetUrl ?? null, adminComments: row.adminComments ?? '',
+            answerSheetUrl: row.answerSheetURL || row.answerSheetUrl || null, // Handle both naming conventions
+            adminComments: row.adminComments ?? '',
             questionWiseMarks: row.questionWiseMarks || [],
             studentComments: row.studentComments || '',
         });

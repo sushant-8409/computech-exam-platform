@@ -53,12 +53,12 @@ export default function AnswerSheetReview() {
     
     switch (viewMode) {
       case 'questionPaper':
-        return active.questionPaperURL;
+        return active.questionPaperURL || active.questionPaperUrl;
       case 'answerKey':
-        return active.answerKeyURL;
+        return active.answerKeyURL || active.answerKeyUrl;
       case 'answerSheet':
       default:
-        return active.answerSheetURL;
+        return active.answerSheetURL || active.answerSheetUrl;
     }
   };
 
@@ -92,11 +92,14 @@ export default function AnswerSheetReview() {
       setQMax(data.maxMarks);
       setOrigQMax(data.maxMarks);
 
-      // Update active object with test URLs from backend
+      // Update active object with test URLs from backend (handle both naming conventions)
       setActive(prev => ({
         ...prev,
-        questionPaperURL: data.questionPaperURL,
-        answerKeyURL: data.answerKeyURL
+        questionPaperURL: data.questionPaperURL || data.questionPaperUrl,
+        answerKeyURL: data.answerKeyURL || data.answerKeyUrl,
+        // Also preserve original field names for backwards compatibility
+        questionPaperUrl: data.questionPaperUrl,
+        answerKeyUrl: data.answerKeyUrl
       }));
 
       const gridMarks = [], gridRemarks = [];
@@ -226,7 +229,7 @@ export default function AnswerSheetReview() {
             <button 
               className={`${styles.toggleButton} ${viewMode === 'answerKey' ? styles.active : ''}`}
               onClick={() => setViewMode('answerKey')}
-              disabled={!active.answerKeyURL}
+              disabled={!(active.answerKeyURL || active.answerKeyUrl)}
             >
               Answer Key
             </button>

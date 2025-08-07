@@ -173,11 +173,11 @@ const ResultDetail = () => {
   const grade = getGrade(percentage);
   const isPass = result.marksObtained >= (test.passingMarks || 0);
 
-  // Document URLs
-  const questionPaperURL = test.questionPaperURL;
-  const answerSheetURL = result.answerSheetURL; // Fixed: was result.answerSheetUrl, now result.answerSheetURL
-  const answerKeyURL = test.answerKeyVisible ? test.answerKeyURL : 
-                      (result.isManualEntry ? test.answerKeyURL : null); // Show answer key for manual entries even if not marked visible
+  // Document URLs - Handle both naming conventions for backwards compatibility
+  const questionPaperURL = test.questionPaperURL || test.questionPaperUrl;
+  const answerSheetURL = result.answerSheetURL || result.answerSheetUrl; // Handle both uppercase and lowercase
+  const answerKeyURL = test.answerKeyVisible ? (test.answerKeyURL || test.answerKeyUrl) : 
+                      (result.isManualEntry ? (test.answerKeyURL || test.answerKeyUrl) : null); // Show for manual entries even if not marked visible
 
   // PDF generation (with QR and branding)
   const handleDownloadPDF = async () => {

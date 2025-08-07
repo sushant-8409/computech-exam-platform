@@ -2612,11 +2612,11 @@ const AdminDashboard = () => {
                 : 'None'}
             </td>
             <td>
-              {r.answerSheetURL ? (
+              {(r.answerSheetURL || r.answerSheetUrl) ? (
                 <button
                   className="btn btn-sm btn-outline"
                   onClick={() =>
-                    window.open(r.answerSheetURL, '_blank')
+                    window.open((r.answerSheetURL || r.answerSheetUrl), '_blank')
                   }
                 >
                   📄 View Sheet
