@@ -67,53 +67,32 @@ const StudentDashboard = () => {
   };
 
   const checkGoogleDriveStatus = async () => {
-    console.log('🔍 Starting Google Drive status check...');
+    console.log('🔍 Checking Admin Google Drive status...');
     setCheckingGoogleStatus(true);
     try {
-      // Check for admin Google Drive tokens in database first
-      console.log('📡 Making request to /auth/google/admin-status');
+      // Check for admin Google Drive tokens in database
       const response = await axios.get('/auth/google/admin-status');
       
-      console.log('📊 Full response:', response);
-      console.log('📊 Response data:', response.data);
-      
       const isConnected = response.data.connected && response.data.driveAccess;
-      console.log('🔗 Setting googleConnected to:', isConnected);
-      
       setGoogleConnected(isConnected);
-      
-      // Force update to test UI (temporary)
-      if (isConnected) {
-        console.log('🚀 FORCING googleConnected to true for testing');
-        setTimeout(() => setGoogleConnected(true), 100);
-      }
       
       console.log('📊 Admin Google Drive Status:', {
         connected: response.data.connected,
         driveAccess: response.data.driveAccess,
-        userInfo: response.data.userInfo,
-        adminEmail: response.data.adminEmail,
-        error: response.data.error,
+        userEmail: response.data.userInfo?.emailAddress,
         finalStatus: isConnected
       });
       
-      if (response.data.connected && response.data.driveAccess) {
-        console.log('✅ Admin Google Drive is connected:', response.data.userInfo?.emailAddress);
+      if (isConnected) {
+        console.log('✅ Google Drive Connected:', response.data.userInfo?.emailAddress);
       } else {
-        console.log('❌ Admin Google Drive not connected:', response.data.error);
+        console.log('❌ Google Drive Not Connected:', response.data.error);
       }
     } catch (error) {
-      console.error('❌ Error checking admin Google Drive status:', error);
-      console.error('Error details:', {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data
-      });
+      console.error('❌ Error checking Google Drive status:', error.message);
       setGoogleConnected(false);
     } finally {
       setCheckingGoogleStatus(false);
-      console.log('✅ Google Drive status check completed');
     }
   };
 
