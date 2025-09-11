@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, useTheme } from '../../App';
 import { toast } from 'react-toastify';
 import styles from './ManualTestEntry.module.css';
+import { CLASS_OPTIONS, BOARD_OPTIONS } from '../../constants/classBoardOptions';
 
 // Subject options (same as in AdminDashboard)
 const SUBJECT_OPTIONS = [
@@ -18,11 +19,7 @@ const SUBJECT_OPTIONS = [
   'Chemistry'
 ];
 
-// Class options (9-12)
-const CLASS_OPTIONS = [9, 10, 11, 12];
-
-// Board options
-const BOARD_OPTIONS = ['CBSE', 'ICSE', 'State Board'];
+// Class and board options are imported from centralized constants
 
 const ManualTestEntry = () => {
   const { user } = useAuth();
@@ -293,12 +290,17 @@ const ManualTestEntry = () => {
       console.log('📁 All file URLs collected:', fileUrls);
 
       // Prepare test data
+      // Normalize selectedStudent fields when used as fallback
+      const selectedClass = formData.class || (selectedStudent && (selectedStudent.class?.value ?? selectedStudent.class));
+      const selectedBoard = formData.board || (selectedStudent && (selectedStudent.board?.value ?? selectedStudent.board));
+      const selectedSchool = formData.school || (selectedStudent && (selectedStudent.school?.value ?? selectedStudent.school));
+
       const testData = {
         title: formData.title,
         subject: formData.subject,
-        class: formData.class || selectedStudent.class,
-        board: formData.board || selectedStudent.board,
-        school: formData.school || selectedStudent.school,
+        class: selectedClass,
+        board: selectedBoard,
+        school: selectedSchool,
         testType: formData.testType,
         testDate: formData.testDate,
         duration: parseInt(formData.duration) || 0,
@@ -429,7 +431,7 @@ const ManualTestEntry = () => {
               >
                 <option value="">Select Class</option>
                 {CLASS_OPTIONS.map(classNum => (
-                  <option key={classNum} value={classNum}>{classNum}</option>
+                  <option key={classNum.value} value={classNum.value}>{classNum.label}</option>
                 ))}
               </select>
               {selectedStudent && formData.class && (
@@ -535,18 +537,26 @@ const ManualTestEntry = () => {
                       key={student._id}
                       className={styles.studentOption}
                       onClick={() => {
-                        setSelectedStudent(student);
+                        // Normalize fields that may be option objects ({value,label}) into scalars
+                        const normalized = {
+                          ...student,
+                          class: student.class && (student.class.value ?? student.class),
+                          board: student.board && (student.board.value ?? student.board),
+                          subject: student.subject && (student.subject.value ?? student.subject)
+                        };
+
+                        setSelectedStudent(normalized);
                         setSearchQuery(student.name);
                         setSearchResults([]);
-                        
-                        // Auto-fill form fields based on student data
+
+                        // Auto-fill form fields based on normalized student data
                         setFormData(prev => ({
                           ...prev,
-                          class: student.class || prev.class,
-                          board: student.board || prev.board,
-                          school: student.school || prev.school,
+                          class: normalized.class || prev.class,
+                          board: normalized.board || prev.board,
+                          school: normalized.school || prev.school,
                           // Auto-fill subject if student has a preferred subject
-                          subject: student.subject || prev.subject
+                          subject: normalized.subject || prev.subject
                         }));
                       }}
                     >
@@ -556,7 +566,7 @@ const ManualTestEntry = () => {
                       </div>
                       <div className={styles.studentMeta}>
                         {student.rollNo && <span>Roll: {student.rollNo}</span>}
-                        {student.class && <span>Class: {student.class}</span>}
+                        {student.class && <span>Class: {typeof student.class === 'object' ? student.class.label ?? student.class.value : student.class}</span>}
                         {student.phone && <span>📞 {student.phone}</span>}
                       </div>
                     </div>

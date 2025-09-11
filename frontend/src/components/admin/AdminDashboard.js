@@ -5,6 +5,8 @@ import { useAuth } from '../../App';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
+import './AdminDashboard.css';
+// Force refresh by adding comment
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -21,6 +23,9 @@ import {
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import NotificationCenter from './NotificationCenter';
 import NotificationSettings from './NotificationSettings';
+import CodingTestCreator from './CodingTestCreatorMulti';
+import ExampleBox from './ExampleBox';
+import { CLASS_OPTIONS, BOARD_OPTIONS } from '../../constants/classBoardOptions';
 // Register Chart.js components
 ChartJS.register(
   CategoryScale,
@@ -122,32 +127,28 @@ const AdminDashboard = () => {
 
   const checkGDriveStatus = async () => {
     try {
-      console.log('🔍 Checking Google Drive status...');
+      console.log('🔍 Checking Admin Google Drive status...');
       
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.log('❌ No auth token found');
-        setGDriveConnected(false);
-        return;
-      }
-
-      // Use the correct endpoint that checks admin Google Drive status
-      const res = await axios.get('/api/student/google-drive-status', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      // Check for admin Google Drive tokens in database
+      const res = await axios.get('/auth/google/admin-status');
+      
+      console.log('📊 Admin Google Drive status response:', {
+        connected: res.data.connected,
+        driveAccess: res.data.driveAccess,
+        userInfo: res.data.userInfo,
+        adminEmail: res.data.adminEmail,
+        error: res.data.error
       });
       
-      console.log('📊 Google Drive status response:', res.data);
-      setGDriveConnected(res.data.connected);
+      setGDriveConnected(res.data.connected && res.data.driveAccess);
       
-      if (res.data.connected) {
-        console.log('✅ Google Drive is connected');
+      if (res.data.connected && res.data.driveAccess) {
+        console.log('✅ Admin Google Drive is connected:', res.data.userInfo?.emailAddress);
       } else {
-        console.log('❌ Google Drive not connected:', res.data.message);
+        console.log('❌ Admin Google Drive not connected:', res.data.error);
       }
     } catch (error) {
-      console.error('❌ Error checking Google Drive status:', error);
+      console.error('❌ Error checking Admin Google Drive status:', error);
       setGDriveConnected(false);
     }
   };
@@ -314,11 +315,27 @@ const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterClass, setFilterClass] = useState('');
   const [filterBoard, setFilterBoard] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [currentTestId, setCurrentTestId] = useState(null);
+  
+  // Coding test specific states
+  const [codingTests, setCodingTests] = useState([]);
+  const [codingTestsLoading, setCodingTestsLoading] = useState(false);
+  const [showCodingMarkModal, setShowCodingMarkModal] = useState(false);
+  const [selectedCodingTest, setSelectedCodingTest] = useState(null);
+  const [modifiedMarks, setModifiedMarks] = useState({});
+  const [adminNotes, setAdminNotes] = useState('');
+  const [cheatingFlags, setCheatingFlags] = useState({});
+  const [codingSearchTerm, setCodingSearchTerm] = useState('');
+  const [codingStatusFilter, setCodingStatusFilter] = useState('all');
+  const [showCodingManagement, setShowCodingManagement] = useState(false);
+  const [searchEmail, setSearchEmail] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+  
   const [formFields, setFormFields] = useState({
     title: '',
     description: '',
@@ -346,7 +363,26 @@ const AdminDashboard = () => {
     duration: 60, totalMarks: 100, passingMarks: 40,
     questionsCount: 10, startDate: '', endDate: '',
     answerKeyVisible: false, resumeEnabled: true,
-    proctoringSettings: { strictMode: true, allowTabSwitch: 0, requireFullscreen: true, blockRightClick: true, blockKeyboardShortcuts: true }
+    proctoringSettings: {
+      strictMode: true, allowTabSwitch: 0,
+      requireFullscreen: true,
+      blockRightClick: true,
+      blockKeyboardShortcuts: true,
+      maxViolations: 10
+    },
+    // Camera Monitoring Settings
+    cameraMonitoring: {
+      enabled: false,
+      captureInterval: 60,
+      saveToGoogleDrive: true,
+      requireCameraAccess: false,
+      faceDetection: false,
+      suspiciousActivityDetection: true
+    },
+    // Paper submission settings
+    paperSubmissionRequired: false,
+    paperUploadTimeLimit: 15,
+    paperUploadAllowedDuringTest: false
   };
   // Form States
   const [form, setForm] = useState({
@@ -354,7 +390,26 @@ const AdminDashboard = () => {
     duration: 60, totalMarks: 100, passingMarks: 40,
     questionsCount: 10, startDate: '', endDate: '',
     answerKeyVisible: false, resumeEnabled: true,
-    proctoringSettings: { strictMode: true, allowTabSwitch: 0, requireFullscreen: true, blockRightClick: true, blockKeyboardShortcuts: true }
+    proctoringSettings: {
+      strictMode: true, allowTabSwitch: 0,
+      requireFullscreen: true,
+      blockRightClick: true,
+      blockKeyboardShortcuts: true,
+      maxViolations: 10
+    },
+    // Camera Monitoring Settings
+    cameraMonitoring: {
+      enabled: false,
+      captureInterval: 60,
+      saveToGoogleDrive: true,
+      requireCameraAccess: false,
+      faceDetection: false,
+      suspiciousActivityDetection: true
+    },
+    // Paper submission settings
+    paperSubmissionRequired: false,
+    paperUploadTimeLimit: 15,
+    paperUploadAllowedDuringTest: false
   });
   const [testForm, setTestForm] = useState({
     title: '', description: '', subject: '', class: '', board: '',
@@ -365,8 +420,22 @@ const AdminDashboard = () => {
       strictMode: true, allowTabSwitch: 0,
       requireFullscreen: true,
       blockRightClick: true,
-      blockKeyboardShortcuts: true
-    }
+      blockKeyboardShortcuts: true,
+      maxViolations: 10
+    },
+    // Camera Monitoring Settings
+    cameraMonitoring: {
+      enabled: false,
+      captureInterval: 60,
+      saveToGoogleDrive: true,
+      requireCameraAccess: false,
+      faceDetection: false,
+      suspiciousActivityDetection: true
+    },
+    // Paper submission settings
+    paperSubmissionRequired: false,
+    paperUploadTimeLimit: 15,
+    paperUploadAllowedDuringTest: false
   });
 
   // Add these state variables with your existing ones
@@ -379,7 +448,6 @@ const AdminDashboard = () => {
     subjectPerformance: []
   });
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResult, setSearchResult] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
 
   // Add this function to fetch analytics data
@@ -419,6 +487,7 @@ const AdminDashboard = () => {
 
   const [files, setFiles] = useState({ questionPaper: null, answerKey: null });
   const [loading, setLoading] = useState(false);
+  const [showCodingTestCreator, setShowCodingTestCreator] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [uploading, setUploading] = useState(false);
   // In AdminDashboard component
@@ -439,7 +508,46 @@ const AdminDashboard = () => {
       const response = await axios.get('/api/admin/analytics/grade-distribution', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setGradeDistribution(response.data);
+      // Normalize response to an array of { grade, count, percentage }
+      const raw = response.data;
+      let normalized = [];
+
+      if (Array.isArray(raw)) {
+        normalized = raw.map(item => ({
+          grade: item.grade || item._id || item.label || String(item.grade || item._id || ''),
+          count: Number(item.count ?? item.value ?? item.total ?? 0),
+          percentage: item.percentage != null ? Number(item.percentage) : null
+        }));
+      } else if (raw && typeof raw === 'object') {
+        // If API returned an object like { 'A+': 5, 'A': 3 }
+        const entries = Object.entries(raw);
+        normalized = entries.map(([k, v]) => {
+          if (v != null && typeof v === 'object') {
+            return {
+              grade: v.grade || v._id || k,
+              count: Number(v.count ?? v.value ?? v.total ?? 0),
+              percentage: v.percentage != null ? Number(v.percentage) : null
+            };
+          }
+          return { grade: k, count: Number(v ?? 0), percentage: null };
+        });
+      } else {
+        normalized = [];
+      }
+
+      // Compute percentages if missing
+      const total = normalized.reduce((s, it) => s + (it.count || 0), 0) || 0;
+      if (total > 0) {
+        normalized = normalized.map(it => ({
+          ...it,
+          percentage: it.percentage != null ? it.percentage : Math.round((it.count / total) * 100)
+        }));
+      } else {
+        // Ensure percentage is at least 0
+        normalized = normalized.map(it => ({ ...it, percentage: it.percentage != null ? it.percentage : 0 }));
+      }
+
+      setGradeDistribution(normalized);
     } catch (error) {
       console.error('❌ Failed to fetch grade distribution:', error);
       if (error.response?.status === 401) {
@@ -550,10 +658,26 @@ const AdminDashboard = () => {
         return;
       }
 
-      const response = await axios.get('/api/admin/recent-activity', {
+      const response = await axios.get('/api/admin/analytics/recent-activity', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setRecentActivity(response.data);
+      // Normalize response to array
+      const raw = response.data;
+      let normalized = [];
+      if (Array.isArray(raw)) {
+        normalized = raw;
+      } else if (raw && typeof raw === 'object') {
+        // If wrapped in an object like { recentActivity: [...] }
+        if (Array.isArray(raw.recentActivity)) normalized = raw.recentActivity;
+        else if (Array.isArray(raw.results)) normalized = raw.results;
+        else {
+          // attempt to coerce object entries into an array
+          normalized = Object.values(raw).flat().filter(Boolean);
+        }
+      } else {
+        normalized = [];
+      }
+      setRecentActivity(normalized);
     } catch (error) {
       console.error('❌ Failed to fetch recent activity:', error);
       if (error.response?.status === 401) {
@@ -629,11 +753,11 @@ const AdminDashboard = () => {
   };
   // Valid combinations for class and board
   const validClassBoardCombinations = {
-    'CBSE': ['9', '10', '11', '12'],
-    'ICSE': ['9', '10'],
-    'ISC': ['11', '12'],
-    'WBCHSE': ['11', '12'],
-    'State Board': ['9', '10', '11', '12']
+    CBSE: ['9', '10', '11', '12'],
+    ICSE: ['9', '10'],
+    ISC: ['11', '12'],
+    WBCHSE: ['11', '12'],
+    Other: ['9', '10', '11', '12']
   };
   // inside AdminDashboard component, alongside other handlers
 
@@ -694,6 +818,7 @@ const AdminDashboard = () => {
     fetchDashboardData();
     fetchChartData();
     fetchAnalyticsData();
+    fetchCodingTests(); // Fetch coding test data for enhanced results management
     // Load theme preference
     const savedTheme = localStorage.getItem('admin-theme');
     if (savedTheme === 'dark') {
@@ -762,6 +887,9 @@ const AdminDashboard = () => {
     }
   }, []);
 
+// touch: rebuild trigger
+// touch2: recentActivity normalized
+
 
 
   // File upload handler
@@ -818,6 +946,121 @@ const AdminDashboard = () => {
     }
   };
 
+  // Coding test management functions
+  const fetchCodingTests = useCallback(async () => {
+    try {
+      setCodingTestsLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No auth token found');
+      
+      const response = await axios.get('/api/admin/coding-tests-comprehensive', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        setCodingTests(response.data.tests);
+      } else {
+        toast.error('Failed to fetch coding tests');
+      }
+    } catch (error) {
+      console.error('Error fetching coding tests:', error);
+      toast.error('Failed to load coding tests');
+      if (error.response?.status === 401) {
+        navigate('/login');
+      }
+    } finally {
+      setCodingTestsLoading(false);
+    }
+  }, [navigate]);
+
+  const handleCodingMarkModification = (test) => {
+    setSelectedCodingTest(test);
+    setModifiedMarks({
+      totalScore: test.totalScore || 0,
+      codeQuality: test.codeQuality || 0,
+      efficiency: test.efficiency || 0,
+      testCases: test.testCases || 0
+    });
+    setAdminNotes(test.adminNotes || '');
+    setCheatingFlags({
+      timeViolation: test.flags?.timeViolation || false,
+      codePatterns: test.flags?.codePatterns || false,
+      behaviorAnomaly: test.flags?.behaviorAnomaly || false
+    });
+    setShowCodingMarkModal(true);
+  };
+
+  const saveCodingMarkModifications = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const updateData = {
+        resultId: selectedCodingTest._id,
+        modifiedMarks,
+        adminNotes,
+        cheatingFlags,
+        adminReviewed: true,
+        modifiedBy: 'admin',
+        modificationTimestamp: new Date().toISOString()
+      };
+
+      const response = await axios.put('/api/admin/modify-coding-marks', updateData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        toast.success('Marks updated successfully');
+        setShowCodingMarkModal(false);
+        fetchCodingTests();
+        fetchDashboardData(); // Refresh the main results too
+      } else {
+        toast.error('Failed to update marks');
+      }
+    } catch (error) {
+      console.error('Error updating marks:', error);
+      toast.error('Failed to save changes');
+    }
+  };
+
+  const flagCodingTestForCheating = async (testId, reason) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/admin/flag-cheating', {
+        resultId: testId,
+        reason,
+        flaggedBy: 'admin',
+        timestamp: new Date().toISOString()
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        toast.success('Test flagged for review');
+        fetchCodingTests();
+        fetchDashboardData();
+      } else {
+        toast.error('Failed to flag test');
+      }
+    } catch (error) {
+      console.error('Error flagging test:', error);
+      toast.error('Failed to flag test');
+    }
+  };
+
+  const getFilteredCodingTests = () => {
+    return codingTests.filter(test => {
+      const matchesSearch = 
+        test.studentId?.name?.toLowerCase().includes(codingSearchTerm.toLowerCase()) ||
+        test.studentId?.email?.toLowerCase().includes(codingSearchTerm.toLowerCase()) ||
+        test.testTitle?.toLowerCase().includes(codingSearchTerm.toLowerCase());
+      
+      const matchesStatus = codingStatusFilter === 'all' || 
+        (codingStatusFilter === 'flagged' && test.isFlagged) ||
+        (codingStatusFilter === 'reviewed' && test.adminReviewed) ||
+        (codingStatusFilter === 'pending' && !test.adminReviewed);
+      
+      return matchesSearch && matchesStatus;
+    });
+  };
 
   /**
    * Step 2: Create the test record in MongoDB
@@ -1001,6 +1244,18 @@ const AdminDashboard = () => {
   const filterData = (data, type) => {
     let filtered = [...data];
 
+    // Remove duplicates based on ID first
+    if (type === 'results') {
+      const seen = new Set();
+      filtered = filtered.filter(item => {
+        if (seen.has(item._id)) {
+          return false;
+        }
+        seen.add(item._id);
+        return true;
+      });
+    }
+
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(item => {
@@ -1008,7 +1263,7 @@ const AdminDashboard = () => {
           ? [item.name, item.email, item.rollNo]
           : type === 'tests'
             ? [item.title, item.subject]
-            : [item.testTitle, item.studentId?.name];
+            : [item.testTitle, item.studentId?.name, item.studentId?.email];
 
         return searchFields.some(field =>
           field?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -1018,18 +1273,55 @@ const AdminDashboard = () => {
 
     // Class filter
     if (filterClass) {
-      filtered = filtered.filter(item => item.class === filterClass);
+      filtered = filtered.filter(item => {
+        if (type === 'results') {
+          return item.studentId?.class === filterClass;
+        }
+        return item.class === filterClass;
+      });
     }
 
     // Board filter
     if (filterBoard) {
-      filtered = filtered.filter(item => item.board === filterBoard);
+      filtered = filtered.filter(item => {
+        if (type === 'results') {
+          return item.studentId?.board === filterBoard;
+        }
+        return item.board === filterBoard;
+      });
+    }
+
+    // Status filter for results
+    if (filterStatus && type === 'results') {
+      filtered = filtered.filter(item => item.status === filterStatus);
     }
 
     // Sort
     filtered.sort((a, b) => {
-      const aValue = a[sortBy];
-      const bValue = b[sortBy];
+      let aValue, bValue;
+      
+      if (type === 'results') {
+        switch (sortBy) {
+          case 'submittedAt':
+            aValue = new Date(a.submittedAt);
+            bValue = new Date(b.submittedAt);
+            break;
+          case 'studentName':
+            aValue = a.studentId?.name || '';
+            bValue = b.studentId?.name || '';
+            break;
+          case 'testTitle':
+            aValue = a.testTitle || '';
+            bValue = b.testTitle || '';
+            break;
+          default:
+            aValue = a[sortBy];
+            bValue = b[sortBy];
+        }
+      } else {
+        aValue = a[sortBy];
+        bValue = b[sortBy];
+      }
 
       if (sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
@@ -1081,10 +1373,10 @@ const AdminDashboard = () => {
         ) : (
           <Bar
             data={{
-              labels: gradeDistribution.map(item => item.grade),
+              labels: (Array.isArray(gradeDistribution) ? gradeDistribution : []).map(item => item.grade),
               datasets: [{
                 label: 'Number of Students',
-                data: gradeDistribution.map(item => item.count),
+                data: (Array.isArray(gradeDistribution) ? gradeDistribution : []).map(item => item.count),
                 backgroundColor: [
                   '#10b981', // A+ - Emerald
                   '#3b82f6', // A - Blue
@@ -1129,9 +1421,9 @@ const AdminDashboard = () => {
         )}
       </div>
       <div className="grade-stats">
-        {gradeDistribution.map((grade, index) => (
+        {(Array.isArray(gradeDistribution) ? gradeDistribution : []).map((grade, index) => (
           <div key={index} className="grade-stat-item">
-            <span className={`grade-badge grade-${grade.grade.toLowerCase().replace('+', 'plus')}`}>
+            <span className={`grade-badge grade-${(grade.grade || '').toString().toLowerCase().replace('+', 'plus')}`}>
               {grade.grade}
             </span>
             <span className="grade-count">{grade.count} students</span>
@@ -1230,8 +1522,8 @@ const AdminDashboard = () => {
       <div className="activity-list">
         {dashboardLoading ? (
           <div className="loading-spinner">Loading...</div>
-        ) : recentActivity.length > 0 ? (
-          recentActivity.map((activity, index) => (
+        ) : (Array.isArray(recentActivity) ? recentActivity : []).length > 0 ? (
+          (Array.isArray(recentActivity) ? recentActivity : []).map((activity, index) => (
             <div key={index} className="activity-item">
               <div className="activity-icon">
                 {activity.type === 'test_submitted' ? '📝' :
@@ -1294,9 +1586,9 @@ const AdminDashboard = () => {
           <button
             className="btn btn-primary"
             onClick={fetchDashboardData}
-            disabled={loading}
+            disabled={dashboardLoading}
           >
-            {loading ? 'Loading...' : 'Refresh All Data'}
+            {dashboardLoading ? 'Loading...' : 'Refresh All Data'}
           </button>
           <div className="last-updated">
             Last updated: {new Date().toLocaleTimeString()}
@@ -1305,7 +1597,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Loading State */}
-      {loading ? (
+      {dashboardLoading ? (
         <div className="dashboard-loading">
           <div className="loading-spinner">
             <div className="spinner"></div>
@@ -1412,10 +1704,10 @@ const AdminDashboard = () => {
                   ) : (
                     <Bar
                       data={{
-                        labels: gradeDistribution.map(item => item.grade),
+                  labels: (Array.isArray(gradeDistribution) ? gradeDistribution : []).map(item => item.grade),
                         datasets: [{
                           label: 'Number of Students',
-                          data: gradeDistribution.map(item => item.count),
+                      data: (Array.isArray(gradeDistribution) ? gradeDistribution : []).map(item => item.count),
                           backgroundColor: [
                             '#10b981', // A+ - Emerald
                             '#3b82f6', // A - Blue
@@ -1460,15 +1752,15 @@ const AdminDashboard = () => {
                   )}
                 </div>
                 <div className="grade-stats">
-                  {gradeDistribution.map((grade, index) => (
-                    <div key={index} className="grade-stat-item">
-                      <span className={`grade-badge grade-${grade.grade.toLowerCase().replace('+', 'plus')}`}>
-                        {grade.grade}
-                      </span>
-                      <span className="grade-count">{grade.count} students</span>
-                      <span className="grade-percentage">({grade.percentage}%)</span>
-                    </div>
-                  ))}
+                  {(Array.isArray(gradeDistribution) ? gradeDistribution : []).map((grade, index) => (
+                      <div key={index} className="grade-stat-item">
+                        <span className={`grade-badge grade-${(grade.grade || '').toString().toLowerCase().replace('+', 'plus')}`}>
+                          {grade.grade}
+                        </span>
+                        <span className="grade-count">{grade.count} students</span>
+                        <span className="grade-percentage">({grade.percentage}%)</span>
+                      </div>
+                    ))}
                 </div>
               </div>
 
@@ -1564,8 +1856,8 @@ const AdminDashboard = () => {
                 <div className="activity-list">
                   {dashboardLoading ? (
                     <div className="loading-spinner">Loading activities...</div>
-                  ) : recentActivity.length > 0 ? (
-                    recentActivity.map((activity, index) => (
+                  ) : (Array.isArray(recentActivity) ? recentActivity : []).length > 0 ? (
+                    (Array.isArray(recentActivity) ? recentActivity : []).map((activity, index) => (
                       <div key={index} className="activity-item">
                         <div className="activity-icon">
                           {activity.type === 'test_submitted' ? (
@@ -1747,6 +2039,24 @@ const AdminDashboard = () => {
       <div className="form-header">
         <h2>➕ Create New Test</h2>
         <p>Create comprehensive tests with question papers, answer sheets, and advanced proctoring</p>
+        
+        {/* Test Type Selection */}
+        <div className="test-type-selector">
+          <button
+            type="button"
+            className="test-type-btn traditional-test-btn active"
+            onClick={() => {}}
+          >
+            📄 Traditional Test
+          </button>
+          <button
+            type="button"
+            className="test-type-btn coding-test-btn"
+            onClick={() => setShowCodingTestCreator(true)}
+          >
+            💻 Coding Test
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleCreateTest} className="modern-form">
@@ -1792,10 +2102,9 @@ const AdminDashboard = () => {
                 required
               >
                 <option value="">Select Class</option>
-                <option value="9">Class 9</option>
-                <option value="10">Class 10</option>
-                <option value="11">Class 11</option>
-                <option value="12">Class 12</option>
+                {CLASS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
 
@@ -1807,11 +2116,9 @@ const AdminDashboard = () => {
                 required
               >
                 <option value="">Select Board</option>
-                <option value="CBSE">CBSE</option>
-                <option value="ICSE">ICSE</option>
-                <option value="ISC">ISC</option>
-                <option value="WBCHSE">WBCHSE</option>
-                <option value="State Board">State Board</option>
+                {BOARD_OPTIONS.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -2155,6 +2462,192 @@ const AdminDashboard = () => {
                 <option value={3}>3 tab switches allowed</option>
               </select>
             </div>
+
+            <div className="form-group">
+              <label>Maximum Violations Allowed</label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={testForm.proctoringSettings.maxViolations}
+                onChange={(e) => setTestForm({
+                  ...testForm,
+                  proctoringSettings: { ...testForm.proctoringSettings, maxViolations: parseInt(e.target.value) || 10 }
+                })}
+              />
+              <small>Students will be auto-submitted after exceeding this limit (1-10)</small>
+            </div>
+          </div>
+        </div>
+
+        {/* Camera Monitoring Settings */}
+        <div className="form-section">
+          <h3>📹 Camera Monitoring Settings</h3>
+
+          <div className="proctoring-grid">
+            <div className="proctoring-option">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={testForm.cameraMonitoring?.enabled || false}
+                  onChange={(e) => setTestForm({
+                    ...testForm,
+                    cameraMonitoring: { 
+                      ...testForm.cameraMonitoring, 
+                      enabled: e.target.checked 
+                    }
+                  })}
+                />
+                <span className="option-content">
+                  <strong>Enable Camera Monitoring</strong>
+                  <small>Activate camera-based monitoring during test</small>
+                </span>
+              </label>
+            </div>
+
+            {testForm.cameraMonitoring?.enabled && (
+              <>
+                <div className="proctoring-option">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={testForm.cameraMonitoring?.requireCameraAccess || false}
+                      onChange={(e) => setTestForm({
+                        ...testForm,
+                        cameraMonitoring: { 
+                          ...testForm.cameraMonitoring, 
+                          requireCameraAccess: e.target.checked 
+                        }
+                      })}
+                    />
+                    <span className="option-content">
+                      <strong>Require Camera Access</strong>
+                      <small>Test won't start without camera permissions</small>
+                    </span>
+                  </label>
+                </div>
+
+                <div className="proctoring-option">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={testForm.cameraMonitoring?.suspiciousActivityDetection || false}
+                      onChange={(e) => setTestForm({
+                        ...testForm,
+                        cameraMonitoring: { 
+                          ...testForm.cameraMonitoring, 
+                          suspiciousActivityDetection: e.target.checked 
+                        }
+                      })}
+                    />
+                    <span className="option-content">
+                      <strong>Suspicious Activity Detection</strong>
+                      <small>AI-based detection of irregular behavior</small>
+                    </span>
+                  </label>
+                </div>
+
+                <div className="proctoring-option">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={testForm.cameraMonitoring?.saveToGoogleDrive || false}
+                      onChange={(e) => setTestForm({
+                        ...testForm,
+                        cameraMonitoring: { 
+                          ...testForm.cameraMonitoring, 
+                          saveToGoogleDrive: e.target.checked 
+                        }
+                      })}
+                    />
+                    <span className="option-content">
+                      <strong>Save Photos to Google Drive</strong>
+                      <small>Store monitoring images in Google Drive</small>
+                    </span>
+                  </label>
+                </div>
+
+                <div className="form-group">
+                  <label>Photo Capture Interval</label>
+                  <select
+                    value={testForm.cameraMonitoring?.captureInterval || 60}
+                    onChange={(e) => setTestForm({
+                      ...testForm,
+                      cameraMonitoring: { 
+                        ...testForm.cameraMonitoring, 
+                        captureInterval: parseInt(e.target.value) 
+                      }
+                    })}
+                  >
+                    <option value={30}>Every 30 seconds</option>
+                    <option value={60}>Every 1 minute</option>
+                    <option value={120}>Every 2 minutes</option>
+                    <option value={300}>Every 5 minutes</option>
+                  </select>
+                  <small>How often to capture monitoring photos</small>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Paper Upload Settings */}
+        <div className="form-section">
+          <h3>📄 Paper Upload Settings</h3>
+
+          <div className="proctoring-grid">
+            <div className="proctoring-option">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={testForm.paperSubmissionRequired || false}
+                  onChange={(e) => setTestForm({
+                    ...testForm,
+                    paperSubmissionRequired: e.target.checked
+                  })}
+                />
+                <span className="option-content">
+                  <strong>Require Paper Submission</strong>
+                  <small>Students must upload answer sheets</small>
+                </span>
+              </label>
+            </div>
+
+            {testForm.paperSubmissionRequired && (
+              <>
+                <div className="proctoring-option">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={testForm.paperUploadAllowedDuringTest || false}
+                      onChange={(e) => setTestForm({
+                        ...testForm,
+                        paperUploadAllowedDuringTest: e.target.checked
+                      })}
+                    />
+                    <span className="option-content">
+                      <strong>Allow Upload During Test</strong>
+                      <small>Students can upload and exit early</small>
+                    </span>
+                  </label>
+                </div>
+
+                <div className="form-group">
+                  <label>Upload Time Limit (minutes)</label>
+                  <input
+                    type="number"
+                    min="5"
+                    max="60"
+                    value={testForm.paperUploadTimeLimit || 15}
+                    onChange={(e) => setTestForm({
+                      ...testForm,
+                      paperUploadTimeLimit: parseInt(e.target.value) || 15
+                    })}
+                  />
+                  <small>Time allowed for paper upload after test completion (5-60 minutes)</small>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -2205,7 +2698,7 @@ const AdminDashboard = () => {
               type="button"
               className="btn btn-secondary"
               onClick={handleUploadFiles}
-              disabled={uploading || !files.questionPaper && !files.answerKey}
+              disabled={uploading || (!files.questionPaper && !files.answerKey)}
               style={{ marginLeft: '1rem' }}
             >
               {uploading
@@ -2355,6 +2848,13 @@ const AdminDashboard = () => {
                       <h4>{test.title}</h4>
                       <p>{test.subject}</p>
                       <small>Class {test.class} - {test.board}</small>
+                      <div className="test-type-badge">
+                        {test.type === 'coding' || test.isCodingTest ? (
+                          <span className="badge coding-badge">💻 Coding Test</span>
+                        ) : (
+                          <span className="badge traditional-badge">📄 Traditional Test</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td>
@@ -2584,68 +3084,960 @@ const AdminDashboard = () => {
   };
 
   // Render Results Management with Answer Sheet Review
-  const renderResultsTable = () => (
-    <table className="data-table">
-      <thead>
-        <tr>
-          <th>Student</th>
-          <th>Test</th>
-          <th>Score</th>
-          <th>Violations</th>
-          <th>Answer Sheet</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {results.map(r => (
-          <tr key={r._id}>
-            <td>{r.studentId?.name}</td>
-            <td>{r.testTitle}</td>
-            <td>
-              {r.marksObtained != null
-                ? `${r.marksObtained}/${r.totalMarks}`
-                : 'Pending'}
-            </td>
-            <td>
-              {r.violations?.length > 0
-                ? r.violations.length
-                : 'None'}
-            </td>
-            <td>
-              {(r.answerSheetURL || r.answerSheetUrl) ? (
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={() =>
-                    window.open((r.answerSheetURL || r.answerSheetUrl), '_blank')
-                  }
-                >
-                  📄 View Sheet
-                </button>
-              ) : (
-                '—'
-              )}
-            </td>
-            <td>
-              <button
-                className="btn btn-sm btn-success"
-                onClick={() =>
-                  navigate('/admin/answer-review', { state: { fromResult: r } })
+  const renderResultsTable = () => {
+    const filteredResults = filterData(results, 'results');
+    const paginatedResults = paginateData(filteredResults);
+
+    return (
+      <div className="results-management">
+        <div className="section-header">
+          <h2>📊 Results Management</h2>
+          <div className="view-toggle">
+            <button
+              className={`btn ${!showCodingManagement ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setShowCodingManagement(false)}
+            >
+              📄 All Results ({filteredResults.length})
+            </button>
+            <button
+              className={`btn ${showCodingManagement ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setShowCodingManagement(true)}
+            >
+              💻 Coding Tests ({codingTests.filter(t => !t.adminReviewed).length} pending)
+            </button>
+          </div>
+          <div className="header-actions">
+            <button className="btn btn-primary">
+              📤 Export Results
+            </button>
+            <button
+              className={`btn ${bulkActionMode ? 'btn-danger' : 'btn-outline'}`}
+              onClick={() => setBulkActionMode(!bulkActionMode)}
+            >
+              {bulkActionMode ? '✕ Cancel' : '☑️ Bulk Actions'}
+            </button>
+          </div>
+        </div>
+
+        {showCodingManagement ? renderCodingTestManagement() : renderRegularResults(filteredResults, paginatedResults)}
+
+        {/* Filters Section */}
+        <div className="filters-section">
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="🔍 Search results..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="filter-controls">
+            <select
+              value={filterClass}
+              onChange={(e) => setFilterClass(e.target.value)}
+            >
+              <option value="">All Classes</option>
+              <option value="9">Class 9</option>
+              <option value="10">Class 10</option>
+              <option value="11">Class 11</option>
+              <option value="12">Class 12</option>
+            </select>
+            <select
+              value={filterBoard}
+              onChange={(e) => setFilterBoard(e.target.value)}
+            >
+              <option value="">All Boards</option>
+              <option value="CBSE">CBSE</option>
+              <option value="ICSE">ICSE</option>
+              <option value="ISC">ISC</option>
+              <option value="WBCHSE">WBCHSE</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="published">Published</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Results Table */}
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
+              <tr>
+                {bulkActionMode && <th><input type="checkbox" /></th>}
+                <th>Student</th>
+                <th>Test Info</th>
+                <th>Type</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Violations</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedResults.map(r => {
+                const isCodingTest = r.testId?.type === 'coding' || 
+                                   r.submissionType === 'multi_question_coding' || 
+                                   r.codingResults ||
+                                   r.testTitle?.toLowerCase().includes('cpcode') ||
+                                   r.testTitle?.toLowerCase().includes('coding') ||
+                                   r.testTitle?.toLowerCase().includes('program');
+                
+                // Debug logging
+                console.log('Result debug:', {
+                  testTitle: r.testTitle,
+                  testId: r.testId,
+                  submissionType: r.submissionType,
+                  codingResults: r.codingResults,
+                  isCodingTest: isCodingTest
+                });
+                return (
+                  <tr key={r._id}>
+                    {bulkActionMode && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.includes(r._id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedItems([...selectedItems, r._id]);
+                            } else {
+                              setSelectedItems(selectedItems.filter(id => id !== r._id));
+                            }
+                          }}
+                        />
+                      </td>
+                    )}
+                    <td>
+                      <div className="student-info">
+                        <div className="student-avatar">
+                          {r.studentId?.name?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                        <div className="student-details">
+                          <h4>{r.studentId?.name || 'Unknown'}</h4>
+                          <small>{r.studentId?.email || 'No email'}</small>
+                          <small>Roll: {r.studentId?.rollNo || 'N/A'}</small>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="test-info">
+                        <h4>{r.testTitle || 'Unknown Test'}</h4>
+                        <small>{r.testSubject || 'N/A'}</small>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`test-type-badge ${isCodingTest ? 'coding' : 'traditional'}`}>
+                        {isCodingTest ? '💻 Coding' : '📄 Traditional'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="score-display">
+                        {isCodingTest ? (
+                          // Coding test score display
+                          r.codingResults ? (
+                            <div className="coding-score">
+                              <div className="score-primary">
+                                {r.codingResults.totalScore || r.marksObtained || 0}/{r.codingResults.maxScore || r.totalMarks || 0}
+                              </div>
+                              <div className="score-secondary">
+                                {r.codingResults.passedTestCases || 0}/{r.codingResults.totalTestCases || 0} Tests
+                              </div>
+                              <div className="score-percentage">
+                                {r.percentage ? `${r.percentage.toFixed(1)}%` : '0%'}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="score-pending">Processing...</span>
+                          )
+                        ) : (
+                          // Traditional test score display
+                          r.marksObtained != null ? (
+                            <div className="traditional-score">
+                              <div className="score-primary">
+                                {r.marksObtained}/{r.totalMarks}
+                              </div>
+                              <div className="score-percentage">
+                                {r.percentage ? `${r.percentage.toFixed(1)}%` : 
+                                 r.totalMarks > 0 ? `${((r.marksObtained / r.totalMarks) * 100).toFixed(1)}%` : '0%'}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="score-pending">Pending</span>
+                          )
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`status-badge status-${r.status}`}>
+                        {r.status === 'pending' ? '⏳ Pending' :
+                         r.status === 'reviewed' ? '👁️ Reviewed' :
+                         r.status === 'published' ? '✅ Published' :
+                         r.status === 'completed' ? '🏁 Completed' :
+                         '❓ Unknown'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="submission-time">
+                        {r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('en-IN') : 'N/A'}
+                        {r.submittedAt && (
+                          <small>{new Date(r.submittedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</small>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="violations-display">
+                        {r.violations?.length > 0 ? (
+                          <span className="violations-count warning">
+                            ⚠️ {r.violations.length}
+                          </span>
+                        ) : (
+                          <span className="violations-count clean">✅ None</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="action-buttons">
+                        {isCodingTest ? (
+                          // Coding test actions
+                          <>
+                            <button
+                              className="btn btn-sm btn-success"
+                              title="Review & Mark Coding Test"
+                              onClick={() =>
+                                navigate('/admin/answer-review', { state: { fromResult: r, defaultTab: 'coding' } })
+                              }
+                            >
+                              📝 Mark
+                            </button>
+                            <button
+                              className="btn btn-sm btn-info"
+                              title="View Coding Solutions"
+                              onClick={() => navigate(`/admin/coding-review/${r._id}`)}
+                            >
+                              💻 Code Review
+                            </button>
+                            <button
+                              className="btn btn-sm btn-primary"
+                              title="View Details"
+                              onClick={() => navigate(`/admin/result-details/${r._id}`)}
+                            >
+                              👁️ Details
+                            </button>
+                          </>
+                        ) : (
+                          // Traditional test actions
+                          <>
+                            <button
+                              className="btn btn-sm btn-success"
+                              title="Answer Review & Marking"
+                              onClick={() =>
+                                navigate('/admin/answer-review', { state: { fromResult: r } })
+                              }
+                            >
+                              📝 Mark
+                            </button>
+                            {(r.answerSheetURL || r.answerSheetUrl) && (
+                              <button
+                                className="btn btn-sm btn-outline"
+                                title="View Answer Sheet"
+                                onClick={() =>
+                                  window.open((r.answerSheetURL || r.answerSheetUrl), '_blank')
+                                }
+                              >
+                                📄 Sheet
+                              </button>
+                            )}
+                            <button
+                              className="btn btn-sm btn-info"
+                              title="View Details"
+                              onClick={() => navigate(`/admin/result-details/${r._id}`)}
+                            >
+                              👁️ Details
+                            </button>
+                          </>
+                        )}
+                        {r.violations?.length > 0 && (
+                          <button
+                            className="btn btn-sm btn-warning"
+                            title="View Violations"
+                            onClick={() => navigate(`/admin/violations/${r._id}`)}
+                          >
+                            ⚠️ Violations
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="pagination-container">
+          <div className="pagination-info">
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredResults.length)} of {filteredResults.length} results
+          </div>
+          <div className="pagination-controls">
+            <button
+              className="btn btn-sm btn-outline"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(currentPage - 1)}
+            >
+              ← Previous
+            </button>
+            <span className="page-info">Page {currentPage} of {Math.ceil(filteredResults.length / itemsPerPage) || 1}</span>
+            <button
+              className="btn btn-sm btn-outline"
+              disabled={currentPage >= Math.ceil(filteredResults.length / itemsPerPage)}
+              onClick={() => setCurrentPage(currentPage + 1)}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render regular results view
+  const renderRegularResults = (filteredResults, paginatedResults) => (
+    <>
+      {/* Filters Section */}
+      <div className="filters-section">
+        <div className="search-box">
+          <input
+            type="text"
+            placeholder="🔍 Search results..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="filter-controls">
+          <select
+            value={filterClass}
+            onChange={(e) => setFilterClass(e.target.value)}
+          >
+            <option value="">All Classes</option>
+            <option value="9">Class 9</option>
+            <option value="10">Class 10</option>
+            <option value="11">Class 11</option>
+            <option value="12">Class 12</option>
+          </select>
+          <select
+            value={filterBoard}
+            onChange={(e) => setFilterBoard(e.target.value)}
+          >
+            <option value="">All Boards</option>
+            <option value="CBSE">CBSE</option>
+            <option value="ICSE">ICSE</option>
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="done">Completed</option>
+            <option value="reviewed">Reviewed</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Bulk Actions Bar */}
+      {bulkActionMode && (
+        <div className="bulk-actions-bar">
+          <div className="selection-info">
+            <input
+              type="checkbox"
+              checked={selectedItems.length === filteredResults.length && filteredResults.length > 0}
+              onChange={() => {
+                if (selectedItems.length === filteredResults.length) {
+                  setSelectedItems([]);
+                } else {
+                  setSelectedItems(filteredResults.map(item => item._id));
                 }
-              >
-                📝 Mark
-              </button>
+              }}
+            />
+            <span>{selectedItems.length} of {filteredResults.length} selected</span>
+          </div>
+          <div className="bulk-actions">
+            <button
+              className="btn btn-danger"
+              onClick={() => handleBulkAction('delete')}
+              disabled={selectedItems.length === 0}
+            >
+              🗑️ Delete Selected
+            </button>
+            <button
+              className="btn btn-warning"
+              onClick={() => handleBulkAction('unpublish')}
+              disabled={selectedItems.length === 0}
+            >
+              👁️‍🗨️ Mark Reviewed
+            </button>
+            <button
+              className="btn btn-success"
+              onClick={() => handleBulkAction('publish')}
+              disabled={selectedItems.length === 0}
+            >
+              ✅ Publish Selected
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Results Table - Same as before */}
+      {filteredResults.length > 0 ? (
+        // Rest of the table content stays the same
+        <div className="table-container">
+          {/* Student Search Section */}
+          <div className="student-search-section">
+            <div className="search-form">
+              <input
+                type="email"
+                placeholder="Enter student email..."
+                value={searchEmail}
+                onChange={(e) => setSearchEmail(e.target.value)}
+                className="search-email-input"
+              />
               <button
-                className="btn btn-sm btn-info"
-                onClick={() => navigate(`/result/${r._id}`)}
+                onClick={handleStudentSearch}
+                className="search-btn"
+                disabled={searchLoading}
               >
-                👁️ Details
+                {searchLoading ? '🔄' : '🔍'}
               </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+            </div>
+
+            {searchResult && (
+              <div className="search-result-card">
+                <div className="student-info">
+                  <h4>{searchResult.name}</h4>
+                  <p>{searchResult.email}</p>
+                  <small>Roll: {searchResult.rollNo || 'Not assigned'}</small>
+                </div>
+                <div className="student-stats">
+                  <span className="test-count">📝 {searchResult.results?.length || 0} tests taken</span>
+                </div>
+
+                {searchResult.results && searchResult.results.length > 0 && (
+                  <div className="recent-results">
+                    <h5>Recent Test Results:</h5>
+                    <div className="results-list">
+                      {searchResult.results.slice(0, 3).map((result, index) => (
+                        <div key={index} className="result-item">
+                          <div className="result-info">
+                            <span className="test-title">{result.testTitle}</span>
+                            <span className="score">{result.marksObtained}/{result.totalMarks}</span>
+                            <span className="percentage">{((result.marksObtained / result.totalMarks) * 100).toFixed(1)}%</span>
+                            <span className="date">{new Date(result.submittedAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Standard Results Table content... */}
+          <table className="data-table">
+            <thead>
+              <tr>
+                {bulkActionMode && <th><input type="checkbox" /></th>}
+                <th>Student</th>
+                <th>Test Info</th>
+                <th>Type</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Violations</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedResults.map(r => {
+                const isCodingTest = r.testId?.type === 'coding' || 
+                                   r.submissionType === 'multi_question_coding' || 
+                                   r.codingResults ||
+                                   r.testTitle?.toLowerCase().includes('cpcode') ||
+                                   r.testTitle?.toLowerCase().includes('coding') ||
+                                   r.testTitle?.toLowerCase().includes('program');
+
+                return (
+                  <tr 
+                    key={r._id}
+                    className={`${r.status === 'pending' ? 'pending-row' : ''} ${selectedItems.includes(r._id) ? 'selected' : ''}`}
+                  >
+                    {bulkActionMode && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.includes(r._id)}
+                          onChange={() => {
+                            if (selectedItems.includes(r._id)) {
+                              setSelectedItems(selectedItems.filter(id => id !== r._id));
+                            } else {
+                              setSelectedItems([...selectedItems, r._id]);
+                            }
+                          }}
+                        />
+                      </td>
+                    )}
+                    <td>
+                      <div className="student-info">
+                        <strong>{r.studentId?.name || 'Unknown'}</strong>
+                        <small>{r.studentId?.email}</small>
+                        {r.studentId?.class && (
+                          <span className="class-badge">{r.studentId.class}-{r.studentId.board}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="test-info">
+                        <strong>{r.testTitle}</strong>
+                        <small>{r.testSubject}</small>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`type-badge ${isCodingTest ? 'coding' : 'traditional'}`}>
+                        {isCodingTest ? '💻 Coding' : '📝 Traditional'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="score-display">
+                        <span className="score">{r.marksObtained || 0}/{r.totalMarks || 0}</span>
+                        {isCodingTest && r.codingResults && (
+                          <div className="coding-score-details">
+                            <div className="test-cases-summary">
+                              <small className="test-cases-info">
+                                {r.codingResults.passedTestCases || 0}/{r.codingResults.totalTestCases || 0} Tests
+                              </small>
+                            </div>
+                          </div>
+                        )}
+                        <span className="percentage">
+                          {r.totalMarks > 0 ? ((r.marksObtained / r.totalMarks) * 100).toFixed(1) : 0}%
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`status-badge ${
+                         r.status === 'pending' ? 'warning' :
+                         r.status === 'completed' || r.status === 'done' ? 'success' :
+                         r.status === 'reviewed' ? 'info' :
+                         r.status === 'published' ? 'info' : 'default'
+                       }`}>
+                        {
+                         r.status === 'pending' ? '⏳ Pending' :
+                         r.status === 'completed' || r.status === 'done' ? '✅ Done' :
+                         r.status === 'reviewed' ? '👁️ Reviewed' :
+                         r.status === 'published' ? '📢 Published' :
+                         r.status
+                        }
+                      </span>
+                    </td>
+                    <td>
+                      <div className="submission-info">
+                        {r.submittedAt && (
+                          <span>{new Date(r.submittedAt).toLocaleDateString('en-IN')}</span>
+                        )}
+                        {r.submittedAt && (
+                          <small>{new Date(r.submittedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</small>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="violations-display">
+                        {r.violations?.length > 0 ? (
+                          <span className="violations-count warning">
+                            ⚠️ {r.violations.length}
+                          </span>
+                        ) : (
+                          <span className="violations-count clean">✅ None</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="action-buttons">
+                        {isCodingTest ? (
+                          <>
+                            <button
+                              className="btn btn-sm btn-success"
+                              title="Review & Mark Coding Test"
+                              onClick={() =>
+                                navigate('/admin/answer-review', { state: { fromResult: r, defaultTab: 'coding' } })
+                              }
+                            >
+                              📝 Mark
+                            </button>
+                            <button
+                              className="btn btn-sm btn-info"
+                              title="View Coding Solutions"
+                              onClick={() => navigate(`/admin/coding-review/${r._id}`)}
+                            >
+                              💻 Code
+                            </button>
+                            <button
+                              className="btn btn-sm btn-warning"
+                              title="Advanced Coding Management"
+                              onClick={() => {
+                                setShowCodingManagement(true);
+                                setCodingSearchTerm(r.studentId?.email || '');
+                              }}
+                            >
+                              🔧 Manage
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              className="btn btn-sm btn-success"
+                              title="Answer Review & Marking"
+                              onClick={() =>
+                                navigate('/admin/answer-review', { state: { fromResult: r } })
+                              }
+                            >
+                              📝 Review
+                            </button>
+                            <button
+                              className="btn btn-sm btn-primary"
+                              title="View Details"
+                              onClick={() => navigate(`/admin/result-details/${r._id}`)}
+                            >
+                              👁️ Details
+                            </button>
+                          </>
+                        )}
+                        <button
+                          className="btn btn-sm btn-outline"
+                          title="View violations"
+                          onClick={() => {
+                            Swal.fire({
+                              title: 'Test Violations',
+                              html: r.violations?.length > 0 ?
+                                r.violations.map(v => `<p><strong>${v.type}</strong>: ${v.details || 'No details'}</p>`).join('') :
+                                '<p>No violations recorded</p>',
+                              icon: 'info'
+                            });
+                          }}
+                        >
+                          🚨
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Pagination */}
+          <div className="pagination-container">
+            <div className="pagination-info">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredResults.length)} of {filteredResults.length} results
+            </div>
+            <div className="pagination-controls">
+              <button
+                className="btn btn-sm btn-outline"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(currentPage - 1)}
+              >
+                ← Previous
+              </button>
+              <span className="page-info">Page {currentPage} of {Math.ceil(filteredResults.length / itemsPerPage) || 1}</span>
+              <button
+                className="btn btn-sm btn-outline"
+                disabled={currentPage >= Math.ceil(filteredResults.length / itemsPerPage)}
+                onClick={() => setCurrentPage(currentPage + 1)}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="no-data">
+          <p>📄 No results found matching your criteria</p>
+        </div>
+      )}
+    </>
   );
+
+  // Render coding test management view
+  const renderCodingTestManagement = () => {
+    const filteredCodingTests = getFilteredCodingTests();
+    
+    return (
+      <div className="coding-test-management">
+        <div className="coding-filters-section">
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="🔍 Search coding tests by student, email, or test title..."
+              value={codingSearchTerm}
+              onChange={(e) => setCodingSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="status-filters">
+            <button 
+              className={`filter-btn ${codingStatusFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setCodingStatusFilter('all')}
+            >
+              All Tests ({codingTests.length})
+            </button>
+            <button 
+              className={`filter-btn ${codingStatusFilter === 'pending' ? 'active' : ''}`}
+              onClick={() => setCodingStatusFilter('pending')}
+            >
+              🔍 Pending Review ({codingTests.filter(t => !t.adminReviewed).length})
+            </button>
+            <button 
+              className={`filter-btn ${codingStatusFilter === 'flagged' ? 'active' : ''}`}
+              onClick={() => setCodingStatusFilter('flagged')}
+            >
+              🚩 Flagged ({codingTests.filter(t => t.isFlagged).length})
+            </button>
+            <button 
+              className={`filter-btn ${codingStatusFilter === 'reviewed' ? 'active' : ''}`}
+              onClick={() => setCodingStatusFilter('reviewed')}
+            >
+              ✅ Reviewed ({codingTests.filter(t => t.adminReviewed).length})
+            </button>
+          </div>
+        </div>
+
+        {codingTestsLoading ? (
+          <div className="loading-spinner">Loading coding tests...</div>
+        ) : filteredCodingTests.length > 0 ? (
+          <div className="coding-tests-table">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Test</th>
+                  <th>Score</th>
+                  <th>Test Cases</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCodingTests.map((test) => (
+                  <tr key={test._id} className={test.isFlagged ? 'flagged-row' : ''}>
+                    <td>
+                      <div className="student-info">
+                        <strong>{test.studentId?.name || 'Unknown'}</strong>
+                        <small>{test.studentId?.email}</small>
+                        {test.studentId?.class && (
+                          <span className="class-badge">{test.studentId.class}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="test-info">
+                        <strong>{test.testTitle}</strong>
+                        <small>{test.testSubject}</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="score-display">
+                        <span className="score">{test.totalScore || 0}/{test.maxScore || 0}</span>
+                        <span className="percentage">
+                          {test.maxScore > 0 ? ((test.totalScore / test.maxScore) * 100).toFixed(1) : 0}%
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="test-cases-info">
+                        <span className={`test-cases ${(test.passedTestCases / test.totalTestCases) > 0.7 ? 'success' : 'warning'}`}>
+                          {test.passedTestCases || 0}/{test.totalTestCases || 0}
+                        </span>
+                        <small>
+                          {test.totalTestCases > 0 ? 
+                            `${((test.passedTestCases / test.totalTestCases) * 100).toFixed(0)}% passed` : 
+                            'No tests'
+                          }
+                        </small>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="submission-info">
+                        {test.submittedAt && (
+                          <>
+                            <span>{new Date(test.submittedAt).toLocaleDateString()}</span>
+                            <small>{new Date(test.submittedAt).toLocaleTimeString()}</small>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="status-badges">
+                        {test.isFlagged && <span className="badge danger">🚩 Flagged</span>}
+                        {test.adminReviewed ? (
+                          <span className="badge success">✅ Reviewed</span>
+                        ) : (
+                          <span className="badge warning">🔍 Pending</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="action-buttons">
+                        <button
+                          className="btn btn-sm btn-success"
+                          title="Modify Marks"
+                          onClick={() => handleCodingMarkModification(test)}
+                        >
+                          📝 Mark
+                        </button>
+                        <button
+                          className="btn btn-sm btn-info"
+                          title="View Code Solutions"
+                          onClick={() => navigate('/admin/answer-review', { state: { fromResult: test, defaultTab: 'coding' } })}
+                        >
+                          💻 Code
+                        </button>
+                        <button
+                          className="btn btn-sm btn-warning"
+                          title="Flag for Cheating"
+                          onClick={() => flagCodingTestForCheating(test._id, 'Manual review required')}
+                        >
+                          🚩 Flag
+                        </button>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          title="View Monitoring Data"
+                          onClick={() => navigate(`/admin/monitoring-details/${test._id}`)}
+                        >
+                          👁️ Monitor
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="no-data">
+            <p>💻 No coding tests found matching your criteria</p>
+          </div>
+        )}
+
+        {/* Mark Modification Modal */}
+        {showCodingMarkModal && selectedCodingTest && (
+          <div className="modal-overlay" onClick={() => setShowCodingMarkModal(false)}>
+            <div className="modal-content coding-mark-modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>📝 Modify Coding Test Marks</h3>
+                <button 
+                  className="close-btn" 
+                  onClick={() => setShowCodingMarkModal(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="student-test-info">
+                  <h4>{selectedCodingTest.studentId?.name}</h4>
+                  <p>{selectedCodingTest.testTitle}</p>
+                </div>
+                
+                <div className="marks-form">
+                  <div className="form-group">
+                    <label>Total Score</label>
+                    <input
+                      type="number"
+                      value={modifiedMarks.totalScore || 0}
+                      onChange={(e) => setModifiedMarks({
+                        ...modifiedMarks,
+                        totalScore: parseInt(e.target.value) || 0
+                      })}
+                      min="0"
+                      max={selectedCodingTest.maxScore || 100}
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Admin Notes</label>
+                    <textarea
+                      value={adminNotes}
+                      onChange={(e) => setAdminNotes(e.target.value)}
+                      placeholder="Add notes about mark modifications..."
+                      rows={4}
+                    />
+                  </div>
+                  
+                  <div className="cheating-flags">
+                    <h4>🚩 Flagging Options</h4>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={cheatingFlags.timeViolation || false}
+                        onChange={(e) => setCheatingFlags({
+                          ...cheatingFlags,
+                          timeViolation: e.target.checked
+                        })}
+                      />
+                      Time Violation
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={cheatingFlags.codePatterns || false}
+                        onChange={(e) => setCheatingFlags({
+                          ...cheatingFlags,
+                          codePatterns: e.target.checked
+                        })}
+                      />
+                      Suspicious Code Patterns
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={cheatingFlags.behaviorAnomaly || false}
+                        onChange={(e) => setCheatingFlags({
+                          ...cheatingFlags,
+                          behaviorAnomaly: e.target.checked
+                        })}
+                      />
+                      Behavior Anomaly
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setShowCodingMarkModal(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="btn btn-success" 
+                  onClick={saveCodingMarkModifications}
+                >
+                  💾 Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Render Analytics Dashboard
   const renderAnalytics = () => (
@@ -2913,6 +4305,12 @@ const AdminDashboard = () => {
           </table>
         </div>
       </div>
+
+      {/* Grade Distribution Chart */}
+      {renderGradeDistribution()}
+
+      {/* Recent Activity */}
+      {renderRecentActivity()}
     </div>
   );
 
@@ -3025,6 +4423,16 @@ const AdminDashboard = () => {
             >
               <span className="nav-icon">📊</span>
               <span className="nav-text">Results</span>
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('analytics');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <span className="nav-icon">�</span>
+              <span className="nav-text">Analytics</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'manual-entry' ? 'active' : ''}`}
@@ -3173,7 +4581,22 @@ const AdminDashboard = () => {
           {activeTab === 'notifications' && <NotificationCenter />}
           {activeTab === 'settings' && <NotificationSettings />}
         </div>
+        
+        {/* Coding Test Creator Modal */}
+        {showCodingTestCreator && (
+          <CodingTestCreator
+            onClose={() => setShowCodingTestCreator(false)}
+            onTestCreated={(newTest) => {
+              setTests(prev => [newTest, ...prev]);
+              setShowCodingTestCreator(false);
+              toast.success('🚀 Coding test created successfully!');
+              // Switch to tests tab to see the created test
+              setActiveTab('tests');
+            }}
+          />
+        )}
       </main>
+      <ExampleBox />
     </div>
   );
 

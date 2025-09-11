@@ -1,0 +1,304 @@
+/* Paper Upload Timer Overlay */
+.paper-upload-timer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+  backdrop-filter: blur(8px);
+}
+
+.paper-upload-timer-container {
+  background: var(--surface);
+  border-radius: 16px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border);
+}
+
+/* Timer Header */
+.timer-header {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  padding: 2rem;
+  border-radius: 16px 16px 0 0;
+  text-align: center;
+}
+
+.timer-header h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.timer-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.timer-label {
+  font-size: 1.125rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.timer-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  font-family: 'Courier New', monospace;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  min-width: 120px;
+  text-align: center;
+}
+
+.timer-value.warning {
+  animation: pulse-warning 2s infinite;
+  background: rgba(255, 193, 7, 0.3);
+  border-color: #ffc107;
+}
+
+.timer-value.critical {
+  animation: pulse-critical 1s infinite;
+  background: rgba(220, 53, 69, 0.3);
+  border-color: #dc3545;
+  color: #ff6b6b;
+}
+
+@keyframes pulse-warning {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+}
+
+@keyframes pulse-critical {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.9; }
+}
+
+/* Upload Content */
+.upload-content {
+  padding: 2rem;
+}
+
+.instructions {
+  background: var(--surface-elevated);
+  border: 2px solid var(--primary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.instructions h3 {
+  color: var(--primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+}
+
+.instructions ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.instructions li {
+  color: var(--text);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.instructions li:last-child {
+  border-bottom: none;
+}
+
+.instructions li::before {
+  content: '✓';
+  background: var(--primary);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+/* Timer Actions */
+.timer-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.timer-actions .btn {
+  min-width: 200px;
+  min-height: 48px;
+  font-weight: 600;
+}
+
+/* Time Expired */
+.time-expired {
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+.expired-message {
+  margin-bottom: 2rem;
+}
+
+.expired-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  display: block;
+  opacity: 0.7;
+}
+
+.expired-message h3 {
+  color: var(--error);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+}
+
+.expired-message p {
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+/* Upload Success */
+.upload-success {
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+.success-message {
+  margin-bottom: 2rem;
+}
+
+.success-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  display: block;
+  color: var(--success);
+}
+
+.success-message h3 {
+  color: var(--success);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+}
+
+.success-message p {
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .paper-upload-timer-overlay {
+    padding: 0.5rem;
+  }
+
+  .paper-upload-timer-container {
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+
+  .timer-header {
+    padding: 1.5rem;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .timer-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .timer-display {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .timer-value {
+    font-size: 2rem;
+    min-width: 100px;
+  }
+
+  .upload-content {
+    padding: 1.5rem;
+  }
+
+  .instructions {
+    padding: 1rem;
+  }
+
+  .instructions li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    text-align: left;
+  }
+
+  .time-expired,
+  .upload-success {
+    padding: 2rem 1.5rem;
+  }
+
+  .expired-icon,
+  .success-icon {
+    font-size: 3rem;
+  }
+
+  .timer-actions .btn {
+    min-width: 150px;
+  }
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .paper-upload-timer-overlay {
+  background: rgba(0, 0, 0, 0.95);
+}
+
+[data-theme="dark"] .instructions {
+  background: var(--surface);
+  border-color: var(--primary-dark);
+}
+
+[data-theme="dark"] .instructions li {
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .timer-value.warning {
+  background: rgba(255, 193, 7, 0.2);
+}
+
+[data-theme="dark"] .timer-value.critical {
+  background: rgba(220, 53, 69, 0.2);
+}

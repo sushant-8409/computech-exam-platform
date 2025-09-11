@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate }      from 'react-router-dom';
 import axios                           from 'axios';
+import { CLASS_OPTIONS, BOARD_OPTIONS, BOARD_LANGUAGE_RECOMMENDATION } from '../../constants/classBoardOptions';
 import './EditTestPage.css';            // ensure this file exists and is named lowercase
 
 const EditTestPage = () => {
@@ -11,6 +12,7 @@ const EditTestPage = () => {
   const [original, setOriginal] = useState({});
   const [form, setForm]         = useState({});
   const [loading, setLoading]   = useState(true);
+  const [testType, setTestType] = useState('traditional'); // Track test type for UI changes
 
   useEffect(() => {
     if (!id) return;
@@ -19,6 +21,7 @@ const EditTestPage = () => {
         if (data.success) {
           const t = data.data;
           setOriginal(t);
+          setTestType(t.type || 'traditional'); // Set test type for UI management
           setForm({
             title:            t.title            || '',
             description:      t.description      || '',
@@ -35,7 +38,8 @@ const EditTestPage = () => {
             answerKeyVisible: t.answerKeyVisible || false,
             startDate:        t.startDate        ? t.startDate.slice(0,16) : '',
             endDate:          t.endDate          ? t.endDate.slice(0,16)   : '',
-            active:           t.active           || false
+            active:           t.active           || false,
+            type:             t.type             || 'traditional'
           });
         }
       })
@@ -47,7 +51,14 @@ const EditTestPage = () => {
 
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
-    setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
+    const newValue = type === 'checkbox' ? checked : value;
+    
+    // Update test type state for UI management
+    if (name === 'type') {
+      setTestType(value);
+    }
+    
+    setForm(f => ({ ...f, [name]: newValue }));
   };
 
   const handleSubmit = async e => {
@@ -68,10 +79,18 @@ const EditTestPage = () => {
   };
 
   return (
-    <div className="edit-test-page">
+    <div className={`edit-test-page ${testType === 'coding' ? 'coding-test-theme' : 'traditional-test-theme'}`}>
       <div className="container form-wrapper">
-        <h1>Edit Test</h1>
+        <h1>Edit Test - {testType === 'coding' ? 'Coding Test' : 'Traditional Test'}</h1>
         <form onSubmit={handleSubmit}>
+          <label>
+            Test Type
+            <select name="type" value={form.type} onChange={handleChange}>
+              <option value="traditional">Traditional Test</option>
+              <option value="coding">Coding Test</option>
+            </select>
+          </label>
+
           <label>
             Title
             <input name="title" value={form.title} onChange={handleChange} />
@@ -89,12 +108,22 @@ const EditTestPage = () => {
 
           <label>
             Class
-            <input name="class" value={form.class} onChange={handleChange} />
+            <select name="class" value={form.class} onChange={handleChange}>
+              <option value="">Select Class</option>
+              {CLASS_OPTIONS.map(cls => (
+                <option key={cls.value} value={cls.value}>{cls.label}</option>
+              ))}
+            </select>
           </label>
 
           <label>
             Board
-            <input name="board" value={form.board} onChange={handleChange} />
+            <select name="board" value={form.board} onChange={handleChange}>
+              <option value="">Select Board</option>
+              {BOARD_OPTIONS.map(board => (
+                <option key={board} value={board}>{board}</option>
+              ))}
+            </select>
           </label>
 
           <label>
@@ -117,30 +146,44 @@ const EditTestPage = () => {
             <input type="number" name="questionsCount" value={form.questionsCount} onChange={handleChange} />
           </label>
 
-          <label>
-            Question Paper URL
-            <input type="url" name="questionPaperURL" value={form.questionPaperURL} onChange={handleChange} />
-          </label>
+          {/* Traditional Test specific fields */}
+          {testType === 'traditional' && (
+            <>
+              <label>
+                Question Paper URL
+                <input type="url" name="questionPaperURL" value={form.questionPaperURL} onChange={handleChange} />
+              </label>
 
-          <label>
-            Answer Sheet URL
-            <input type="url" name="answerSheetURL" value={form.answerSheetURL} onChange={handleChange} />
-          </label>
+              <label>
+                Answer Sheet URL
+                <input type="url" name="answerSheetURL" value={form.answerSheetURL} onChange={handleChange} />
+              </label>
 
-          <label>
-            Answer Key URL
-            <input type="url" name="answerKeyURL" value={form.answerKeyURL} onChange={handleChange} />
-          </label>
+              <label>
+                Answer Key URL
+                <input type="url" name="answerKeyURL" value={form.answerKeyURL} onChange={handleChange} />
+              </label>
+            </>
+          )}
+
+          {/* Coding Test specific message */}
+          {testType === 'coding' && (
+            <div className="coding-test-info">
+              <p><strong>Note:</strong> Coding test questions and problems are managed through the coding test interface. Only basic test settings can be edited here.</p>
+            </div>
+          )}
 
           <div className="checkbox-group">
-            <label>
-              <input
-                type="checkbox"
-                name="answerKeyVisible"
-                checked={form.answerKeyVisible}
-                onChange={handleChange}
-              /> Show Answer Key
-            </label>
+            {testType === 'traditional' && (
+              <label>
+                <input
+                  type="checkbox"
+                  name="answerKeyVisible"
+                  checked={form.answerKeyVisible}
+                  onChange={handleChange}
+                /> Show Answer Key
+              </label>
+            )}
             <label>
               <input
                 type="checkbox"

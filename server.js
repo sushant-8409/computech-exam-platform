@@ -63,15 +63,23 @@ if (process.env.NODE_ENV === 'development') {
 
 // ================== API Routes ==================
 // NOTE: OAuth routes MUST come first to avoid conflicts with React fallback
-app.use(require('./routes/auth.routes')); // This handles /auth/google and /auth/google/callback
+// OAuth routes moved to auth.js
 app.use('/api/auth', require('./routes/auth'));
+app.use(require('./routes/googleAuth')); // Google OAuth routes - must come before React fallback
 app.use('/api/student', require('./routes/student'));
 app.use('/api/tests', require('./routes/tests'));
+app.use('/api/coding-test', require('./routes/codingTest')); // Coding test routes
 app.use('/api', require('./routes/analytics'));
 app.use('/api/files', require('./routes/files'));
 app.use('/api/student/mock-tests', require('./routes/mockTest'));
 app.use('/api', require('./routes/security')); // Security violation tracking
-// app.use(require('./routes/upload.routes')); // Temporarily commented out to debug
+app.use('/api/student/monitoring', require('./routes/monitoring')); // Camera monitoring
+app.use('/api/student', require('./routes/traditionalTest')); // Traditional test interface
+app.use(require('./routes/upload.routes')); // Upload routes for Google Drive
+
+// Cronjob routes for automated tasks
+app.use('/api/cronjob', require('./routes/cronjob')); // Cronjob endpoints
+
 // Registering all admin routes sequentially as in the original file
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/admin', require('./routes/manualTestEntry')); // Manual test entry routes

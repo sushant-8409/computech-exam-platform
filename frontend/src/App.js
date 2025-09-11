@@ -8,6 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 import ReviewRequestPage from './components/student/ReviewRequestPage';
 import QuestionWiseResults from './components/student/QuestionWiseResults';
+import StudentCodeReview from './components/student/StudentCodeReview';
 import Header from './components/Header';
 import Login from './components/Login';
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -16,13 +17,17 @@ import EditTestPage from './components/admin/EditTestPage';
 import StudentDetail from './components/admin/StudentDetail';
 import EditStudentPage from './components/admin/EditStudentPage';
 import ManualTestEntry from './components/admin/ManualTestEntry';
+import CodingTestReview from './components/admin/CodingTestReview';
 import StudentDashboard from './components/student/StudentDashboard';
 import TestInterface from './components/student/TestInterface';
+import TraditionalTestInterface from './components/student/TraditionalTestInterface';
+import CodingTestInterface from './components/student/CodingTestInterface';
 import ResultDetail from './components/student/ResultDetail';
 import LoadingSpinner from './components/LoadingSpinner';
 import Analytics from './components/admin/Analytics';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import offlineHandler from './utils/offlineHandler';
+import autoRefreshManager from './utils/autoRefresh';
 import MockTestCreator from './components/student/MockTestCreator';
 import { useDevToolsProtection } from './hooks/useDevToolsProtection'; // Security protection
 
@@ -245,9 +250,11 @@ function AppLayoutWithHeader() {
         pauseOnFocusLoss
         draggable
         pauseOnHover
+        limit={3}
         toastStyle={{
           fontSize: '14px',
-          borderRadius: '8px'
+          borderRadius: '8px',
+          zIndex: 9999
         }}
       />
     </>
@@ -272,9 +279,11 @@ function AppLayoutWithoutHeader() {
         pauseOnFocusLoss
         draggable
         pauseOnHover
+        limit={3}
         toastStyle={{
           fontSize: '14px',
-          borderRadius: '8px'
+          borderRadius: '8px',
+          zIndex: 9999
         }}
       />
     </>
@@ -362,6 +371,15 @@ function UniversalRedirect() {
 }
 
 export default function App() {
+  // Initialize auto-refresh manager
+  useEffect(() => {
+    // Make toast available globally for auto-refresh manager
+    window.toast = toast;
+    
+    // Initialize auto-refresh
+    console.log('🔄 Auto-refresh manager initialized');
+  }, []);
+
   // Initialize DevTools protection for the entire application
   const { getViolationCount } = useDevToolsProtection({
     enabled: true,
@@ -404,13 +422,31 @@ export default function App() {
             {/* ✅ ONLY Public route - login */}
             <Route path="/login" element={<LoginRoute />} />
 
-            {/* ✅ PROTECTED ROUTES: TestInterface WITHOUT Header */}
+            {/* ✅ PROTECTED ROUTES: Traditional TestInterface WITHOUT Header */}
             <Route path="/student/test/:testId" element={
               <ProtectedRoute>
                 <AppLayoutWithoutHeader />
               </ProtectedRoute>
             }>
+              <Route index element={<TraditionalTestInterface />} />
+            </Route>
+
+            {/* ✅ PROTECTED ROUTES: Legacy TestInterface WITHOUT Header (for backward compatibility) */}
+            <Route path="/student/legacy-test/:testId" element={
+              <ProtectedRoute>
+                <AppLayoutWithoutHeader />
+              </ProtectedRoute>
+            }>
               <Route index element={<TestInterface />} />
+            </Route>
+
+            {/* ✅ PROTECTED ROUTES: CodingTestInterface WITHOUT Header */}
+            <Route path="/student/coding-test/:testId" element={
+              <ProtectedRoute>
+                <AppLayoutWithoutHeader />
+              </ProtectedRoute>
+            }>
+              <Route index element={<CodingTestInterface />} />
             </Route>
 
             {/* ✅ PROTECTED ROUTES: All other routes WITH Header */}
@@ -431,7 +467,9 @@ export default function App() {
                 <Route path="manual-entry" element={<ManualTestEntry />} />
                 <Route path="students/:id" element={<StudentDetail />} />
                 <Route path="students/edit/:id" element={<EditStudentPage />} />
-                <Route path="analytics" element={<Analytics />} /> 
+                <Route path="analytics" element={<Analytics />} />
+                <Route path="coding-review/:resultId" element={<CodingTestReview />} />
+                <Route path="result-details/:resultId" element={<ResultDetail />} />
               </Route>
 
               {/* Student section */}
@@ -439,6 +477,7 @@ export default function App() {
                 <Route index element={<StudentDashboard />} />
                 <Route path="mock-test" element={<MockTestCreator />} />
                 <Route path="result/:resultId" element={<ResultDetail />} />
+                <Route path="result/:resultId/code-review" element={<StudentCodeReview />} />
                 <Route path="request-review/:resultId" element={<ReviewRequestPage />} />
                 <Route path="result/:resultId/breakdown" element={<QuestionWiseResults />} />
               </Route>

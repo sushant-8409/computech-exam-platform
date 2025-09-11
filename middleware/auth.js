@@ -16,6 +16,7 @@ const authenticateStudent = async (req, res, next) => {
     // 1) If it's an admin token, just let them through
     if (decoded.role === 'admin') {
       req.user = { id: 'admin', role: 'admin', name: 'Administrator', email: decoded.email };
+      req.student = null; // Explicitly set to null for admin users
       return next();
     }
 

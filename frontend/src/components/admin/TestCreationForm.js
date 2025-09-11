@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CLASS_OPTIONS, BOARD_OPTIONS } from '../../constants/classBoardOptions';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
@@ -22,8 +23,22 @@ const TestCreationForm = ({ onTestCreated }) => {
       allowTabSwitch: 0,
       requireFullscreen: true,
       blockRightClick: true,
-      blockKeyboardShortcuts: true
-    }
+      blockKeyboardShortcuts: true,
+      maxViolations: 10
+    },
+    // Camera Monitoring Settings
+    cameraMonitoring: {
+      enabled: false,
+      captureInterval: 60,
+      saveToGoogleDrive: true,
+      requireCameraAccess: false,
+      faceDetection: false,
+      suspiciousActivityDetection: true
+    },
+    // Paper submission settings
+    paperSubmissionRequired: false,
+    paperUploadTimeLimit: 15,
+    paperUploadAllowedDuringTest: false
   });
 
   const [files, setFiles] = useState({
@@ -157,8 +172,15 @@ const TestCreationForm = ({ onTestCreated }) => {
         startDate: '', endDate: '', resumeEnabled: true, answerKeyVisible: false,
         proctoringSettings: {
           strictMode: true, allowTabSwitch: 0, requireFullscreen: true,
-          blockRightClick: true, blockKeyboardShortcuts: true
-        }
+          blockRightClick: true, blockKeyboardShortcuts: true, maxViolations: 10
+        },
+        cameraMonitoring: {
+          enabled: false, captureInterval: 60, saveToGoogleDrive: true,
+          requireCameraAccess: false, faceDetection: false, suspiciousActivityDetection: true
+        },
+        paperSubmissionRequired: false,
+        paperUploadTimeLimit: 15,
+        paperUploadAllowedDuringTest: false
       });
       setFiles({ questionPaper: null, answerSheet: null, answerKey: null });
       setUploadProgress({});
@@ -227,8 +249,8 @@ const TestCreationForm = ({ onTestCreated }) => {
                 required
               >
                 <option value="">Select Class</option>
-                {Array.from({length: 12}, (_, i) => (
-                  <option key={i+1} value={i+1}>{i+1}</option>
+                {CLASS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
@@ -242,9 +264,9 @@ const TestCreationForm = ({ onTestCreated }) => {
                 required
               >
                 <option value="">Select Board</option>
-                <option value="CBSE">CBSE</option>
-                <option value="ICSE">ICSE</option>
-                <option value="State Board">State Board</option>
+                {BOARD_OPTIONS.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -486,6 +508,20 @@ const TestCreationForm = ({ onTestCreated }) => {
             </label>
           </div>
 
+          <div className="form-group">
+            <label>Maximum Violations Allowed</label>
+            <input
+              type="number"
+              name="proctoringSettings.maxViolations"
+              value={formData.proctoringSettings.maxViolations}
+              onChange={handleInputChange}
+              min="1"
+              max="10"
+              placeholder="e.g., 10"
+            />
+            <small>Students will be automatically flagged if they exceed this limit (Max: 10)</small>
+          </div>
+
           <div className="checkbox-group">
             <label>
               <input
@@ -497,6 +533,141 @@ const TestCreationForm = ({ onTestCreated }) => {
               🔄 Enable Test Resume (if interrupted)
             </label>
           </div>
+        </div>
+
+        {/* Camera Monitoring Settings */}
+        <div className="form-section">
+          <h3>📷 Camera Monitoring Settings</h3>
+          
+          <div className="checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                name="cameraMonitoring.enabled"
+                checked={formData.cameraMonitoring.enabled}
+                onChange={handleInputChange}
+              />
+              Enable Camera Monitoring
+            </label>
+            <small>Automatically capture photos during the test for proctoring</small>
+          </div>
+
+          {formData.cameraMonitoring.enabled && (
+            <>
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="cameraMonitoring.requireCameraAccess"
+                    checked={formData.cameraMonitoring.requireCameraAccess}
+                    onChange={handleInputChange}
+                  />
+                  Require Camera Access (Test cannot start without camera)
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label>Photo Capture Interval (seconds)</label>
+                <select
+                  name="cameraMonitoring.captureInterval"
+                  value={formData.cameraMonitoring.captureInterval}
+                  onChange={handleInputChange}
+                >
+                  <option value={30}>Every 30 seconds</option>
+                  <option value={60}>Every 1 minute</option>
+                  <option value={120}>Every 2 minutes</option>
+                  <option value={300}>Every 5 minutes</option>
+                </select>
+              </div>
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="cameraMonitoring.saveToGoogleDrive"
+                    checked={formData.cameraMonitoring.saveToGoogleDrive}
+                    onChange={handleInputChange}
+                  />
+                  Save Photos to Google Drive
+                </label>
+                <small>Photos will be automatically uploaded to Google Drive for storage</small>
+              </div>
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="cameraMonitoring.suspiciousActivityDetection"
+                    checked={formData.cameraMonitoring.suspiciousActivityDetection}
+                    onChange={handleInputChange}
+                  />
+                  Enable Suspicious Activity Detection
+                </label>
+                <small>AI-powered detection of potential cheating behaviors</small>
+              </div>
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="cameraMonitoring.faceDetection"
+                    checked={formData.cameraMonitoring.faceDetection}
+                    onChange={handleInputChange}
+                  />
+                  Enable Face Detection
+                </label>
+                <small>Detect multiple faces or absence of the test taker</small>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Paper Submission Settings */}
+        <div className="form-section">
+          <h3>📄 Paper Submission Settings</h3>
+          
+          <div className="checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                name="paperSubmissionRequired"
+                checked={formData.paperSubmissionRequired}
+                onChange={handleInputChange}
+              />
+              📝 Require Paper Submission
+            </label>
+          </div>
+
+          {formData.paperSubmissionRequired && (
+            <>
+              <div className="form-group">
+                <label>Paper Upload Time Limit (minutes)</label>
+                <input
+                  type="number"
+                  name="paperUploadTimeLimit"
+                  value={formData.paperUploadTimeLimit}
+                  onChange={handleInputChange}
+                  min="5"
+                  max="60"
+                  placeholder="e.g., 15"
+                />
+                <small>Time allocated after test completion for paper upload</small>
+              </div>
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="paperUploadAllowedDuringTest"
+                    checked={formData.paperUploadAllowedDuringTest}
+                    onChange={handleInputChange}
+                  />
+                  Allow Paper Upload During Test
+                </label>
+                <small>If enabled, students can upload their answer sheets during the test</small>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Submit Button */}

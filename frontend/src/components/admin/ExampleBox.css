@@ -1,0 +1,205 @@
+/* ExampleBox.css - Small closeable example box */
+.example-box {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  width: 320px;
+  max-width: 90vw;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+  z-index: 1000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: all 0.3s ease;
+}
+
+.example-box.minimized {
+  height: 50px;
+  overflow: hidden;
+}
+
+.example-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 11px 11px 0 0;
+  font-weight: 600;
+}
+
+.example-box-header h4 {
+  margin: 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.example-box-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.control-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.close-btn:hover {
+  background: rgba(239, 68, 68, 0.8);
+}
+
+.example-box-content {
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.example-section {
+  margin-bottom: 16px;
+}
+
+.example-section:last-child {
+  margin-bottom: 0;
+}
+
+.example-section h5 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.example-section ol,
+.example-section ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+.example-section li {
+  margin-bottom: 4px;
+}
+
+/* Badge styles within the example */
+.coding-badge {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.action-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+}
+
+.action-badge.mark {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+}
+
+.tab-badge {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.action-example {
+  background: #f3f4f6;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-weight: 500;
+  text-align: center;
+  border-left: 3px solid #6366f1;
+  color: #374151;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .example-box {
+    right: 10px;
+    width: 280px;
+    top: 70px;
+  }
+  
+  .example-box-content {
+    padding: 12px;
+    max-height: 300px;
+  }
+  
+  .quick-actions {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
+/* Animation for showing/hiding */
+.example-box {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .example-box {
+    background: #1f2937;
+    border-color: #374151;
+    color: #f9fafb;
+  }
+  
+  .example-section h5 {
+    color: #f3f4f6;
+  }
+  
+  .example-section li {
+    color: #d1d5db;
+  }
+  
+  .action-example {
+    background: #374151;
+    color: #f3f4f6;
+  }
+}

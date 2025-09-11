@@ -67,18 +67,53 @@ const StudentDashboard = () => {
   };
 
   const checkGoogleDriveStatus = async () => {
+    console.log('🔍 Starting Google Drive status check...');
     setCheckingGoogleStatus(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/student/google-drive-status', {
-        headers: { Authorization: `Bearer ${token}` }
+      // Check for admin Google Drive tokens in database first
+      console.log('📡 Making request to /auth/google/admin-status');
+      const response = await axios.get('/auth/google/admin-status');
+      
+      console.log('📊 Full response:', response);
+      console.log('📊 Response data:', response.data);
+      
+      const isConnected = response.data.connected && response.data.driveAccess;
+      console.log('🔗 Setting googleConnected to:', isConnected);
+      
+      setGoogleConnected(isConnected);
+      
+      // Force update to test UI (temporary)
+      if (isConnected) {
+        console.log('🚀 FORCING googleConnected to true for testing');
+        setTimeout(() => setGoogleConnected(true), 100);
+      }
+      
+      console.log('📊 Admin Google Drive Status:', {
+        connected: response.data.connected,
+        driveAccess: response.data.driveAccess,
+        userInfo: response.data.userInfo,
+        adminEmail: response.data.adminEmail,
+        error: response.data.error,
+        finalStatus: isConnected
       });
-      setGoogleConnected(response.data.connected || false);
+      
+      if (response.data.connected && response.data.driveAccess) {
+        console.log('✅ Admin Google Drive is connected:', response.data.userInfo?.emailAddress);
+      } else {
+        console.log('❌ Admin Google Drive not connected:', response.data.error);
+      }
     } catch (error) {
-      console.error('Error checking Google Drive status:', error);
+      console.error('❌ Error checking admin Google Drive status:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
       setGoogleConnected(false);
     } finally {
       setCheckingGoogleStatus(false);
+      console.log('✅ Google Drive status check completed');
     }
   };
 
@@ -191,17 +226,61 @@ const StudentDashboard = () => {
     ).length;
     
     const resultsReady = results.filter(r => 
-      ['published' , 'reviewed'].includes(r?.status) && r?.marksObtained !== undefined
+      ['published' , 'reviewed'].includes(r?.status) && 
+      (r?.marksObtained !== undefined || r?.codingResults)
     ).length;
 
-    return { completedTests, resultsReady };
+    // Separate analytics for traditional and coding tests
+    const traditionalTests = results.filter(r => r.testId?.type !== 'coding');
+    const codingTests = results.filter(r => r.testId?.type === 'coding');
+    
+    const avgTraditionalScore = traditionalTests.length > 0 ? 
+      traditionalTests
+        .filter(r => r.marksObtained !== undefined && r.totalMarks > 0)
+        .reduce((sum, r) => sum + (r.marksObtained / r.totalMarks * 100), 0) / traditionalTests.length : 0;
+    
+    const avgCodingScore = codingTests.length > 0 ?
+      codingTests
+        .filter(r => r.codingResults && r.codingResults.totalTestCases > 0)
+        .reduce((sum, r) => sum + (r.codingResults.passedTestCases / r.codingResults.totalTestCases * 100), 0) / codingTests.length : 0;
+
+    return { 
+      completedTests, 
+      resultsReady, 
+      traditionalTests: traditionalTests.length,
+      codingTests: codingTests.length,
+      avgTraditionalScore: avgTraditionalScore.toFixed(1),
+      avgCodingScore: avgCodingScore.toFixed(1)
+    };
   };
 
-  const { completedTests, resultsReady } = getAnalytics();
+  const { 
+    completedTests, 
+    resultsReady, 
+    traditionalTests,
+    codingTests,
+    avgTraditionalScore,
+    avgCodingScore
+  } = getAnalytics();
 
-  const handleStartTest = (testId) => {
+  const handleStartTest = (testId, isResume = false, testType = 'traditional') => {
     if (testId) {
-      navigate(`/student/test/${testId}`);
+      // Route to appropriate interface based on test type
+      if (testType === 'coding') {
+        // For coding tests, route to coding interface
+        if (isResume) {
+          navigate(`/student/coding-test/${testId}?resume=true`);
+        } else {
+          navigate(`/student/coding-test/${testId}`);
+        }
+      } else {
+        // For traditional tests, route to regular test interface
+        if (isResume) {
+          navigate(`/student/test/${testId}?resume=true`);
+        } else {
+          navigate(`/student/test/${testId}`);
+        }
+      }
     }
   };
 
@@ -282,8 +361,30 @@ const StudentDashboard = () => {
           </div>
         </div>
 
-        {/* ✅ Analytics Quick Access */}
+        {/* ✅ Enhanced Analytics Quick Access */}
         <div className={styles.analyticsSection}>
+          {/* Test Type Summary */}
+          {(traditionalTests > 0 || codingTests > 0) && (
+            <div className={styles.testTypeSummary}>
+              <div className={styles.testTypeCard}>
+                <div className={styles.testTypeIcon}>📄</div>
+                <div className={styles.testTypeInfo}>
+                  <h4>Traditional Tests</h4>
+                  <span className={styles.testTypeCount}>{traditionalTests}</span>
+                  <p>Avg: {avgTraditionalScore}%</p>
+                </div>
+              </div>
+              <div className={styles.testTypeCard}>
+                <div className={styles.testTypeIcon}>💻</div>
+                <div className={styles.testTypeInfo}>
+                  <h4>Coding Tests</h4>
+                  <span className={styles.testTypeCount}>{codingTests}</span>
+                  <p>Avg: {avgCodingScore}%</p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className={styles.analyticsCard}>
             <div className={styles.analyticsContent}>
               <div className={styles.analyticsIcon}>📊</div>
@@ -294,6 +395,7 @@ const StudentDashboard = () => {
                   <span>📈 Trends</span>
                   <span>📚 Subject Analysis</span>
                   <span>🏆 Grade Distribution</span>
+                  <span>💻 Code Performance</span>
                   <span>📄 PDF Reports</span>
                 </div>
               </div>
@@ -406,21 +508,42 @@ const StudentDashboard = () => {
                 <div key={test._id || test.id} className={`${styles.testCard} ${styles.available}`}>
                   <div className={styles.testHeader}>
                     <h3>{test.title || 'Untitled Test'}</h3>
-                    <span className={`${styles.testStatus} ${styles.availableStatus}`}>LIVE</span>
+                    <span className={`${styles.testStatus} ${styles.availableStatus}`}>
+                      {test.canResume ? 'RESUME' : 'LIVE'}
+                    </span>
                   </div>
                   <div className={styles.testDetails}>
-                    <p><strong>📚 Subject:</strong> {test.subject || 'N/A'}</p>
+                    <p><strong>� Type:</strong> 
+                      <span className={`${styles.testTypeBadge} ${styles[test.type || 'traditional']}`}>
+                        {test.type === 'coding' ? '💻 Coding Test' : '📄 Traditional Test'}
+                      </span>
+                    </p>
+                    <p><strong>�📚 Subject:</strong> {test.subject || 'N/A'}</p>
                     <p><strong>⏱️ Duration:</strong> {test.duration || 'N/A'} minutes</p>
                     <p><strong>💯 Total Marks:</strong> {test.totalMarks || 'N/A'}</p>
                     <p><strong>🎯 Passing Marks:</strong> {test.passingMarks || 'N/A'}</p>
                     <p><strong>📝 Class:</strong> {test.class || 'N/A'} | <strong>🏫 Board:</strong> {test.board || 'N/A'}</p>
+                    {test.type === 'coding' && (
+                      <p><strong>🔧 Language:</strong> 
+                        <span className={styles.languageBadge}>
+                          {test.board === 'CBSE' ? 'Python' : 
+                           test.board === 'ICSE' || test.board === 'ISC' ? 'Java' : 'C'}
+                        </span>
+                      </p>
+                    )}
                     <p><strong>⚠️ Ends:</strong> {test.endDate ? new Date(test.endDate).toLocaleString() : 'N/A'}</p>
+                    {test.canResume && (
+                      <p className={styles.resumeMessage}>
+                        <strong>🔄 Resume Available:</strong> Continue from where you left off
+                      </p>
+                    )}
                   </div>
                   <button 
-                    className={styles.btnStartTest}
-                    onClick={() => handleStartTest(test._id || test.id)}
+                    className={`${test.canResume ? styles.btnResumeTest : styles.btnStartTest} ${test.type === 'coding' ? styles.codingTestBtn : ''}`}
+                    onClick={() => handleStartTest(test._id || test.id, test.canResume, test.type)}
                   >
-                    🚀 Start Test Now
+                    {test.canResume ? '🔄 Resume Test' : 
+                     test.type === 'coding' ? '💻 Start Coding Challenge' : '🚀 Start Test Now'}
                   </button>
                 </div>
               ))}
@@ -440,10 +563,23 @@ const StudentDashboard = () => {
                     <span className={`${styles.testStatus} ${styles.upcomingStatus}`}>UPCOMING</span>
                   </div>
                   <div className={styles.testDetails}>
-                    <p><strong>📚 Subject:</strong> {test.subject || 'N/A'}</p>
+                    <p><strong>� Type:</strong> 
+                      <span className={`${styles.testTypeBadge} ${styles[test.type || 'traditional']}`}>
+                        {test.type === 'coding' ? '💻 Coding Test' : '📄 Traditional Test'}
+                      </span>
+                    </p>
+                    <p><strong>�📚 Subject:</strong> {test.subject || 'N/A'}</p>
                     <p><strong>⏱️ Duration:</strong> {test.duration || 'N/A'} minutes</p>
                     <p><strong>💯 Total Marks:</strong> {test.totalMarks || 'N/A'}</p>
                     <p><strong>🎯 Passing Marks:</strong> {test.passingMarks || 'N/A'}</p>
+                    {test.type === 'coding' && (
+                      <p><strong>🔧 Language:</strong> 
+                        <span className={styles.languageBadge}>
+                          {test.board === 'CBSE' ? 'Python' : 
+                           test.board === 'ICSE' || test.board === 'ISC' ? 'Java' : 'C'}
+                        </span>
+                      </p>
+                    )}
                     <p><strong>🚀 Starts:</strong> {test.startDate ? new Date(test.startDate).toLocaleString() : 'N/A'}</p>
                     <p><strong>⚠️ Ends:</strong> {test.endDate ? new Date(test.endDate).toLocaleString() : 'N/A'}</p>
                   </div>
@@ -465,6 +601,7 @@ const StudentDashboard = () => {
                 <thead>
                   <tr>
                     <th>Test Name</th>
+                    <th>Type</th>
                     <th>Score</th>
                     <th>Percentage</th>
                     <th>Status</th>
@@ -479,29 +616,61 @@ const StudentDashboard = () => {
                       : '0.00';
                     const isPublished = r.status === 'published';
                     const isReviewed = r.status === 'reviewed';
+                    const isCompleted = r.status === 'completed';
+                    const isDone = r.status === 'done';
+                    // Status-based test type classification:
+                    // - pending, underreview, reviewed → Traditional test
+                    // - done, completed → Coding test
+                    const isCodingTest = ['done', 'completed'].includes(r.status);
+                    const isTraditionalTest = ['pending', 'underreview', 'reviewed'].includes(r.status);
                     
                     return (
                       <tr key={r._id}>
                         <td>{r.testTitle || r.testId?.title || 'Unknown'}</td>
                         <td>
-                          {r.marksObtained !== undefined && r.totalMarks > 0
-                            ? `${r.marksObtained}/${r.totalMarks}`
-                            : 'Pending'}
+                          <span className={`${styles.testTypeBadge} ${isCodingTest ? styles.coding : styles.traditional}`}>
+                            {isCodingTest ? '💻 Coding' : '📄 Traditional'}
+                          </span>
                         </td>
                         <td>
-                          {r.marksObtained !== undefined && r.totalMarks > 0
-                            ? `${pct}%`
-                            : 'Pending'}
+                          {isCodingTest ? (
+                            // For coding tests, show test cases passed
+                            r.codingResults ? 
+                              `${r.codingResults.passedTestCases || 0}/${r.codingResults.totalTestCases || 0} Tests` :
+                              'Pending'
+                          ) : (
+                            // For traditional tests, show marks
+                            r.marksObtained !== undefined && r.totalMarks > 0
+                              ? `${r.marksObtained}/${r.totalMarks}`
+                              : 'Pending'
+                          )}
+                        </td>
+                        <td>
+                          {isCodingTest ? (
+                            // For coding tests, show percentage based on test cases
+                            r.codingResults && r.codingResults.totalTestCases > 0 ?
+                              `${((r.codingResults.passedTestCases / r.codingResults.totalTestCases) * 100).toFixed(2)}%` :
+                              'Pending'
+                          ) : (
+                            // For traditional tests, show marks percentage
+                            r.marksObtained !== undefined && r.totalMarks > 0
+                              ? `${pct}%`
+                              : 'Pending'
+                          )}
                         </td>
                         <td>
                           <span className={`${styles.statusBadge} ${
                             isPublished ? styles.statusFinal :
+                            isCompleted ? styles.statusCompleted :
                             isReviewed ? styles.statusReviewed :
+                            isDone ? styles.statusDone :
                             styles.statusPending
                           }`}>
                             {isPublished ? '✅ Final' :
+                             isCompleted ? '✅ Completed' :
                              isReviewed ? 'Reviewed' :
-                             '⏳ Under Review'}
+                             isDone ? '📝 Under Review' :
+                             '⏳ Pending'}
                           </span>
                         </td>
                         <td>
@@ -511,7 +680,7 @@ const StudentDashboard = () => {
                         </td>
                         <td>
                           <div className={styles.actionButtons}>
-                            {(isPublished || isReviewed) && (
+                            {(isPublished || isReviewed || isCompleted) && (
                               <>
                                 <button
                                   className={styles.btnAction}
@@ -519,13 +688,28 @@ const StudentDashboard = () => {
                                 >
                                   View Details
                                 </button>
-                                <button
-                                  className={styles.btnAction}
-                                  onClick={() => navigate(`/student/result/${r._id}/breakdown`)}
-                                >
-                                  Question Wise
-                                </button>
+                                {isCodingTest && !r.hideViewCodingResults && r.showViewCodingResults && (
+                                  <button
+                                    className={`${styles.btnAction} ${styles.codingResultBtn}`}
+                                    onClick={() => navigate(`/student/result/${r._id}/code-review`)}
+                                  >
+                                    View Code Results
+                                  </button>
+                                )}
+                                {!isCodingTest && (isCompleted || isReviewed || isPublished) && (
+                                  <button
+                                    className={styles.btnAction}
+                                    onClick={() => navigate(`/student/result/${r._id}/breakdown`)}
+                                  >
+                                    Question Wise
+                                  </button>
+                                )}
                               </>
+                            )}
+                            {isDone && isCodingTest && (
+                              <span className={styles.reviewPendingNote}>
+                                📝 Awaiting Review
+                              </span>
                             )}
                           </div>
                         </td>

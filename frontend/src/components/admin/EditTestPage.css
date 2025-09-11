@@ -8,6 +8,7 @@
   --text-secondary:   #4a5568;
   --border-color:     #d2dae2;
   --input-bg:         #f0f4f8;
+  --accent:           #4f8ef7;
   --accent-hover:     #3a76d1;
   --error-color:      #e53e3e;
   --success-color:    #2f855a;
@@ -15,6 +16,18 @@
   --spacing:          1rem;
   --transition:       0.2s ease-in-out;
   --font-family:      'Inter', sans-serif;
+}
+
+/* Coding Test Theme Colors */
+:root {
+  --coding-accent:       #00d4aa;
+  --coding-accent-hover: #00b894;
+  --coding-bg-page:      #0d1117;
+  --coding-bg-form:      #161b22;
+  --coding-text-primary: #f0f6fc;
+  --coding-text-secondary: #8b949e;
+  --coding-border-color: #30363d;
+  --coding-input-bg:     #21262d;
 }
 
 /* Dark mode */
@@ -61,6 +74,81 @@
   justify-content: center;
 }
 
+/* Traditional Test Theme (default) */
+.edit-test-page.traditional-test-theme {
+  background: var(--bg-page);
+  color: var(--text-primary);
+}
+
+.edit-test-page.traditional-test-theme .form-wrapper {
+  background: var(--bg-form);
+  border: 1px solid var(--border-color);
+}
+
+.edit-test-page.traditional-test-theme h1 {
+  color: var(--accent);
+}
+
+.edit-test-page.traditional-test-theme button.primary {
+  background: var(--accent);
+}
+
+.edit-test-page.traditional-test-theme button.primary:hover {
+  background: var(--accent-hover);
+}
+
+/* Coding Test Theme */
+.edit-test-page.coding-test-theme {
+  background: var(--coding-bg-page);
+  color: var(--coding-text-primary);
+}
+
+.edit-test-page.coding-test-theme .form-wrapper {
+  background: var(--coding-bg-form);
+  border: 1px solid var(--coding-border-color);
+}
+
+.edit-test-page.coding-test-theme h1 {
+  color: var(--coding-accent);
+}
+
+.edit-test-page.coding-test-theme input,
+.edit-test-page.coding-test-theme textarea,
+.edit-test-page.coding-test-theme select {
+  background: var(--coding-input-bg);
+  border-color: var(--coding-border-color);
+  color: var(--coding-text-primary);
+}
+
+.edit-test-page.coding-test-theme input:focus,
+.edit-test-page.coding-test-theme textarea:focus,
+.edit-test-page.coding-test-theme select:focus {
+  border-color: var(--coding-accent);
+  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.2);
+}
+
+.edit-test-page.coding-test-theme label {
+  color: var(--coding-text-secondary);
+}
+
+.edit-test-page.coding-test-theme button.primary {
+  background: var(--coding-accent);
+}
+
+.edit-test-page.coding-test-theme button.primary:hover {
+  background: var(--coding-accent-hover);
+}
+
+.edit-test-page.coding-test-theme button.secondary {
+  background: var(--coding-input-bg);
+  color: var(--coding-text-primary);
+  border-color: var(--coding-border-color);
+}
+
+.edit-test-page.coding-test-theme button.secondary:hover {
+  background: var(--coding-border-color);
+}
+
 .form-wrapper {
   background: var(--bg-form);
   padding: calc(var(--spacing) * 1.5);
@@ -98,7 +186,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   margin-top: 0.5rem;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border-color);
@@ -110,10 +199,27 @@ textarea {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(79,142,247,0.2);
+}
+
+/*────────────────── Coding Test Info Box ───────────────────*/
+.coding-test-info {
+  grid-column: 1 / -1;
+  background: rgba(0, 212, 170, 0.1);
+  border: 1px solid var(--coding-accent);
+  border-radius: var(--radius);
+  padding: var(--spacing);
+  margin: var(--spacing) 0;
+}
+
+.coding-test-info p {
+  margin: 0;
+  color: var(--coding-text-primary);
+  font-size: 0.9rem;
 }
 
 textarea {

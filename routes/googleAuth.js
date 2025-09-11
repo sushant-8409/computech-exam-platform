@@ -342,6 +342,68 @@ router.get('/auth/google/test-config', (req, res) => {
   });
 });
 
+// Route to check admin Google Drive connection status from database
+router.get('/auth/google/admin-status', async (req, res) => {
+  try {
+    const User = require('../models/User');
+    
+    // Find admin user with Google tokens in database
+    const adminUser = await User.findOne({
+      role: 'admin',
+      $and: [
+        { 'googleTokens.access_token': { $exists: true } },
+        { 'googleTokens.refresh_token': { $exists: true } }
+      ]
+    });
+
+    if (adminUser && adminUser.googleTokens) {
+      // Test if the tokens are still valid
+      try {
+        const oauth2Client = new google.auth.OAuth2(
+          process.env.GOOGLE_OAUTH_CLIENT_ID,
+          process.env.GOOGLE_OAUTH_CLIENT_SECRET
+        );
+        oauth2Client.setCredentials(adminUser.googleTokens);
+
+        const drive = google.drive({ version: 'v3', auth: oauth2Client });
+        const driveResponse = await drive.about.get({ fields: 'user' });
+        
+        console.log('✅ Admin Google Drive connected:', driveResponse.data.user.emailAddress);
+        
+        res.json({
+          connected: true,
+          driveAccess: true,
+          userInfo: driveResponse.data.user,
+          adminEmail: adminUser.email,
+          tokenExpiry: adminUser.googleTokens.expiry_date ? new Date(adminUser.googleTokens.expiry_date) : null
+        });
+      } catch (driveError) {
+        console.error('❌ Admin Google Drive tokens invalid:', driveError.message);
+        res.json({
+          connected: false,
+          driveAccess: false,
+          error: 'Admin Google Drive tokens are invalid or expired',
+          adminEmail: adminUser.email
+        });
+      }
+    } else {
+      console.log('❌ No admin Google Drive tokens found in database');
+      res.json({
+        connected: false,
+        driveAccess: false,
+        error: 'No admin Google Drive tokens found in database'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error checking admin Google Drive status:', error);
+    res.status(500).json({
+      connected: false,
+      driveAccess: false,
+      error: 'Failed to check admin Google Drive status'
+    });
+  }
+});
+
 // Route to disconnect Google Drive
 router.post('/auth/google/disconnect', (req, res) => {
   req.session.googleTokens = null;

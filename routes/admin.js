@@ -18,6 +18,7 @@ const notificationService = require('../services/notificationService');
 const SYSTEM_ADMIN_ID = '000000000000000000000001';
 const ReviewResult   = require('../models/ReviewResult');
 const { authenticateAdmin } = require('../middleware/auth');
+const judge0Service = require('../services/judge0Service');
 
 // Apply authentication middleware to all admin routes
 router.use(authenticateAdmin);
@@ -432,7 +433,7 @@ router.get('/results', async (req, res) => {
 
         results = await Result.find()
           .populate('studentId', 'name email rollNo class board')
-          .populate('testId', 'title subject questionsCount totalMarks')
+          .populate('testId', 'title subject questionsCount totalMarks type coding')
           .sort({ submittedAt: -1 })
           .lean();
 
@@ -464,6 +465,269 @@ router.get('/results', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch results',
+      error: error.message
+    });
+  }
+});
+
+// Get single result details for review
+router.get('/results/:resultId', authenticateAdmin, async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    console.log(`📊 Fetching result details for ID: ${resultId}`);
+
+    if (!mongoose.connection.readyState || !Result) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database not available'
+      });
+    }
+
+    const result = await Result.findById(resultId)
+      .populate('studentId', 'name email rollNo class board')
+      .populate('testId', 'title subject type questionsCount totalMarks')
+      .lean();
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Result not found'
+      });
+    }
+
+    console.log(`✅ Result details retrieved for ${result.studentId?.name || 'Unknown'}`);
+
+    res.json({
+      success: true,
+      result
+    });
+  } catch (error) {
+    console.error('❌ Get result details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch result details',
+      error: error.message
+    });
+  }
+});
+
+// Update result comments
+router.patch('/results/:resultId/comments', authenticateAdmin, async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    const { comments } = req.body;
+    
+    console.log(`📝 Updating comments for result: ${resultId}`);
+
+    if (!mongoose.connection.readyState || !Result) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database not available'
+      });
+    }
+
+    const result = await Result.findByIdAndUpdate(
+      resultId,
+      { adminComments: comments },
+      { new: true }
+    );
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Result not found'
+      });
+    }
+
+    console.log(`✅ Comments updated for result: ${resultId}`);
+
+    res.json({
+      success: true,
+      message: 'Comments updated successfully',
+      result
+    });
+  } catch (error) {
+    console.error('❌ Update comments error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update comments',
+      error: error.message
+    });
+  }
+});
+
+// Update result status
+router.patch('/results/:resultId/status', authenticateAdmin, async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    const { status } = req.body;
+    
+    console.log(`🔄 Updating status for result: ${resultId} to ${status}`);
+
+    if (!mongoose.connection.readyState || !Result) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database not available'
+      });
+    }
+
+    const result = await Result.findByIdAndUpdate(
+      resultId,
+      { status },
+      { new: true, runValidators: true }
+    );
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Result not found'
+      });
+    }
+
+    console.log(`✅ Status updated successfully for result: ${resultId}`);
+
+    res.json({
+      success: true,
+      result
+    });
+  } catch (error) {
+    console.error('❌ Update status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update status',
+      error: error.message
+    });
+  }
+});
+
+// Update question marks for coding tests
+router.patch('/results/:resultId/question-marks', authenticateAdmin, async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    const { questionIndex, marks } = req.body;
+    
+    console.log(`📝 Updating marks for result: ${resultId}, question: ${questionIndex}, marks: ${marks}`);
+
+    if (!mongoose.connection.readyState || !Result) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database not available'
+      });
+    }
+
+    const result = await Result.findById(resultId);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Result not found'
+      });
+    }
+
+    // Update the specific question marks in coding results
+    if (result.codingResults && result.codingResults.questionResults) {
+      if (questionIndex >= 0 && questionIndex < result.codingResults.questionResults.length) {
+        result.codingResults.questionResults[questionIndex].score = marks;
+        
+        // Recalculate total score
+        result.codingResults.totalScore = result.codingResults.questionResults.reduce(
+          (sum, qr) => sum + (qr.score || 0), 0
+        );
+        
+        // Update percentage and marks obtained
+        result.marksObtained = result.codingResults.totalScore;
+        result.percentage = (result.codingResults.totalScore / result.codingResults.maxScore) * 100;
+        
+        await result.save();
+        
+        console.log(`✅ Question marks updated successfully for result: ${resultId}`);
+        
+        res.json({
+          success: true,
+          result
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid question index'
+        });
+      }
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'No coding results found'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Update question marks error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update question marks',
+      error: error.message
+    });
+  }
+});
+
+// PATCH /api/admin/results/:resultId/marks - Save & Approve all marks
+router.patch('/results/:resultId/marks', authenticateAdmin, async (req, res) => {
+  try {
+    const { resultId } = req.params;
+    const { questionWiseMarks, adminComments } = req.body;
+    
+    console.log(`📝 Saving & approving marks for result: ${resultId}`);
+
+    if (!mongoose.connection.readyState || !Result) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database not available'
+      });
+    }
+
+    const result = await Result.findById(resultId);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Result not found'
+      });
+    }
+
+    // Update question wise marks
+    if (questionWiseMarks && Array.isArray(questionWiseMarks)) {
+      result.questionWiseMarks = questionWiseMarks;
+      
+      // Calculate total marks obtained
+      const totalObtained = questionWiseMarks.reduce((sum, qm) => sum + (qm.obtainedMarks || 0), 0);
+      const totalMax = questionWiseMarks.reduce((sum, qm) => sum + (qm.maxMarks || 0), 0);
+      
+      result.marksObtained = totalObtained;
+      result.totalMarks = totalMax;
+      result.percentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
+    }
+
+    // Update admin comments
+    if (adminComments !== undefined) {
+      result.adminComments = adminComments;
+    }
+
+    // Change status from 'done' to 'completed' when admin saves & approves
+    if (result.status === 'done') {
+      result.status = 'completed';
+      console.log(`✅ Status changed from 'done' to 'completed' for result: ${resultId}`);
+    }
+
+    await result.save();
+    
+    console.log(`✅ Marks saved and approved successfully for result: ${resultId}`);
+    
+    res.json({
+      success: true,
+      message: 'Marks saved and approved successfully',
+      result
+    });
+  } catch (error) {
+    console.error('❌ Save marks error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save marks',
       error: error.message
     });
   }
@@ -636,8 +900,79 @@ router.post(
         answerKeyURL,       // ← new
         resumeEnabled = true,
         answerKeyVisible = false,
-        proctoringSettings = {}
+        proctoringSettings = {},
+        cameraMonitoring = {},
+        paperSubmissionRequired = false,
+        paperUploadTimeLimit = 15,
+        paperUploadAllowedDuringTest = false,
+        // Modern coding test fields
+        type = 'traditional',
+        coding,
+        // Legacy coding test fields (for backward compatibility)
+        isCodingTest = false,
+        codingLanguage,
+        codingProblem
       } = req.body;
+
+      // Determine if this is a coding test from either new or old format
+      const isActuallyACodingTest = type === 'coding' || isCodingTest;
+
+      // Validate coding test specific fields for both old and new formats
+      if (isActuallyACodingTest) {
+        // New format validation (multi-question coding tests)
+        if (coding && coding.questions && coding.questions.length > 0) {
+          // Validate new format coding questions
+          for (const question of coding.questions) {
+            if (!question.title || !question.description) {
+              return res.status(400).json({
+                success: false,
+                message: 'Question title and description are required for coding tests'
+              });
+            }
+            if (!question.testCases || question.testCases.length === 0) {
+              return res.status(400).json({
+                success: false,
+                message: 'At least one test case is required for each coding question'
+              });
+            }
+          }
+        } 
+        // Legacy format validation (single question coding tests)
+        else if (codingProblem) {
+          if (!codingProblem.title || !codingProblem.description) {
+            return res.status(400).json({
+              success: false,
+              message: 'Coding problem title and description are required for coding tests'
+            });
+          }
+          
+          if (!codingProblem.testCases || codingProblem.testCases.length === 0) {
+            return res.status(400).json({
+              success: false,
+              message: 'At least one test case is required for coding tests'
+            });
+          }
+
+          // Auto-detect language based on board if not provided
+          if (!codingLanguage) {
+            const languageInfo = judge0Service.getLanguageIdForBoard(board);
+            codingLanguage = languageInfo.language;
+          }
+
+          // Generate starter code if not provided
+          if (!codingProblem.starterCode) {
+            const starterCode = judge0Service.getStarterCode(codingLanguage, codingProblem.title);
+            codingProblem.starterCode = {
+              [codingLanguage]: starterCode
+            };
+          }
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: 'Coding test must have either coding questions or coding problem defined'
+          });
+        }
+      }
 
       // build your document in one shot
       const test = await Test.create({
@@ -656,12 +991,24 @@ router.post(
         answerKeyURL,       // persisted
         resumeEnabled,
         answerKeyVisible,
-        proctoringSettings
+        proctoringSettings,
+        cameraMonitoring,
+        paperSubmissionRequired,
+        paperUploadTimeLimit,
+        paperUploadAllowedDuringTest,
+        // Modern coding test fields with backward compatibility
+        type: isActuallyACodingTest ? 'coding' : 'traditional',
+        coding: coding || undefined, // New multi-question format
+        // Legacy coding test fields (for backward compatibility)
+        isCodingTest: isActuallyACodingTest,
+        codingLanguage,
+        codingProblem: codingProblem || undefined,
+        createdBy: req.user._id
       });
 
       res.status(201).json({
         success: true,
-        message: 'Test created successfully',
+        message: `${isActuallyACodingTest ? 'Coding test' : 'Test'} created successfully`,
         test
       });
     } catch (err) {
@@ -1532,8 +1879,504 @@ router.post('/test-notification', authenticateAdmin, async (req, res) => {
   }
 });
 
+// ===== CODING TEST SPECIFIC ROUTES =====
+
+// Test Judge0 service connection
+router.get('/coding/test-connection', async (req, res) => {
+  try {
+    const serviceInfo = await judge0Service.getAbout();
+    res.json({
+      success: true,
+      message: 'Judge0 service connected successfully',
+      service: serviceInfo
+    });
+  } catch (error) {
+    console.error('Judge0 connection test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to connect to Judge0 service',
+      error: error.message
+    });
+  }
+});
+
+// Get available programming languages
+router.get('/coding/languages', async (req, res) => {
+  try {
+    const languages = await judge0Service.getLanguages();
+    res.json({
+      success: true,
+      languages: languages
+    });
+  } catch (error) {
+    console.error('Error fetching languages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch programming languages'
+    });
+  }
+});
+
+// Get language recommendation based on education board
+router.get('/coding/language-for-board/:board', (req, res) => {
+  try {
+    const { board } = req.params;
+    const languageInfo = judge0Service.getLanguageIdForBoard(board);
+    
+    res.json({
+      success: true,
+      board: board,
+      recommendedLanguage: languageInfo.language,
+      languageId: languageInfo.languageId,
+      description: `Recommended programming language for ${board} students`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get language recommendation'
+    });
+  }
+});
+
+// Generate starter code for a language
+router.post('/coding/starter-code', (req, res) => {
+  try {
+    const { language, problemTitle } = req.body;
+    
+    if (!language) {
+      return res.status(400).json({
+        success: false,
+        message: 'Programming language is required'
+      });
+    }
+
+    const starterCode = judge0Service.getStarterCode(language, problemTitle || 'Coding Problem');
+    
+    res.json({
+      success: true,
+      language: language,
+      starterCode: starterCode
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate starter code'
+    });
+  }
+});
+
+// Test code compilation (for admin to test their coding problems)
+router.post('/coding/test-compile', async (req, res) => {
+  try {
+    const { sourceCode, language, testInput, expectedOutput } = req.body;
+    
+    if (!sourceCode || !language) {
+      return res.status(400).json({
+        success: false,
+        message: 'Source code and language are required'
+      });
+    }
+
+    const languageId = judge0Service.languageIds[language];
+    if (!languageId) {
+      return res.status(400).json({
+        success: false,
+        message: `Unsupported language: ${language}`
+      });
+    }
+
+    const result = await judge0Service.submitCode(sourceCode, languageId, testInput, expectedOutput);
+    
+    res.json({
+      success: true,
+      result: {
+        output: result.stdout,
+        stderr: result.stderr,
+        status: result.status,
+        executionTime: result.time,
+        memory: result.memory,
+        passed: result.status?.id === 3 && result.stdout?.trim() === expectedOutput?.trim()
+      }
+    });
+
+  } catch (error) {
+    console.error('Code compilation test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Code compilation failed',
+      error: error.message
+    });
+  }
+});
+
+// Get coding test results with detailed analysis
+router.get('/coding/test-results/:testId', async (req, res) => {
+  try {
+    const { testId } = req.params;
+    
+    const results = await Result.find({ 
+      testId: testId, 
+      submissionType: 'coding_submission' 
+    })
+    .populate('studentId', 'name email rollNumber')
+    .sort({ obtainedMarks: -1 });
+
+    const testDetails = await Test.findById(testId);
+    
+    if (!testDetails || !testDetails.isCodingTest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Coding test not found'
+      });
+    }
+
+    // Calculate statistics
+    const totalSubmissions = results.length;
+    const scores = results.map(r => r.obtainedMarks);
+    const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const maxScore = scores.length > 0 ? Math.max(...scores) : 0;
+    const minScore = scores.length > 0 ? Math.min(...scores) : 0;
+    
+    // Test case pass rates
+    const testCaseStats = {};
+    results.forEach(result => {
+      if (result.codingSubmission && result.codingSubmission.testResults) {
+        result.codingSubmission.testResults.results.forEach((tcResult, index) => {
+          if (!testCaseStats[index]) {
+            testCaseStats[index] = { passed: 0, total: 0 };
+          }
+          testCaseStats[index].total++;
+          if (tcResult.passed) {
+            testCaseStats[index].passed++;
+          }
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      testDetails: {
+        title: testDetails.title,
+        language: testDetails.codingLanguage,
+        totalMarks: testDetails.totalMarks,
+        totalTestCases: testDetails.codingProblem?.testCases?.length || 0
+      },
+      statistics: {
+        totalSubmissions,
+        averageScore: Math.round(averageScore * 100) / 100,
+        maxScore,
+        minScore,
+        passRate: totalSubmissions > 0 ? (results.filter(r => r.obtainedMarks >= testDetails.passingMarks).length / totalSubmissions * 100) : 0
+      },
+      testCaseStats,
+      results: results.map(result => ({
+        student: result.studentId,
+        score: result.obtainedMarks,
+        totalMarks: result.totalMarks,
+        percentage: result.percentage,
+        passedTests: result.codingSubmission?.passedTestCases || 0,
+        totalTests: result.codingSubmission?.totalTestCases || 0,
+        submittedAt: result.submittedAt,
+        timeTaken: result.timeTaken,
+        language: result.codingSubmission?.language
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error fetching coding test results:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch test results'
+    });
+  }
+});
+
 // Mount manual test entry routes
 router.use('/', manualTestEntryRoutes);
+
+// ===============================================
+// CODING ADMIN PANEL ROUTES
+// ===============================================
+
+// Get all coding tests for comprehensive admin review
+router.get('/coding-tests-comprehensive', async (req, res) => {
+  try {
+    console.log('📊 Fetching comprehensive coding tests for admin panel...');
+    
+    const Result = require('../models/Result');
+    const Student = require('../models/Student');
+    const Test = require('../models/Test');
+    
+    // Find all results that are coding tests
+    const codingResults = await Result.find({
+      $or: [
+        { 'testId.type': 'coding' },
+        { submissionType: 'multi_question_coding' },
+        { codingResults: { $exists: true } },
+        { testTitle: { $regex: 'cpcode|coding|program', $options: 'i' } }
+      ]
+    })
+    .populate('studentId', 'name email')
+    .populate('testId', 'title type duration')
+    .sort({ submittedAt: -1 })
+    .lean();
+
+    // Enrich data with additional metadata
+    const enrichedResults = codingResults.map(result => ({
+      ...result,
+      isFlagged: result.flags?.timeViolation || result.flags?.codePatterns || result.flags?.behaviorAnomaly || false,
+      adminReviewed: result.adminReviewed || false,
+      adminModified: result.modifiedMarks ? true : false,
+      totalScore: result.modifiedMarks?.totalScore || result.totalScore || 0,
+      maxScore: result.maxScore || 100,
+      timeTaken: result.timeTaken || result.duration || 0,
+      testTitle: result.testTitle || result.testId?.title || 'Unknown Test',
+      violations: result.violations || [],
+      monitoringData: {
+        tabSwitches: result.monitoringData?.tabSwitches || 0,
+        fullscreenExits: result.monitoringData?.fullscreenExits || 0,
+        copyPasteEvents: result.monitoringData?.copyPasteEvents || 0,
+        suspiciousActivity: result.monitoringData?.suspiciousActivity || false
+      }
+    }));
+
+    console.log(`✅ Found ${enrichedResults.length} coding test submissions`);
+    
+    res.json({
+      success: true,
+      tests: enrichedResults,
+      summary: {
+        total: enrichedResults.length,
+        flagged: enrichedResults.filter(t => t.isFlagged).length,
+        reviewed: enrichedResults.filter(t => t.adminReviewed).length,
+        pending: enrichedResults.filter(t => !t.adminReviewed).length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching comprehensive coding tests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch coding tests',
+      error: error.message
+    });
+  }
+});
+
+// Modify coding test marks and flags
+router.put('/modify-coding-marks', async (req, res) => {
+  try {
+    console.log('🔧 Modifying coding test marks...');
+    
+    const { 
+      resultId, 
+      modifiedMarks, 
+      adminNotes, 
+      cheatingFlags, 
+      adminReviewed, 
+      modifiedBy,
+      modificationTimestamp 
+    } = req.body;
+
+    if (!resultId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Result ID is required'
+      });
+    }
+
+    const Result = require('../models/Result');
+    
+    // Find the result
+    const result = await Result.findById(resultId);
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Result not found'
+      });
+    }
+
+    // Update the result with modified data
+    const updateData = {
+      modifiedMarks,
+      adminNotes,
+      adminReviewed: true,
+      modifiedBy: modifiedBy || 'admin',
+      modificationTimestamp: modificationTimestamp || new Date().toISOString()
+    };
+
+    // Update flags if provided
+    if (cheatingFlags) {
+      updateData.flags = {
+        ...result.flags,
+        ...cheatingFlags,
+        adminFlagged: true,
+        adminFlaggedAt: new Date().toISOString()
+      };
+      
+      // Set overall flagged status if any flag is true
+      updateData.isFlagged = Object.values(cheatingFlags).some(flag => flag === true);
+    }
+
+    // If marks were modified, update the total score
+    if (modifiedMarks && modifiedMarks.totalScore !== undefined) {
+      updateData.totalScore = modifiedMarks.totalScore;
+      updateData.isMarksModified = true;
+    }
+
+    const updatedResult = await Result.findByIdAndUpdate(
+      resultId,
+      updateData,
+      { new: true }
+    );
+
+    console.log(`✅ Updated coding test result for result ID: ${resultId}`);
+
+    res.json({
+      success: true,
+      message: 'Coding test marks updated successfully',
+      result: updatedResult
+    });
+
+  } catch (error) {
+    console.error('❌ Error modifying coding marks:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to modify coding marks',
+      error: error.message
+    });
+  }
+});
+
+// Flag a test for cheating review
+router.post('/flag-cheating', async (req, res) => {
+  try {
+    console.log('🚩 Flagging test for cheating review...');
+    
+    const { resultId, reason, flaggedBy, timestamp } = req.body;
+
+    if (!resultId || !reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Result ID and reason are required'
+      });
+    }
+
+    const Result = require('../models/Result');
+    
+    const updateData = {
+      isFlagged: true,
+      cheatingFlag: {
+        reason,
+        flaggedBy: flaggedBy || 'admin',
+        timestamp: timestamp || new Date().toISOString(),
+        status: 'pending_review'
+      },
+      $push: {
+        adminActions: {
+          action: 'flagged_for_cheating',
+          reason,
+          performedBy: flaggedBy || 'admin',
+          timestamp: timestamp || new Date().toISOString()
+        }
+      }
+    };
+
+    const updatedResult = await Result.findByIdAndUpdate(
+      resultId,
+      updateData,
+      { new: true }
+    );
+
+    if (!updatedResult) {
+      return res.status(404).json({
+        success: false,
+        message: 'Result not found'
+      });
+    }
+
+    console.log(`🚩 Flagged result ${resultId} for cheating review`);
+
+    res.json({
+      success: true,
+      message: 'Test flagged for review successfully',
+      result: updatedResult
+    });
+
+  } catch (error) {
+    console.error('❌ Error flagging test:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to flag test',
+      error: error.message
+    });
+  }
+});
+
+// Get detailed monitoring data for a specific result
+router.get('/monitoring-details/:resultId', async (req, res) => {
+  try {
+    console.log('📊 Fetching detailed monitoring data...');
+    
+    const { resultId } = req.params;
+    const Result = require('../models/Result');
+    
+    const result = await Result.findById(resultId)
+      .populate('studentId', 'name email')
+      .populate('testId', 'title type duration')
+      .lean();
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Result not found'
+      });
+    }
+
+    // Extract comprehensive monitoring data
+    const monitoringData = {
+      basic: {
+        submittedAt: result.submittedAt,
+        timeTaken: result.timeTaken,
+        testDuration: result.testId?.duration,
+        submissionType: result.submissionType
+      },
+      violations: result.violations || [],
+      tabActivity: {
+        switches: result.monitoringData?.tabSwitches || 0,
+        suspiciousPatterns: result.monitoringData?.suspiciousTabActivity || []
+      },
+      fullscreenActivity: {
+        exits: result.monitoringData?.fullscreenExits || 0,
+        timeline: result.monitoringData?.fullscreenTimeline || []
+      },
+      copyPasteEvents: result.monitoringData?.copyPasteEvents || 0,
+      codeAnalysis: {
+        patterns: result.codeAnalysis?.patterns || [],
+        similarity: result.codeAnalysis?.similarity || null,
+        complexity: result.codeAnalysis?.complexity || null
+      },
+      browserInfo: result.browserInfo || {},
+      geolocation: result.geolocation || null,
+      deviceInfo: result.deviceInfo || {}
+    };
+
+    res.json({
+      success: true,
+      student: result.studentId,
+      test: result.testId,
+      monitoringData
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching monitoring details:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch monitoring details',
+      error: error.message
+    });
+  }
+});
 
 console.log('📝 Admin routes module loaded successfully');
 

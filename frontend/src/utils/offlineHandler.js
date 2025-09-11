@@ -6,6 +6,8 @@ class OfflineHandler {
     this.isOnline = navigator.onLine;
     this.pendingRequests = [];
     this.initialized = false;
+    this.lastOnlineToast = 0; // Prevent excessive online toasts
+    this.lastOfflineToast = 0; // Prevent excessive offline toasts
   }
 
   init() {
@@ -36,9 +38,15 @@ class OfflineHandler {
     console.log('🟢 App came online');
     this.isOnline = true;
     
-    toast.success('🌐 Connection restored! Syncing data...', {
-      toastId: 'online-status'
-    });
+    // Only show toast if it's been more than 10 seconds since last online toast
+    const now = Date.now();
+    if (now - this.lastOnlineToast > 10000) {
+      toast.success('🌐 Connection restored!', {
+        toastId: 'online-status',
+        autoClose: 3000
+      });
+      this.lastOnlineToast = now;
+    }
 
     // ✅ Process pending requests
     this.processPendingRequests();
@@ -51,10 +59,15 @@ class OfflineHandler {
     console.log('🔴 App went offline');
     this.isOnline = false;
     
-    toast.warning('📡 You are offline. Some features may be limited.', {
-      toastId: 'offline-status',
-      autoClose: false
-    });
+    // Only show toast if it's been more than 5 seconds since last offline toast
+    const now = Date.now();
+    if (now - this.lastOfflineToast > 5000) {
+      toast.warning('📡 You are offline. Some features may be limited.', {
+        toastId: 'offline-status',
+        autoClose: 5000
+      });
+      this.lastOfflineToast = now;
+    }
   }
 
   // ✅ Queue requests when offline

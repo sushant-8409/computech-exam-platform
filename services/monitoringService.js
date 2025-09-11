@@ -1,0 +1,299 @@
+const crypto = require('crypto');
+const fs = require('fs').promises;
+const path = require('path');
+const Result = require('../models/Result');
+
+class MonitoringService {
+  constructor() {
+    this.activeSessions = new Map();
+    this.monitoringIntervals = new Map();
+    this.violationThresholds = {
+      tabSwitch: 5,
+      fullscreenExit: 3,
+      focusLoss: 10,
+      inactivity: 300000 // 5 minutes in ms
+    };
+  }
+
+  // Initialize monitoring for a test session
+  startMonitoring(sessionId, studentId, testId, settings = {}) {
+    console.log(`📸 Starting monitoring for session: ${sessionId}`);
+    
+    const sessionData = {
+      sessionId,
+      studentId,
+      testId,
+      startTime: new Date(),
+      settings: {
+        cameraMonitoring: settings.cameraMonitoring || false,
+        browserLockdown: settings.browserLockdown || false,
+        screenshotInterval: settings.screenshotInterval || 30000, // 30 seconds
+        flagSuspiciousActivity: settings.flagSuspiciousActivity || true
+      },
+      violations: [],
+      monitoringImages: [],
+      suspiciousActivities: [],
+      stats: {
+        tabSwitchCount: 0,
+        fullscreenViolations: 0,
+        focusLostCount: 0,
+        totalViolations: 0,
+        lastActivity: new Date()
+      }
+    };
+
+    this.activeSessions.set(sessionId, sessionData);
+
+    // Start periodic monitoring if camera is enabled
+    if (sessionData.settings.cameraMonitoring) {
+      const intervalId = setInterval(() => {
+        this.performPeriodicCheck(sessionId);
+      }, sessionData.settings.screenshotInterval);
+      
+      this.monitoringIntervals.set(sessionId, intervalId);
+    }
+
+    return sessionData;
+  }
+
+  // Record a violation
+  recordViolation(sessionId, violationType, details = '', severity = 'medium') {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      console.warn(`⚠️ No active session found for: ${sessionId}`);
+      return null;
+    }
+
+    const violation = {
+      type: violationType,
+      timestamp: new Date(),
+      details,
+      severity,
+      sessionTime: Date.now() - session.startTime.getTime()
+    };
+
+    session.violations.push(violation);
+    session.stats.totalViolations++;
+    session.stats.lastActivity = new Date();
+
+    // Update specific counters
+    switch (violationType) {
+      case 'tab_switch':
+        session.stats.tabSwitchCount++;
+        break;
+      case 'fullscreen_exit':
+        session.stats.fullscreenViolations++;
+        break;
+      case 'focus_loss':
+        session.stats.focusLostCount++;
+        break;
+    }
+
+    console.log(`⚠️ Violation recorded for ${sessionId}: ${violationType} - ${details}`);
+    return violation;
+  }
+
+  // Store monitoring image
+  async storeMonitoringImage(sessionId, imageData, type = 'monitoring', flagged = false) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      console.warn(`⚠️ No active session found for storing image: ${sessionId}`);
+      return null;
+    }
+
+    try {
+      // Generate filename
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `monitoring-${sessionId}-${timestamp}.jpg`;
+      const filepath = path.join(__dirname, '../tmp', filename);
+
+      console.log(`📸 Storing monitoring image: ${filename}`);
+
+      // Save image data (assuming base64)
+      let imageBuffer;
+      if (imageData.startsWith('data:image')) {
+        const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
+        imageBuffer = Buffer.from(base64Data, 'base64');
+        await fs.writeFile(filepath, imageBuffer);
+      }
+
+      const monitoringImage = {
+        url: `/tmp/${filename}`,
+        data: null, // Don't store large base64 in memory
+        timestamp: new Date(),
+        type,
+        flagged,
+        sessionTime: Date.now() - session.startTime.getTime(),
+        filepath: filepath,
+        filename: filename
+      };
+
+      session.monitoringImages.push(monitoringImage);
+      session.stats.lastActivity = new Date();
+
+      // Upload to Google Drive if enabled
+      try {
+        const monitoringRoutes = require('../routes/monitoring');
+        const { uploadToGoogleDrive } = monitoringRoutes;
+        if (typeof uploadToGoogleDrive === 'function' && imageBuffer) {
+          console.log('📤 Uploading image to Google Drive...');
+          const driveResult = await uploadToGoogleDrive(
+            imageBuffer,
+            filename,
+            'image/jpeg'
+          );
+          if (driveResult) {
+            monitoringImage.driveFileId = driveResult.fileId;
+            monitoringImage.driveLink = driveResult.webViewLink;
+            console.log('✅ Image uploaded to Drive:', driveResult.fileId);
+          }
+        }
+      } catch (driveError) {
+        console.warn('⚠️ Failed to upload to Google Drive:', driveError.message);
+        // Continue without drive upload
+      }
+
+      console.log(`📸 Monitoring image stored for ${sessionId}: ${type} ${flagged ? '(flagged)' : ''}`);
+      return monitoringImage;
+
+    } catch (error) {
+      console.error('❌ Error storing monitoring image:', error);
+      return null;
+    }
+  }
+
+  // Record suspicious activity
+  recordSuspiciousActivity(sessionId, activityType, confidence = 0.5, description = '') {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return null;
+
+    const activity = {
+      timestamp: new Date(),
+      type: activityType,
+      confidence,
+      description,
+      severity: confidence > 0.8 ? 'high' : confidence > 0.5 ? 'medium' : 'low',
+      sessionTime: Date.now() - session.startTime.getTime()
+    };
+
+    session.suspiciousActivities.push(activity);
+    session.stats.lastActivity = new Date();
+
+    // Auto-flag high confidence suspicious activities
+    if (confidence > 0.8) {
+      this.recordViolation(sessionId, 'suspicious_activity', description, 'high');
+    }
+
+    console.log(`🚨 Suspicious activity recorded for ${sessionId}: ${activityType} (${Math.round(confidence * 100)}%)`);
+    return activity;
+  }
+
+  // Perform periodic monitoring check
+  async performPeriodicCheck(sessionId) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return;
+
+    // Check for inactivity
+    const inactiveTime = Date.now() - session.stats.lastActivity.getTime();
+    if (inactiveTime > this.violationThresholds.inactivity) {
+      this.recordViolation(sessionId, 'inactivity', `No activity for ${Math.round(inactiveTime / 60000)} minutes`, 'medium');
+    }
+
+    // Here you could add more automated checks like:
+    // - Face detection analysis
+    // - Screen content analysis
+    // - Audio level monitoring
+    console.log(`🔍 Periodic check completed for ${sessionId}`);
+  }
+
+  // Get session statistics
+  getSessionStats(sessionId) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) return null;
+
+    return {
+      sessionId,
+      duration: Date.now() - session.startTime.getTime(),
+      totalViolations: session.stats.totalViolations,
+      tabSwitchCount: session.stats.tabSwitchCount,
+      fullscreenViolations: session.stats.fullscreenViolations,
+      focusLostCount: session.stats.focusLostCount,
+      monitoringImagesCount: session.monitoringImages.length,
+      suspiciousActivitiesCount: session.suspiciousActivities.length,
+      lastActivity: session.stats.lastActivity
+    };
+  }
+
+  // End monitoring and save to database
+  async endMonitoring(sessionId, resultId = null, startTime = null, endTime = null) {
+    const session = this.activeSessions.get(sessionId);
+    if (!session) {
+      console.warn(`⚠️ No active session found to end: ${sessionId}`);
+      return null;
+    }
+
+    console.log(`🏁 Ending monitoring for session: ${sessionId}`);
+
+    // Clear monitoring interval
+    const intervalId = this.monitoringIntervals.get(sessionId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      this.monitoringIntervals.delete(intervalId);
+    }
+
+    // Use provided timestamps or default to session times
+    const actualStartTime = startTime ? new Date(startTime) : session.startTime;
+    const actualEndTime = endTime ? new Date(endTime) : new Date();
+
+    // Prepare monitoring data for database
+    const monitoringData = {
+      monitoringImages: session.monitoringImages,
+      violations: session.violations,
+      suspiciousActivities: session.suspiciousActivities,
+      cameraMonitoring: session.settings.cameraMonitoring,
+      browserLockdown: session.settings.browserLockdown,
+      totalViolations: session.stats.totalViolations,
+      tabSwitchCount: session.stats.tabSwitchCount,
+      fullscreenViolations: session.stats.fullscreenViolations,
+      focusLostCount: session.stats.focusLostCount,
+      testStartTime: actualStartTime,
+      testEndTime: actualEndTime,
+      sessionDuration: actualEndTime.getTime() - actualStartTime.getTime()
+    };
+
+    // Save to database if resultId provided
+    if (resultId) {
+      try {
+        await Result.findByIdAndUpdate(resultId, monitoringData);
+        console.log(`✅ Monitoring data saved to result: ${resultId}`);
+      } catch (error) {
+        console.error('❌ Error saving monitoring data:', error);
+      }
+    }
+
+    // Clean up session
+    this.activeSessions.delete(sessionId);
+
+    return {
+      sessionId,
+      endTime: actualEndTime,
+      startTime: actualStartTime,
+      duration: actualEndTime.getTime() - actualStartTime.getTime(),
+      summary: monitoringData
+    };
+  }
+
+  // Get active session data
+  getActiveSession(sessionId) {
+    return this.activeSessions.get(sessionId);
+  }
+
+  // List all active sessions
+  getActiveSessions() {
+    return Array.from(this.activeSessions.keys());
+  }
+}
+
+// Export singleton instance
+const monitoringService = new MonitoringService();
+module.exports = monitoringService;

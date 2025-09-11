@@ -241,8 +241,8 @@ export default function AnswerSheetReview() {
                   {qNums.map((q, i) => (
                     <tr key={q}>
                       <td>{q}</td>
-                      <td><input type="number" value={qMax[i] ?? ''} onChange={e => tweakMax(i, e.target.value)} min="0" className={styles.inputField} /></td>
-                      <td><input type="number" value={marks[i] ?? ''} onChange={e => tweak(i, e.target.value)} min="0" max={qMax[i]} className={styles.inputField} /></td>
+                      <td><input type="number" value={qMax[i] ?? ''} onChange={e => tweakMax(i, e.target.value)} min="0" className={`${styles.inputField} ${darkMode ? styles.darkContrast : styles.lightContrast}`} /></td>
+                      <td><input type="number" value={marks[i] ?? ''} onChange={e => tweak(i, e.target.value)} min="0" max={qMax[i]} className={`${styles.inputField} ${darkMode ? styles.darkContrast : styles.lightContrast}`} /></td>
                       <td><input type="text" value={remarks[i] ?? ''} onChange={e => tweakRemarks(i, e.target.value)} placeholder="Remarks..." className={styles.remarksInput} /></td>
                     </tr>
                   ))}

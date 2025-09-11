@@ -92,6 +92,11 @@ const ResultDetail = () => {
   const [student, setStudent] = useState(null); // Add student state to store API response data
   const [showDoc, setShowDoc] = useState(''); // 'question', 'answer', 'key'
   const [qrDataUrl, setQrDataUrl] = useState('');
+  
+  // Monitoring states
+  const [monitoringData, setMonitoringData] = useState([]);
+  const [showMonitoring, setShowMonitoring] = useState(false);
+  const [monitoringLoading, setMonitoringLoading] = useState(false);
   const pdfRef = useRef();
 
   // Accessibility: focus management
@@ -161,6 +166,34 @@ const ResultDetail = () => {
       })
       .catch(() => setQrDataUrl(''));
   }, [resultId]);
+
+  // Fetch monitoring data for this test
+  const fetchMonitoringData = async () => {
+    if (!test?._id || !user) return;
+    
+    setMonitoringLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/api/student/monitoring/test/${test._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        setMonitoringData(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching monitoring data:', error);
+    } finally {
+      setMonitoringLoading(false);
+    }
+  };
+
+  // Fetch monitoring data when test is available
+  useEffect(() => {
+    if (test?._id && user) {
+      fetchMonitoringData();
+    }
+  }, [test?._id, user]);
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;
@@ -846,6 +879,179 @@ const ResultDetail = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* Security Violations */}
+      {result.violations?.length > 0 && (
+        <section className={styles.card} aria-label="Security Events During Test">
+          <div className={styles.cardBody}>
+            <h3 className={styles.sectionTitle}>
+              🔒 Security Events ({result.violations.length})
+            </h3>
+            <div className={styles.violationsNote}>
+              <p className={styles.noteText}>
+                ⚠️ The following security events were recorded during your test session. 
+                These help maintain exam integrity and are automatically monitored.
+              </p>
+            </div>
+            <div className={styles.tableWrapper}>
+              <table className={styles.table}>
+                <caption className={styles.srOnly}>Security violations during test</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Time</th>
+                    <th scope="col">Event Type</th>
+                    <th scope="col">Severity</th>
+                    <th scope="col">Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.violations.map((violation, idx) => (
+                    <tr key={idx} className={`${styles.violationRow} ${styles[`severity${violation.severity || 'medium'}`]}`}>
+                      <td className={styles.timestampCell}>
+                        <div className={styles.timestampDisplay}>
+                          <span className={styles.timeOnly}>
+                            {new Date(violation.timestamp).toLocaleTimeString()}
+                          </span>
+                          <small className={styles.dateOnly}>
+                            {new Date(violation.timestamp).toLocaleDateString()}
+                          </small>
+                        </div>
+                      </td>
+                      <td className={styles.eventTypeCell}>
+                        <span className={`${styles.eventBadge} ${styles[`type${violation.type?.replace(/\s+/g, '')}`]}`}>
+                          {violation.type}
+                        </span>
+                      </td>
+                      <td className={styles.severityCell}>
+                        <span className={`${styles.severityBadge} ${styles[`severity${violation.severity || 'medium'}`]}`}>
+                          {(violation.severity || 'medium').toUpperCase()}
+                        </span>
+                      </td>
+                      <td className={styles.detailsCell}>
+                        <details className={styles.violationDetails}>
+                          <summary className={styles.detailsSummary}>
+                            View Details
+                          </summary>
+                          <div className={styles.detailsContent}>
+                            <p><strong>Description:</strong> {violation.details}</p>
+                            {violation.sessionTime && (
+                              <p><strong>Session Time:</strong> {Math.round(violation.sessionTime / 1000)}s into test</p>
+                            )}
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className={styles.violationsSummary}>
+              <p className={styles.summaryText}>
+                <strong>Summary:</strong> {result.violations.length} total events recorded. 
+                Maximum allowed violations: 5 (test auto-submits after 5 violations).
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Monitoring Images Section */}
+      {user?.role === 'admin' && monitoringData.length > 0 && (
+        <section className={styles.card} aria-label="Exam Monitoring Images">
+          <div className={styles.cardBody}>
+            <div className={styles.monitoringHeader}>
+              <h4 className={styles.cardTitle}>
+                📷 Monitoring Images ({monitoringData.length})
+              </h4>
+              <button
+                className={styles.toggleButton}
+                onClick={() => setShowMonitoring(!showMonitoring)}
+              >
+                {showMonitoring ? 'Hide Images' : 'Show Images'}
+              </button>
+            </div>
+            
+            <div className={styles.monitoringInfo}>
+              <p>
+                ℹ️ These images were automatically captured during the exam for security monitoring purposes.
+              </p>
+              
+              <div className={styles.monitoringStats}>
+                <span className={styles.statItem}>
+                  Total: {monitoringData.length}
+                </span>
+                <span className={styles.statItem}>
+                  Suspicious: {monitoringData.filter(item => item.suspicious).length}
+                </span>
+                <span className={styles.statItem}>
+                  Flagged: {monitoringData.filter(item => item.flaggedAt).length}
+                </span>
+              </div>
+            </div>
+
+            {showMonitoring && (
+              <div className={styles.monitoringGrid}>
+                {monitoringLoading ? (
+                  <div className={styles.loadingState}>
+                    <LoadingSpinner />
+                    <p>Loading monitoring images...</p>
+                  </div>
+                ) : (
+                  monitoringData.map((item) => (
+                    <div 
+                      key={item.id} 
+                      className={`${styles.monitoringCard} ${item.suspicious ? styles.suspicious : ''}`}
+                    >
+                      <div className={styles.imageContainer}>
+                        <img
+                          src={item.webContentLink}
+                          alt={`Monitoring ${new Date(item.timestamp).toLocaleString()}`}
+                          className={styles.monitoringImage}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'block';
+                          }}
+                        />
+                        <div className={styles.imageError} style={{ display: 'none' }}>
+                          📷 Image unavailable
+                        </div>
+                      </div>
+                      
+                      <div className={styles.imageDetails}>
+                        <div className={styles.timestamp}>
+                          {new Date(item.timestamp).toLocaleString()}
+                        </div>
+                        
+                        {item.suspicious && (
+                          <div className={styles.suspiciousFlag}>
+                            🚨 Flagged as Suspicious
+                            {item.flagReason && (
+                              <div className={styles.flagReason}>
+                                Reason: {item.flagReason}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className={styles.imageActions}>
+                          <a
+                            href={item.webViewLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.viewButton}
+                          >
+                            🔍 View Full Size
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </section>
       )}

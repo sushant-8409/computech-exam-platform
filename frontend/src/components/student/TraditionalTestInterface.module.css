@@ -1,0 +1,1261 @@
+/* TraditionalTestInterface.module.css */
+
+.container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  display: flex;
+  flex-direction: column;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Loading and submitted states */
+.loading, .submitted {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+}
+
+.loading .spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e1e5e9;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.submitted {
+  background: #f0f9ff;
+  color: #0c4a6e;
+}
+
+.submitted h2 {
+  color: #059669;
+  margin-bottom: 16px;
+}
+
+/* Header */
+.header {
+  background: white;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.testInfo h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.testMeta {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.testMeta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+/* Timer */
+.timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  border: 2px solid #d1d5db;
+  transition: all 0.3s ease;
+}
+
+.timer.timerWarning {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  animation: pulse 1s infinite;
+}
+
+.timerIcon {
+  font-size: 16px;
+}
+
+.timerText {
+  font-size: 16px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.timer.timerWarning .timerText {
+  color: #92400e;
+}
+
+/* Monitoring Status */
+.monitoringStatus {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.monitoringIndicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.monitoringIndicator.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.violationCounter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Main Content */
+.main {
+  flex: 1;
+  padding: 24px;
+  overflow: hidden;
+}
+
+/* Start Screen */
+.startScreen {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+  background: white;
+  border-radius: 12px;
+  padding: 48px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.instructions h2 {
+  color: #1f2937;
+  margin-bottom: 32px;
+  font-size: 28px;
+}
+
+.instructionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 32px;
+  text-align: left;
+}
+
+.instruction {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+}
+
+.instructionIcon {
+  font-size: 20px;
+  width: 24px;
+  text-align: center;
+}
+
+.customInstructions {
+  margin-top: 24px;
+  padding: 20px;
+  background: #fef7cd;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.customInstructions h3 {
+  color: #92400e;
+  margin-bottom: 12px;
+}
+
+.startButton {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  padding: 16px 48px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+}
+
+.startButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(59, 130, 246, 0.4);
+}
+
+.startButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Test Interface */
+.testInterface {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+  height: calc(100vh - 120px);
+}
+
+.leftPanel, .rightPanel {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rightPanel {
+  height: fit-content;
+  max-height: calc(100vh - 140px);
+}
+
+/* Question Paper */
+.questionPaper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.questionPaper h3 {
+  padding: 16px 20px;
+  margin: 0;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+}
+
+.pdfViewer {
+  flex: 1;
+  border: none;
+  width: 100%;
+}
+
+.pdfError, .pdfLoading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: #6b7280;
+}
+
+.pdfError {
+  color: #dc2626;
+}
+
+/* Answer Sheet Uploader */
+.answerUploader {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.answerUploader h3 {
+  margin: 0 0 20px 0;
+  color: #374151;
+  font-weight: 600;
+}
+
+.required {
+  color: #dc2626;
+  margin-left: 4px;
+}
+
+.uploadArea {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.uploadArea:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
+}
+
+.uploadSuccess {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #059669;
+}
+
+.successIcon {
+  font-size: 32px;
+}
+
+.replaceBtn {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.replaceBtn:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.uploadPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.uploadBtn {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.uploadBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.uploadIcon {
+  font-size: 16px;
+}
+
+.uploadHint {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Page Management */
+.pageManager {
+  width: 100%;
+  max-width: 500px;
+}
+
+.pageList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.pageItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.pagePreview {
+  width: 60px;
+  height: 80px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+}
+
+.pagePreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pageInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.pageNumber {
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+}
+
+.fileName {
+  font-size: 12px;
+  color: #6b7280;
+  word-break: break-all;
+}
+
+.removePageBtn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.removePageBtn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.pageActions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.addPageBtn {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.addPageBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.addPageBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.submitPagesBtn {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.submitPagesBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.submitPagesBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Test Actions */
+.testActions {
+  padding: 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+/* Answer Sheet Uploader Wrapper */
+.answerSheetUploader {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.uploaderContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.submitButton, .exitButton {
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.submitButton {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  box-shadow: 0 4px 14px 0 rgba(5, 150, 105, 0.3);
+}
+
+.submitButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px 0 rgba(5, 150, 105, 0.4);
+}
+
+.submitButton.disabled,
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.exitButton {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.exitButton:hover:not(:disabled) {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+/* Monitoring Elements */
+.monitoringElements {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+}
+
+/* Spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .testInterface {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    gap: 16px;
+  }
+  
+  .rightPanel {
+    order: -1;
+  }
+  
+  .main {
+    padding: 16px;
+  }
+  
+  .header {
+    padding: 12px 16px;
+  }
+  
+  .header .testInfo h1 {
+    font-size: 20px;
+  }
+  
+  .testMeta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .controls {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-end;
+  }
+  
+  .monitoringStatus {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+    text-align: center;
+  }
+  
+  .controls {
+    flex-direction: row;
+    justify-content: center;
+    gap: 16px;
+  }
+  
+  .startScreen {
+    padding: 24px;
+    margin: 16px;
+  }
+  
+  .instructions h2 {
+    font-size: 24px;
+  }
+  
+  .instruction {
+    padding: 12px;
+  }
+  
+  .instructionIcon {
+    font-size: 16px;
+    width: 20px;
+  }
+  
+  .startButton {
+    padding: 14px 32px;
+    font-size: 16px;
+  }
+  
+  .testActions {
+    padding: 16px;
+  }
+  
+  .answerUploader {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .testMeta {
+    font-size: 12px;
+  }
+  
+  .timer {
+    padding: 6px 12px;
+  }
+  
+  .timerText {
+    font-size: 14px;
+  }
+  
+  .monitoringIndicator,
+  .violationCounter {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+  
+  .uploadArea {
+    padding: 16px;
+  }
+  
+  .uploadBtn {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+  
+  .submitButton,
+  .exitButton {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .container {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  }
+  
+  .header,
+  .leftPanel,
+  .rightPanel,
+  .startScreen {
+    background: #374151;
+    color: #f9fafb;
+  }
+  
+  .questionPaper h3,
+  .testActions {
+    background: #4b5563;
+    border-color: #6b7280;
+  }
+  
+  .timer {
+    background: #4b5563;
+    border-color: #6b7280;
+    color: #f9fafb;
+  }
+  
+  .timer.timerWarning {
+    background: #92400e;
+    border-color: #f59e0b;
+    color: #fbbf24;
+  }
+  
+  .instruction {
+    background: #4b5563;
+    border-color: #3b82f6;
+  }
+  
+  .customInstructions {
+    background: #92400e;
+    color: #fbbf24;
+  }
+  
+  .uploadArea {
+    border-color: #6b7280;
+  }
+  
+  .uploadArea:hover {
+    background: #4b5563;
+    border-color: #3b82f6;
+  }
+  
+  .replaceBtn,
+  .exitButton {
+    background: #4b5563;
+    color: #f9fafb;
+    border-color: #6b7280;
+  }
+  
+  .replaceBtn:hover:not(:disabled),
+  .exitButton:hover:not(:disabled) {
+    background: #6b7280;
+  }
+}
+
+/* Better Viewer Styles */
+.betterViewerOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.betterViewerClose {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border: none;
+  background: #dc3545;
+  color: white;
+  border-radius: 50%;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 10001;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.betterViewerClose:hover {
+  background: #c82333;
+  transform: scale(1.1);
+}
+
+.betterViewerTimer {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10001;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 2px solid #17a2b8;
+}
+
+.betterViewerZoom {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 2px solid #28a745;
+}
+
+.zoomBtn {
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 40px;
+}
+
+.zoomBtn:hover:not(:disabled) {
+  background: #218838;
+  transform: scale(1.05);
+}
+
+.zoomBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zoomDisplay {
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 0 10px;
+  min-width: 50px;
+  text-align: center;
+}
+
+.betterViewerContent {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 20px 20px;
+  overflow: auto; /* Allow scrolling when content exceeds bounds */
+  position: relative;
+}
+
+.pdfContainerBetter {
+  width: 100%;
+  height: 100%;
+  max-width: none; /* Remove max-width constraint for zoomed content */
+  max-height: none; /* Remove max-height constraint for zoomed content */
+  overflow: visible; /* Let parent handle scrolling */
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+  min-width: 100%; /* Ensure minimum width */
+  min-height: 100%; /* Ensure minimum height */
+}
+
+.pdfViewerBetter {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 8px;
+}
+
+.popoutBlockerContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.popoutBlockerOverlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
+  height: 60px;
+  background: transparent;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Better Viewer Button */
+.questionPaperHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.betterViewerButton {
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+.betterViewerButton:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.4);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Enhanced PDF Container */
+.pdfContainer {
+  position: relative;
+  height: 100%;
+}
+
+.pdfViewer {
+  width: 100%;
+  height: 500px;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+    min-height: 100vh;
+  }
+
+  .header {
+    padding: 10px 15px;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .testInfo h1 {
+    font-size: 18px;
+    margin: 0;
+  }
+
+  .testMeta {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .headerRight {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .timer {
+    padding: 8px 12px;
+    font-size: 14px;
+    min-width: auto;
+  }
+
+  .monitoringStatus {
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-start;
+    font-size: 12px;
+  }
+
+  .testInterface {
+    flex-direction: column;
+    gap: 15px;
+    height: auto;
+  }
+
+  .leftPanel {
+    width: 100%;
+    max-height: 60vh;
+    order: 1;
+  }
+
+  .rightPanel {
+    width: 100%;
+    order: 2;
+  }
+
+  .questionPaperHeader {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .questionPaperHeader h3 {
+    font-size: 16px;
+    margin: 0;
+  }
+
+  .betterViewerButton {
+    padding: 10px 15px;
+    font-size: 14px;
+    align-self: center;
+  }
+
+  .pdfViewer {
+    height: 300px;
+    min-height: 300px;
+  }
+
+  .answerUploader h3 {
+    font-size: 16px;
+  }
+
+  .uploadArea {
+    padding: 15px;
+    min-height: 80px;
+  }
+
+  .testActions {
+    gap: 10px;
+  }
+
+  .submitButton,
+  .exitButton {
+    padding: 12px 20px;
+    font-size: 14px;
+    border-radius: 6px;
+  }
+
+  .startScreen {
+    padding: 20px;
+    text-align: center;
+  }
+
+  .startScreen h2 {
+    font-size: 20px;
+    margin-bottom: 15px;
+  }
+
+  .startScreen p {
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  .startButton {
+    padding: 12px 24px;
+    font-size: 16px;
+    margin-top: 20px;
+  }
+
+  /* Better Viewer Mobile Optimizations */
+  .betterViewerTimer {
+    top: 10px;
+    left: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .betterViewerClose {
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .betterViewerZoom {
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .zoomBtn {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 35px;
+  }
+
+  .zoomDisplay {
+    font-size: 12px;
+    min-width: 40px;
+  }
+
+  .betterViewerContent {
+    padding: 80px 10px 10px;
+  }
+
+  .pdfViewerBetter {
+    border-radius: 6px;
+  }
+
+  /* Touch optimizations */
+  .betterViewerButton,
+  .submitButton,
+  .exitButton,
+  .zoomBtn,
+  .betterViewerClose {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Prevent zoom on input focus */
+  input[type="file"] {
+    font-size: 16px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .container {
+    padding: 5px;
+  }
+
+  .header {
+    padding: 8px 10px;
+  }
+
+  .testInfo h1 {
+    font-size: 16px;
+  }
+
+  .testMeta {
+    font-size: 11px;
+  }
+
+  .timer {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .pdfViewer {
+    height: 250px;
+    min-height: 250px;
+  }
+
+  .betterViewerZoom {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    margin: 10px;
+    justify-content: center;
+  }
+
+  .betterViewerContent {
+    padding: 60px 5px 5px;
+  }
+
+  .submitButton,
+  .exitButton {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  .startButton {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+}
+
+/* Landscape orientation on mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .testInterface {
+    flex-direction: row;
+  }
+
+  .leftPanel {
+    width: 60%;
+    max-height: 80vh;
+  }
+
+  .rightPanel {
+    width: 40%;
+  }
+
+  .pdfViewer {
+    height: 60vh;
+  }
+}
+
+/* High DPI screens */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .betterViewerClose,
+  .zoomBtn {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
