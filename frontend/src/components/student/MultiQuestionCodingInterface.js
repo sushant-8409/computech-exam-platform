@@ -59,6 +59,11 @@ const MultiQuestionCodingInterface = () => {
   const [showExampleModal, setShowExampleModal] = useState(false);
   const [exampleResult, setExampleResult] = useState(null);
 
+  // Mobile layout states
+  const [showProblemModal, setShowProblemModal] = useState(false);
+  const [showExamplesModal, setShowExamplesModal] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
   // Refs
   const timerRef = useRef(null);
   const testStartTimeRef = useRef(null);
@@ -142,6 +147,18 @@ const MultiQuestionCodingInterface = () => {
       checkTestReadiness();
     }
   }, [test, requestCameraPermission, testAllowedToStart]);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Handle editor mount
   const handleEditorDidMount = useCallback((editor, monaco) => {
@@ -1202,8 +1219,9 @@ const MultiQuestionCodingInterface = () => {
 
       {/* Main Content Area */}
       <div className="leetcode-main">
-        {/* Left Panel - Problem Description */}
-        <div className="problem-panel">
+        {/* Left Panel - Problem Description (Hidden on mobile) */}
+        {!isMobile && (
+          <div className="problem-panel">
           <div className="problem-header">
             <h2 className="problem-title">{currentQuestion.title}</h2>
             <div className="problem-meta">
@@ -1267,6 +1285,7 @@ const MultiQuestionCodingInterface = () => {
             )}
           </div>
         </div>
+        )}
 
         {/* Right Panel - Code Editor */}
         <div className="code-panel">
@@ -1275,6 +1294,24 @@ const MultiQuestionCodingInterface = () => {
               <span className="language-label">{language.toUpperCase()}</span>
             </div>
             <div className="code-actions">
+              {isMobile && (
+                <>
+                  <button 
+                    className="mobile-problem-btn"
+                    onClick={() => setShowProblemModal(true)}
+                    title="View Problem Statement"
+                  >
+                    📄 Problem
+                  </button>
+                  <button 
+                    className="mobile-examples-btn"
+                    onClick={() => setShowExamplesModal(true)}
+                    title="View Examples"
+                  >
+                    📋 Examples
+                  </button>
+                </>
+              )}
               <button 
                 className="reset-code-btn"
                 onClick={resetCode}
@@ -1469,6 +1506,102 @@ const MultiQuestionCodingInterface = () => {
               >
                 Don't Show Similar Warnings
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Problem Statement Modal */}
+      {showProblemModal && (
+        <div className="mobile-modal-overlay" onClick={() => setShowProblemModal(false)}>
+          <div className="mobile-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <h2>{currentQuestion.title}</h2>
+              <button 
+                className="mobile-modal-close"
+                onClick={() => setShowProblemModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mobile-modal-body">
+              <div className="problem-meta">
+                <span className={`difficulty-badge ${currentQuestion.difficulty}`}>
+                  {currentQuestion.difficulty?.toUpperCase() || 'MEDIUM'}
+                </span>
+                <span className="marks-badge">{currentQuestion.marks} marks</span>
+              </div>
+              
+              <div className="problem-description">
+                <p>{currentQuestion.description}</p>
+              </div>
+
+              {currentQuestion.constraints && (
+                <div className="problem-constraints">
+                  <h4>Constraints:</h4>
+                  <pre>{currentQuestion.constraints}</pre>
+                </div>
+              )}
+
+              {currentQuestion.inputFormat && (
+                <div className="problem-format">
+                  <h4>Input Format:</h4>
+                  <pre>{currentQuestion.inputFormat}</pre>
+                </div>
+              )}
+
+              {currentQuestion.outputFormat && (
+                <div className="problem-format">
+                  <h4>Output Format:</h4>
+                  <pre>{currentQuestion.outputFormat}</pre>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Examples Modal */}
+      {showExamplesModal && (
+        <div className="mobile-modal-overlay" onClick={() => setShowExamplesModal(false)}>
+          <div className="mobile-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="mobile-modal-header">
+              <h2>Examples</h2>
+              <button 
+                className="mobile-modal-close"
+                onClick={() => setShowExamplesModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mobile-modal-body">
+              {currentQuestion.examples && currentQuestion.examples.length > 0 ? (
+                <div className="problem-examples">
+                  {currentQuestion.examples.map((example, index) => (
+                    <div key={index} className="example-block">
+                      <h4>Example {index + 1}:</h4>
+                      <div className="example-content">
+                        <div className="example-input">
+                          <strong>Input:</strong>
+                          <pre>{example.input}</pre>
+                        </div>
+                        <div className="example-output">
+                          <strong>Output:</strong>
+                          <pre>{example.output}</pre>
+                        </div>
+                        {example.explanation && (
+                          <div className="example-explanation">
+                            <strong>Explanation:</strong>
+                            <p>{example.explanation}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>No examples available for this question.</p>
+              )}
             </div>
           </div>
         </div>

@@ -1195,3 +1195,175 @@
 .fullscreen-return-btn:active {
   transform: translateY(0);
 }
+
+/* Mobile-specific styles */
+.mobile-problem-btn,
+.mobile-examples-btn {
+  background: linear-gradient(45deg, #3498db, #2980b9);
+  color: white;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-right: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.mobile-problem-btn:hover,
+.mobile-examples-btn:hover {
+  background: linear-gradient(45deg, #2980b9, #1c6fa0);
+  transform: translateY(-1px);
+}
+
+.mobile-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 1rem;
+}
+
+.mobile-modal-content {
+  background: white;
+  border-radius: 12px;
+  max-width: 90vw;
+  max-height: 85vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mobile-modal-header {
+  background: #f8f9fa;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mobile-modal-header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.25rem;
+}
+
+.mobile-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.mobile-modal-close:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.mobile-modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.mobile-modal-body .problem-meta {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.mobile-modal-body .problem-description {
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+
+.mobile-modal-body .problem-constraints,
+.mobile-modal-body .problem-format {
+  margin-bottom: 1.5rem;
+}
+
+.mobile-modal-body .problem-constraints h4,
+.mobile-modal-body .problem-format h4 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.mobile-modal-body pre {
+  background: #f8f9fa;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 4px solid #3498db;
+  font-size: 0.9rem;
+  overflow-x: auto;
+}
+
+.mobile-modal-body .problem-examples {
+  margin-top: 1rem;
+}
+
+.mobile-modal-body .example-block {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid #28a745;
+}
+
+.mobile-modal-body .example-block h4 {
+  color: #28a745;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.mobile-modal-body .example-input,
+.mobile-modal-body .example-output,
+.mobile-modal-body .example-explanation {
+  margin-bottom: 0.75rem;
+}
+
+.mobile-modal-body .example-input strong,
+.mobile-modal-body .example-output strong,
+.mobile-modal-body .example-explanation strong {
+  color: #2c3e50;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+/* Enhanced mobile responsive styles */
+@media (max-width: 768px) {
+  .problem-panel {
+    display: none !important;
+  }
+  
+  .code-panel {
+    width: 100% !important;
+    height: calc(100vh - 200px);
+  }
+  
+  .leetcode-main {
+    padding: 0 !important;
+  }
+  
+  .mobile-modal-content {
+    max-width: 95vw;
+    max-height: 90vh;
+  }
+  
+  .mobile-modal-body {
+    padding: 1rem;
+  }
+}

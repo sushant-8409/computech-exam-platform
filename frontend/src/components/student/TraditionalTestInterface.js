@@ -48,6 +48,13 @@ const AnswerSheetUploader = React.memo(({
   const [selectedPages, setSelectedPages] = useState([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   
+  // Camera states
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const cameraRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  
   const handleFileSelect = useCallback((event) => {
     // File picker is closing
     if (onFilePickerClose) onFilePickerClose();
@@ -117,6 +124,103 @@ const AnswerSheetUploader = React.memo(({
     });
   }, [selectedPages]);
 
+  // Camera functionality
+  const isAndroid = /android/i.test(navigator.userAgent);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isMobile = isAndroid || isIOS;
+
+  const getCameraConstraints = () => {
+    if (isAndroid) {
+      return {
+        video: {
+          facingMode: { ideal: 'environment' }, // Back camera for documents
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          focusMode: { ideal: 'continuous' }
+        }
+      };
+    } else if (isIOS) {
+      return {
+        video: {
+          facingMode: 'environment', // Back camera
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+    } else {
+      return {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      const constraints = getCameraConstraints();
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      if (cameraRef.current) {
+        cameraRef.current.srcObject = stream;
+        cameraRef.current.play();
+        streamRef.current = stream;
+        setIsCameraActive(true);
+      }
+    } catch (error) {
+      console.error('Camera access error:', error);
+      toast.error('Could not access camera. Please use file upload instead.');
+      setShowCameraModal(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  const capturePhoto = () => {
+    if (!cameraRef.current || !canvasRef.current) return;
+
+    const video = cameraRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0);
+
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], `captured-page-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        const newPage = {
+          id: Date.now(),
+          file: file,
+          name: file.name,
+          preview: URL.createObjectURL(file),
+          isCaptured: true
+        };
+        
+        setSelectedPages(prev => [...prev, newPage]);
+        toast.success('Photo captured successfully!');
+      }
+    }, 'image/jpeg', 0.8);
+  };
+
+  const handleCameraClick = () => {
+    setShowCameraModal(true);
+    setTimeout(() => startCamera(), 100);
+  };
+
+  const closeCameraModal = () => {
+    stopCamera();
+    setShowCameraModal(false);
+  };
+
   return (
     <div className={styles.answerUploader}>
       <div className={styles.uploaderContent}>
@@ -160,23 +264,36 @@ const AnswerSheetUploader = React.memo(({
               
               <div className={styles.pageActions}>
                 {!isSubmitted && (
-                  <button 
-                    onClick={handleAddPage}
-                    className={styles.addPageBtn}
-                    disabled={isUploading}
-                  >
-                    {selectedPages.length === 0 ? (
-                      <>
-                        <span className={styles.uploadIcon}>📁</span>
-                        Add First Page
-                      </>
-                    ) : (
-                      <>
-                        <span className={styles.uploadIcon}>➕</span>
-                        Add Page {selectedPages.length + 1}
-                      </>
+                  <>
+                    <button 
+                      onClick={handleAddPage}
+                      className={styles.addPageBtn}
+                      disabled={isUploading}
+                    >
+                      {selectedPages.length === 0 ? (
+                        <>
+                          <span className={styles.uploadIcon}>📁</span>
+                          Add From Files
+                        </>
+                      ) : (
+                        <>
+                          <span className={styles.uploadIcon}>➕</span>
+                          Add Page {selectedPages.length + 1}
+                        </>
+                      )}
+                    </button>
+                    
+                    {isMobile && (
+                      <button 
+                        onClick={handleCameraClick}
+                        className={styles.cameraBtn}
+                        disabled={isUploading}
+                      >
+                        <span className={styles.uploadIcon}>📷</span>
+                        {isAndroid ? 'Use Back Camera' : 'Take Photo'}
+                      </button>
                     )}
-                  </button>
+                  </>
                 )}
                 
                 {selectedPages.length > 0 && !isSubmitted && (
@@ -215,6 +332,57 @@ const AnswerSheetUploader = React.memo(({
           onChange={handleFileSelect}
           style={{ display: 'none' }}
         />
+
+        {/* Camera Modal */}
+        {showCameraModal && (
+          <div className={styles.cameraModal}>
+            <div className={styles.cameraModalContent}>
+              <div className={styles.cameraHeader}>
+                <h4>📷 Capture Answer Sheet Page</h4>
+                <button 
+                  onClick={closeCameraModal}
+                  className={styles.closeCameraBtn}
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className={styles.cameraContainer}>
+                <video 
+                  ref={cameraRef}
+                  className={styles.cameraVideo}
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                <canvas 
+                  ref={canvasRef}
+                  style={{ display: 'none' }}
+                />
+              </div>
+              
+              <div className={styles.cameraControls}>
+                <button 
+                  onClick={capturePhoto}
+                  className={styles.captureBtn}
+                  disabled={!isCameraActive}
+                >
+                  📸 Capture Photo
+                </button>
+                <button 
+                  onClick={closeCameraModal}
+                  className={styles.cancelBtn}
+                >
+                  Cancel
+                </button>
+              </div>
+              
+              <p className={styles.cameraHint}>
+                Position your answer sheet within the frame and tap capture
+              </p>
+            </div>
+          </div>
+        )}
       </div>
       </div>
     </div>

@@ -169,6 +169,12 @@ router.post('/upload', authenticateStudent, upload.single('monitoringImage'), as
       }
     }
     
+    // Save image to tmp/monitoring folder
+    const tmpMonitoringDir = path.join(__dirname, '..', 'tmp', 'monitoring');
+    await fs.mkdir(tmpMonitoringDir, { recursive: true });
+    const localFilePath = path.join(tmpMonitoringDir, fileName);
+    await fs.writeFile(localFilePath, req.file.buffer);
+    
     // Prepare monitoring data
     const monitoringData = {
       id: `mon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -177,6 +183,7 @@ router.post('/upload', authenticateStudent, upload.single('monitoringImage'), as
       timestamp,
       purpose: purpose || 'monitoring',
       fileName: driveResult?.fileName || fileName,
+      localPath: `tmp/monitoring/${fileName}`, // Add local path for access
       fileId: driveResult?.fileId || null,
       webViewLink: driveResult?.webViewLink || null,
       webContentLink: driveResult?.webContentLink || null,
@@ -186,12 +193,11 @@ router.post('/upload', authenticateStudent, upload.single('monitoringImage'), as
       suspicious: false, // Will be updated by AI analysis
       analysisResults: null, // Will be populated by AI analysis
       savedToGoogleDrive: !!driveResult, // Track if successfully saved to Drive
+      savedToLocal: true, // Track that it's saved locally
     };
-    
+
     // Store monitoring data
-    await storeMonitoringData(monitoringData);
-    
-    console.log(`📷 Monitoring image uploaded: ${fileName} for student ${studentId}`);
+    await storeMonitoringData(monitoringData);    console.log(`📷 Monitoring image uploaded: ${fileName} for student ${studentId}`);
     
     res.json({
       success: true,

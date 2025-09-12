@@ -13,7 +13,10 @@ const { uploadToGDrive: uploadViaOauth } = require('../services/oauthDrive');
 // Configure multer for answer sheet uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'tmp/');
+    const tmpDir = path.join(__dirname, '..', 'tmp');
+    // Ensure directory exists
+    require('fs').mkdirSync(tmpDir, { recursive: true });
+    cb(null, tmpDir);
   },
   filename: function (req, file, cb) {
     const timestamp = new Date().toISOString().replace(/[:.-]/g, '');

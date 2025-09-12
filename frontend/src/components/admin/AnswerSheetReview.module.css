@@ -376,15 +376,19 @@ button:disabled {
   }
   
   .maxInput, .marksInput {
-    max-width: 60px;
-    font-size: 13px;
-    padding: 6px 8px;
+    max-width: 100px;
+    min-width: 80px;
+    font-size: 16px;
+    padding: 12px 16px;
+    height: 44px; /* Better touch target */
   }
   
   .remarksInput {
-    max-width: 120px;
-    font-size: 13px;
-    padding: 6px 8px;
+    max-width: 200px;
+    min-width: 150px;
+    font-size: 16px;
+    padding: 12px 16px;
+    height: 44px; /* Better touch target */
   }
   
   button {
