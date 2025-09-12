@@ -197,10 +197,6 @@ class MonitoringService {
       } catch (dbError) {
         console.error('❌ Error saving monitoring image to database:', dbError.message);
       }
-      } catch (driveError) {
-        console.warn('⚠️ Failed to upload to Google Drive:', driveError.message);
-        // Continue without drive upload
-      }
 
       console.log(`📸 Monitoring image stored for ${sessionId}: ${type} ${flagged ? '(flagged)' : ''}`);
       return monitoringImage;
