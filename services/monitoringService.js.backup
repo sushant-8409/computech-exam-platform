@@ -16,8 +16,7 @@ class MonitoringService {
   }
 
   // Initialize monitoring for a test session
-  startMonitoring(sessionId, studentId, testId, settings) {
-    settings = settings || {};
+  startMonitoring(sessionId, studentId, testId, settings = {}) {
     console.log(`📸 Starting monitoring for session: ${sessionId}`);
     
     const sessionData = {
@@ -58,9 +57,7 @@ class MonitoringService {
   }
 
   // Record a violation
-  recordViolation(sessionId, violationType, details, severity) {
-    details = details || '';
-    severity = severity || 'medium';
+  recordViolation(sessionId, violationType, details = '', severity = 'medium') {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       console.warn(`⚠️ No active session found for: ${sessionId}`);
@@ -97,9 +94,7 @@ class MonitoringService {
   }
 
   // Store monitoring image
-  async storeMonitoringImage(sessionId, imageData, type, flagged) {
-    type = type || 'monitoring';
-    flagged = flagged !== undefined ? flagged : false;
+  async storeMonitoringImage(sessionId, imageData, type = 'monitoring', flagged = false) {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       console.warn(`⚠️ No active session found for storing image: ${sessionId}`);
@@ -211,19 +206,20 @@ class MonitoringService {
     }
   }
 
-  // Record suspicious activity (temporarily disabled due to syntax issue)
-  /*
+  // Record suspicious activity
   recordSuspiciousActivity(sessionId, activityType, confidence, description) {
+    // Set default values
     confidence = confidence !== undefined ? confidence : 0.5;
-    description = description || '';
+    description = description !== undefined ? description : '';
+    
     const session = this.activeSessions.get(sessionId);
     if (!session) return null;
 
-    var activity = {
+    const activity = {
       timestamp: new Date(),
       type: activityType,
-      confidence: confidence,
-      description: description,
+      confidence,
+      description,
       severity: confidence > 0.8 ? 'high' : confidence > 0.5 ? 'medium' : 'low',
       sessionTime: Date.now() - session.startTime.getTime()
     };
@@ -239,7 +235,6 @@ class MonitoringService {
     console.log(`🚨 Suspicious activity recorded for ${sessionId}: ${activityType} (${Math.round(confidence * 100)}%)`);
     return activity;
   }
-  */
 
   // Perform periodic monitoring check
   async performPeriodicCheck(sessionId) {
@@ -278,10 +273,7 @@ class MonitoringService {
   }
 
   // End monitoring and save to database
-  async endMonitoring(sessionId, resultId, startTime, endTime) {
-    resultId = resultId || null;
-    startTime = startTime || null;
-    endTime = endTime || null;
+  async endMonitoring(sessionId, resultId = null, startTime = null, endTime = null) {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       console.warn(`⚠️ No active session found to end: ${sessionId}`);
