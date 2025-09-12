@@ -355,6 +355,75 @@ const TraditionalTestInterface = () => {
     });
   }, []);
 
+  // Touch / Pinch handling for mobile pinch-to-zoom
+  useEffect(() => {
+    let initialDistance = null;
+    let lastScale = pdfScale;
+
+    const el = document.querySelector(`.${styles.betterViewerContent}`);
+    if (!el) return;
+
+    const getDistance = (touches) => {
+      const [a, b] = touches;
+      const dx = a.clientX - b.clientX;
+      const dy = a.clientY - b.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const touchStart = (e) => {
+      if (e.touches && e.touches.length === 2) {
+        initialDistance = getDistance(e.touches);
+        lastScale = pdfScale;
+      }
+    };
+
+    const touchMove = (e) => {
+      if (e.touches && e.touches.length === 2 && initialDistance) {
+        const dist = getDistance(e.touches);
+        const ratio = dist / initialDistance;
+        let newScale = Math.max(0.5, Math.min(3, lastScale * ratio));
+        // Snap to 0.25 increments for consistency
+        newScale = Math.round(newScale * 4) / 4;
+        if (newScale !== pdfScale) {
+          setPdfScale(newScale);
+          // adjust scrolling behavior
+          const betterViewerContent = el;
+          if (betterViewerContent) {
+            if (newScale > 1) {
+              betterViewerContent.style.overflowX = 'auto';
+              betterViewerContent.style.overflowY = 'auto';
+              betterViewerContent.style.justifyContent = 'flex-start';
+              betterViewerContent.style.alignItems = 'flex-start';
+            } else {
+              betterViewerContent.style.overflowX = 'hidden';
+              betterViewerContent.style.overflowY = 'auto';
+              betterViewerContent.style.justifyContent = 'center';
+              betterViewerContent.style.alignItems = 'center';
+            }
+          }
+        }
+        e.preventDefault();
+      }
+    };
+
+    const touchEnd = (e) => {
+      if (!e.touches || e.touches.length < 2) {
+        initialDistance = null;
+        lastScale = pdfScale;
+      }
+    };
+
+    el.addEventListener('touchstart', touchStart, { passive: false });
+    el.addEventListener('touchmove', touchMove, { passive: false });
+    el.addEventListener('touchend', touchEnd);
+
+    return () => {
+      el.removeEventListener('touchstart', touchStart);
+      el.removeEventListener('touchmove', touchMove);
+      el.removeEventListener('touchend', touchEnd);
+    };
+  }, [pdfScale]);
+
   // Enhanced embed URL function
   const enhanceEmbedUrl = useCallback((url) => {
     if (!url) return '';

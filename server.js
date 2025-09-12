@@ -12,6 +12,10 @@ console.log('- Has GOOGLE_OAUTH_CLIENT_ID:', !!process.env.GOOGLE_OAUTH_CLIENT_I
 
 const app = express();
 
+// schedule / cleanup
+const cron = require('node-cron');
+const { cleanupTmpDirectory } = require('./services/tmpCleanup');
+
 // ================== Middleware ==================
 // In your server.js, update CORS config
 app.use(cors({
@@ -88,6 +92,8 @@ app.use('/api/admin', require('./routes/adminReviewResults')); // Restored this 
 app.use('/api/admin', require('./routes/reviewRoutes'));    // Restored this route
 app.use('/api/admin', require('./routes/adminReview')); 
 // Add this line with your other app.use() statements
+// Admin cleanup route (manual trigger for tmp cleanup)
+app.use('/', require('./routes/adminCleanup'));
 
 
 
@@ -126,6 +132,19 @@ const startServer = async () => {
     const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on PORT ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
     });
+
+    // Schedule cleanup every 6 hours
+    try {
+      cron.schedule('0 */6 * * *', async () => {
+        console.log('🧹 Running scheduled tmp cleanup...');
+        const res = await cleanupTmpDirectory({ olderThanMs: 6 * 60 * 60 * 1000 }); // remove files older than 6 hours
+        if (res.success) console.log('🧹 Tmp cleanup completed, removed:', res.removed.length);
+        else console.warn('🧹 Tmp cleanup failed:', res.error);
+      }, { scheduled: true });
+      console.log('🗓️ Scheduled tmp cleanup every 6 hours');
+    } catch (cronErr) {
+      console.warn('⚠️ Cron scheduling unavailable:', cronErr.message);
+    }
 
     // Graceful shutdown
     process.on('SIGTERM', () => {

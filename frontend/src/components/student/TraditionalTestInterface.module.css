@@ -1167,6 +1167,14 @@
     padding: 80px 10px 10px;
   }
 
+  /* Improve touch and overflow behavior for zoomed content */
+  .betterViewerContent {
+    touch-action: pan-y pinch-zoom; /* allow vertical pan and pinch-zoom gestures */
+    -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .pdfViewerBetter {
     border-radius: 6px;
   }
