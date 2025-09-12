@@ -133,7 +133,7 @@ const storeMonitoringData = async (monitoringData) => {
 // API endpoint to upload monitoring images
 router.post('/upload', authenticateStudent, upload.single('monitoringImage'), async (req, res) => {
   try {
-    const { testId, timestamp, purpose, saveToGoogleDrive } = req.body;
+    const { testId, timestamp, purpose } = req.body;
     const studentId = req.student.studentId;
     
     if (!req.file) {
@@ -154,58 +154,58 @@ router.post('/upload', authenticateStudent, upload.single('monitoringImage'), as
     const fileExtension = path.extname(req.file.originalname) || '.jpg';
     const fileName = `monitoring_${studentId}_${testId}_${Date.now()}${fileExtension}`;
     
+    // Always upload to Google Drive for permanent storage
     let driveResult = null;
-    
-    // Only upload to Google Drive if requested
-    if (saveToGoogleDrive === 'true' || saveToGoogleDrive === true) {
-      try {
-        driveResult = await uploadToGoogleDrive(
-          req.file.buffer,
-          fileName,
-          req.file.mimetype
-        );
-      } catch (driveError) {
-        console.warn('Google Drive upload failed, continuing without it:', driveError.message);
-      }
+    try {
+      driveResult = await uploadToGoogleDrive(
+        req.file.buffer,
+        fileName,
+        req.file.mimetype
+      );
+      console.log(`📷 Monitoring image uploaded to Google Drive: ${driveResult.fileId}`);
+    } catch (driveError) {
+      console.error('❌ Google Drive upload failed:', driveError.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to upload monitoring image to Google Drive',
+        error: driveError.message
+      });
     }
     
-    // Save image to tmp/monitoring folder
-    const tmpMonitoringDir = path.join(__dirname, '..', 'tmp', 'monitoring');
-    await fs.mkdir(tmpMonitoringDir, { recursive: true });
-    const localFilePath = path.join(tmpMonitoringDir, fileName);
-    await fs.writeFile(localFilePath, req.file.buffer);
-    
-    // Prepare monitoring data
-    const monitoringData = {
-      id: `mon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    // Store monitoring data in MongoDB
+    const MonitoringImage = require('../models/MonitoringImage');
+    const monitoringImage = new MonitoringImage({
       studentId,
       testId,
-      timestamp,
+      fileName: driveResult.fileName,
+      driveFileId: driveResult.fileId,
+      webViewLink: driveResult.webViewLink,
+      webContentLink: driveResult.webContentLink,
+      directLink: driveResult.directLink,
+      timestamp: new Date(timestamp),
       purpose: purpose || 'monitoring',
-      fileName: driveResult?.fileName || fileName,
-      localPath: `tmp/monitoring/${fileName}`, // Add local path for access
-      fileId: driveResult?.fileId || null,
-      webViewLink: driveResult?.webViewLink || null,
-      webContentLink: driveResult?.webContentLink || null,
-      uploadedAt: new Date().toISOString(),
+      uploadedAt: new Date(),
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.get('User-Agent'),
-      suspicious: false, // Will be updated by AI analysis
-      analysisResults: null, // Will be populated by AI analysis
-      savedToGoogleDrive: !!driveResult, // Track if successfully saved to Drive
-      savedToLocal: true, // Track that it's saved locally
-    };
-
-    // Store monitoring data
-    await storeMonitoringData(monitoringData);    console.log(`📷 Monitoring image uploaded: ${fileName} for student ${studentId}`);
+      sessionInfo: {
+        browser: req.get('User-Agent'),
+        resolution: req.body.resolution || null
+      }
+    });
+    
+    await monitoringImage.save();
+    console.log(`📷 Monitoring image saved to MongoDB: ${monitoringImage._id}`);
     
     res.json({
       success: true,
       message: 'Monitoring image uploaded successfully',
       data: {
-        monitoringId: monitoringData.id,
+        monitoringId: monitoringImage._id,
         fileName: driveResult.fileName,
-        uploadedAt: monitoringData.uploadedAt,
+        driveFileId: driveResult.fileId,
+        iframeUrl: monitoringImage.iframeUrl,
+        thumbnailUrl: monitoringImage.thumbnailUrl,
+        uploadedAt: monitoringImage.uploadedAt,
       }
     });
     
@@ -727,6 +727,83 @@ router.get('/active', authenticateAdmin, (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get active sessions',
+      error: error.message
+    });
+  }
+});
+
+// Get monitoring images for a specific test/student (for admin review)
+router.get('/images/:testId/:studentId', authenticateAdmin, async (req, res) => {
+  try {
+    const { testId, studentId } = req.params;
+    
+    const MonitoringImage = require('../models/MonitoringImage');
+    const monitoringImages = await MonitoringImage.find({
+      testId,
+      studentId
+    })
+    .sort({ timestamp: 1 })
+    .select('fileName driveFileId webViewLink timestamp purpose flagged suspicious uploadedAt')
+    .lean();
+
+    // Add virtual fields manually since we're using lean()
+    const imagesWithUrls = monitoringImages.map(img => ({
+      ...img,
+      iframeUrl: `https://drive.google.com/file/d/${img.driveFileId}/preview`,
+      thumbnailUrl: `https://drive.google.com/thumbnail?id=${img.driveFileId}&sz=w400`,
+      directUrl: `https://drive.google.com/uc?id=${img.driveFileId}&export=view`
+    }));
+
+    console.log(`📊 Retrieved ${imagesWithUrls.length} monitoring images for test ${testId}, student ${studentId}`);
+
+    res.json({
+      success: true,
+      images: imagesWithUrls,
+      count: imagesWithUrls.length
+    });
+
+  } catch (error) {
+    console.error('Error retrieving monitoring images:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve monitoring images',
+      error: error.message
+    });
+  }
+});
+
+// Get all monitoring images for a test (for admin overview)
+router.get('/images/test/:testId', authenticateAdmin, async (req, res) => {
+  try {
+    const { testId } = req.params;
+    
+    const MonitoringImage = require('../models/MonitoringImage');
+    const monitoringImages = await MonitoringImage.find({ testId })
+    .populate('studentId', 'name email studentId')
+    .sort({ timestamp: 1 })
+    .lean();
+
+    // Add virtual fields manually since we're using lean()
+    const imagesWithUrls = monitoringImages.map(img => ({
+      ...img,
+      iframeUrl: `https://drive.google.com/file/d/${img.driveFileId}/preview`,
+      thumbnailUrl: `https://drive.google.com/thumbnail?id=${img.driveFileId}&sz=w400`,
+      directUrl: `https://drive.google.com/uc?id=${img.driveFileId}&export=view`
+    }));
+
+    console.log(`📊 Retrieved ${imagesWithUrls.length} monitoring images for test ${testId}`);
+
+    res.json({
+      success: true,
+      images: imagesWithUrls,
+      count: imagesWithUrls.length
+    });
+
+  } catch (error) {
+    console.error('Error retrieving monitoring images for test:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve monitoring images for test',
       error: error.message
     });
   }

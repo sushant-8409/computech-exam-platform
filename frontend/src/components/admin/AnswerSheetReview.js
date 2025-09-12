@@ -74,6 +74,25 @@ export default function AnswerSheetReview() {
     }
   }, [list, location.state]);
 
+  // Function to load monitoring images from Google Drive
+  const loadMonitoringImages = async (testId, studentId) => {
+    try {
+      const response = await axios.get(
+        `/api/monitoring/images/${testId}/${studentId}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      
+      if (response.data.success) {
+        console.log(`📷 Loaded ${response.data.count} monitoring images from Google Drive`);
+        return response.data.images;
+      }
+      return [];
+    } catch (error) {
+      console.warn('Failed to load monitoring images:', error);
+      return [];
+    }
+  };
+
   // Function to get the current iframe URL based on viewMode
   const getCurrentUrl = () => {
     if (!active) return null;
@@ -158,6 +177,20 @@ export default function AnswerSheetReview() {
         monitoringImages: resObj.monitoringImages || [],
         suspiciousActivities: resObj.suspiciousActivities || []
       }));
+
+      // Load monitoring images from Google Drive after setting active
+      try {
+        const monitoringImages = await loadMonitoringImages(data._id, resObj.studentId._id || resObj.studentId);
+        if (monitoringImages.length > 0) {
+          setActive(prev => ({
+            ...prev,
+            monitoringImages: monitoringImages
+          }));
+          console.log(`📷 Loaded ${monitoringImages.length} monitoring images from Google Drive`);
+        }
+      } catch (error) {
+        console.warn('Failed to load monitoring images:', error);
+      }
 
       // Debug monitoring data
       console.log('📊 Admin Review - Monitoring Data Debug:', {
@@ -796,26 +829,49 @@ export default function AnswerSheetReview() {
                       <div className={styles.imageGrid}>
                         {active.monitoringImages.map((image, index) => (
                           <div key={index} className={styles.imageItem}>
-                            <img 
-                              src={image.url || image.data || image.imageData} 
-                              alt={`Monitoring ${index + 1}`}
-                              className={styles.monitoringImage}
-                              onError={(e) => {
-                                console.warn('🖼️ Failed to load monitoring image:', {
-                                  hasUrl: !!image.url,
-                                  hasData: !!image.data,
-                                  hasImageData: !!image.imageData,
-                                  timestamp: image.timestamp
-                                });
-                                e.target.style.display = 'none';
-                              }}
-                            />
+                            {/* Use iframe for Google Drive images, fallback to img for local images */}
+                            {image.iframeUrl || image.driveFileId ? (
+                              <iframe 
+                                src={image.iframeUrl || `https://drive.google.com/file/d/${image.driveFileId}/preview`}
+                                title={`Monitoring ${index + 1}`}
+                                className={styles.monitoringIframe}
+                                onError={(e) => {
+                                  console.warn('🖼️ Failed to load monitoring iframe:', {
+                                    iframeUrl: image.iframeUrl,
+                                    driveFileId: image.driveFileId,
+                                    timestamp: image.timestamp
+                                  });
+                                }}
+                              />
+                            ) : (
+                              <img 
+                                src={image.url || image.data || image.imageData || image.thumbnailUrl} 
+                                alt={`Monitoring ${index + 1}`}
+                                className={styles.monitoringImage}
+                                onError={(e) => {
+                                  console.warn('🖼️ Failed to load monitoring image:', {
+                                    hasUrl: !!image.url,
+                                    hasData: !!image.data,
+                                    hasImageData: !!image.imageData,
+                                    hasThumbnailUrl: !!image.thumbnailUrl,
+                                    timestamp: image.timestamp
+                                  });
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            )}
                             <div className={styles.imageInfo}>
                               <span className={styles.imageTime}>
                                 {new Date(image.timestamp).toLocaleString()}
                               </span>
                               {image.flagged && (
                                 <span className={styles.flagged}>🚩 Flagged</span>
+                              )}
+                              {image.suspicious && (
+                                <span className={styles.suspicious}>⚠️ Suspicious</span>
+                              )}
+                              {image.driveFileId && (
+                                <span className={styles.driveFile}>☁️ Google Drive</span>
                               )}
                             </div>
                           </div>
