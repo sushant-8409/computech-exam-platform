@@ -63,6 +63,7 @@ const MultiQuestionCodingInterface = () => {
   const [showProblemModal, setShowProblemModal] = useState(false);
   const [showExamplesModal, setShowExamplesModal] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // Refs
   const timerRef = useRef(null);
@@ -1294,55 +1295,122 @@ const MultiQuestionCodingInterface = () => {
               <span className="language-label">{language.toUpperCase()}</span>
             </div>
             <div className="code-actions">
-              {isMobile && (
+              {isMobile ? (
                 <>
+                  {/* Mobile Menu Button */}
                   <button 
-                    className="mobile-problem-btn"
-                    onClick={() => setShowProblemModal(true)}
-                    title="View Problem Statement"
+                    className="mobile-menu-btn"
+                    onClick={() => setShowMobileMenu(!showMobileMenu)}
+                    title="Show Actions Menu"
                   >
-                    📄 Problem
+                    ⚡ Actions {showMobileMenu ? '▲' : '▼'}
+                  </button>
+                  
+                  {/* Mobile Actions Menu */}
+                  {showMobileMenu && (
+                    <div className="mobile-actions-menu">
+                      <button 
+                        className="mobile-problem-btn"
+                        onClick={() => {
+                          setShowProblemModal(true);
+                          setShowMobileMenu(false);
+                        }}
+                        title="View Problem Statement"
+                      >
+                        📄 Problem
+                      </button>
+                      <button 
+                        className="mobile-examples-btn"
+                        onClick={() => {
+                          setShowExamplesModal(true);
+                          setShowMobileMenu(false);
+                        }}
+                        title="View Examples"
+                      >
+                        📋 Examples
+                      </button>
+                      <button 
+                        className="reset-code-btn"
+                        onClick={() => {
+                          resetCode();
+                          setShowMobileMenu(false);
+                        }}
+                        disabled={!currentCode || currentCode === (currentQuestion.starterCode?.[language] || '')}
+                        title="Reset to starter code"
+                      >
+                        🔄 Reset
+                      </button>
+                      <button 
+                        className="run-example-btn"
+                        onClick={() => {
+                          runExampleTestCase();
+                          setShowMobileMenu(false);
+                        }}
+                        disabled={runningExampleCase}
+                        title="Run Example (Ctrl+')"
+                      >
+                        {runningExampleCase ? 'Running...' : 'Run Example'}
+                      </button>
+                      <button 
+                        className="run-tests-btn"
+                        onClick={() => {
+                          runAllTestCases();
+                          setShowMobileMenu(false);
+                        }}
+                        disabled={testingQuestion === currentQuestion.id}
+                      >
+                        {testingQuestion === currentQuestion.id ? 'Testing...' : 'Run Tests'}
+                      </button>
+                      <button 
+                        className="submit-btn"
+                        onClick={() => {
+                          handleSubmit();
+                          setShowMobileMenu(false);
+                        }}
+                        disabled={submitting || submitted}
+                        title="Submit Solution (Ctrl+Enter)"
+                      >
+                        {submitting ? 'Submitting...' : submitted ? 'Submitted' : 'Submit'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Desktop Layout - All buttons visible */}
+                  <button 
+                    className="reset-code-btn"
+                    onClick={resetCode}
+                    disabled={!currentCode || currentCode === (currentQuestion.starterCode?.[language] || '')}
+                    title="Reset to starter code"
+                  >
+                    🔄 Reset
                   </button>
                   <button 
-                    className="mobile-examples-btn"
-                    onClick={() => setShowExamplesModal(true)}
-                    title="View Examples"
+                    className="run-example-btn"
+                    onClick={runExampleTestCase}
+                    disabled={runningExampleCase}
+                    title="Run Example (Ctrl+')"
                   >
-                    📋 Examples
+                    {runningExampleCase ? 'Running...' : 'Run Example'}
+                  </button>
+                  <button 
+                    className="run-tests-btn"
+                    onClick={runAllTestCases}
+                    disabled={testingQuestion === currentQuestion.id}
+                  >
+                    {testingQuestion === currentQuestion.id ? 'Testing...' : 'Run Tests'}
+                  </button>
+                  <button 
+                    className="submit-btn"
+                    onClick={handleSubmit}
+                    disabled={submitting || submitted}
+                    title="Submit Solution (Ctrl+Enter)"
+                  >
+                    {submitting ? 'Submitting...' : submitted ? 'Submitted' : 'Submit'}
                   </button>
                 </>
               )}
-              <button 
-                className="reset-code-btn"
-                onClick={resetCode}
-                disabled={!currentCode || currentCode === (currentQuestion.starterCode?.[language] || '')}
-                title="Reset to starter code"
-              >
-                🔄 Reset
-              </button>
-              <button 
-                className="run-example-btn"
-                onClick={runExampleTestCase}
-                disabled={runningExampleCase}
-                title="Run Example (Ctrl+')"
-              >
-                {runningExampleCase ? 'Running...' : 'Run Example'}
-              </button>
-              <button 
-                className="run-tests-btn"
-                onClick={runAllTestCases}
-                disabled={testingQuestion === currentQuestion.id}
-              >
-                {testingQuestion === currentQuestion.id ? 'Testing...' : 'Run Tests'}
-              </button>
-              <button 
-                className="submit-btn"
-                onClick={handleSubmit}
-                disabled={submitting || submitted}
-                title="Submit Solution (Ctrl+Enter)"
-              >
-                {submitting ? 'Submitting...' : submitted ? 'Submitted' : 'Submit'}
-              </button>
             </div>
           </div>
 

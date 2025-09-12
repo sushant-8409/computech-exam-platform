@@ -212,6 +212,13 @@ const AnswerSheetUploader = React.memo(({
   };
 
   const handleCameraClick = () => {
+    // Stop monitoring temporarily when using back camera
+    if (isMonitoring && monitoringIntervalRef.current) {
+      clearInterval(monitoringIntervalRef.current);
+      monitoringIntervalRef.current = null;
+      console.log('📸 Monitoring paused for camera capture');
+    }
+    
     setShowCameraModal(true);
     setTimeout(() => startCamera(), 100);
   };
@@ -219,6 +226,14 @@ const AnswerSheetUploader = React.memo(({
   const closeCameraModal = () => {
     stopCamera();
     setShowCameraModal(false);
+    
+    // Restart monitoring after camera usage
+    if (isMonitoring && test?.cameraMonitoring?.enabled && !monitoringIntervalRef.current) {
+      monitoringIntervalRef.current = setInterval(() => {
+        captureMonitoringImage();
+      }, test.cameraMonitoring.captureInterval || 30000);
+      console.log('📸 Monitoring resumed after camera capture');
+    }
   };
 
   return (
