@@ -245,9 +245,32 @@ router.post('/upload-answer-sheet', authenticateStudent, upload.single('answerSh
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    // Upload to Google Drive
+    // Get admin's Google Drive tokens for upload
+    const adminUser = await User.findOne({ role: 'admin' });
+    
+    if (!adminUser || !adminUser.googleTokens) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Google Drive not connected. Please contact administrator.' 
+      });
+    }
+
+    // Read file buffer for upload
+    const fileBuffer = await fs.readFile(req.file.path);
+    
+    // Create answer sheet folder structure
     const fileName = `answer-sheet-${testId}-${studentId}-${Date.now()}${path.extname(req.file.originalname)}`;
-    const driveUrl = await gdrive.uploadFile(req.file.path, fileName, 'answer-sheets');
+    const folderPath = `answer-sheets/${testId}/${fileName}`;
+    
+    // Upload to Google Drive using admin tokens and OAuth service
+    const result = await uploadViaOauth(
+      adminUser.googleTokens,
+      fileBuffer,
+      folderPath,
+      req.file.mimetype
+    );
+
+    const driveUrl = result.webViewLink || result.id;
 
     // Update result with answer sheet URL
     await Result.findOneAndUpdate(
@@ -265,6 +288,8 @@ router.post('/upload-answer-sheet', authenticateStudent, upload.single('answerSh
       console.error('File cleanup error:', cleanupErr);
     }
 
+    console.log(`📄 Answer sheet uploaded successfully: ${fileName}`);
+
     res.json({ 
       success: true, 
       message: 'Answer sheet uploaded successfully',
@@ -275,7 +300,7 @@ router.post('/upload-answer-sheet', authenticateStudent, upload.single('answerSh
     console.error('Upload answer sheet error:', error);
     
     // Clean up file on error
-    if (req.file) {
+    if (req.file && req.file.path) {
       try {
         await fs.unlink(req.file.path);
       } catch (cleanupErr) {

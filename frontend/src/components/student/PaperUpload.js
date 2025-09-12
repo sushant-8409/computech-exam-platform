@@ -55,24 +55,115 @@ const PaperUpload = ({ testId, test, user, onUploadComplete, disabled = false })
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // Detect device type for camera optimization
+  const getDeviceInfo = () => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isAndroid = /android/i.test(userAgent);
+    const isIOS = /iphone|ipad|ipod/i.test(userAgent);
+    const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+    return { isAndroid, isIOS, isMobile };
+  };
+
+  // Get optimal camera constraints for device
+  const getCameraConstraints = () => {
+    const deviceInfo = getDeviceInfo();
+    
+    let constraints = {
+      video: {
+        facingMode: 'environment', // Back camera for document capture
+        width: { ideal: 1280, min: 640 },
+        height: { ideal: 720, min: 480 }
+      }
+    };
+
+    // Android-specific optimizations for document scanning
+    if (deviceInfo.isAndroid) {
+      console.log('🤖 Android device - optimizing camera for document capture');
+      constraints.video = {
+        ...constraints.video,
+        width: { ideal: 1920, min: 720, max: 3840 },
+        height: { ideal: 1080, min: 540, max: 2160 },
+        aspectRatio: 16/9,
+        facingMode: { ideal: 'environment' }, // Prefer back camera for documents
+        focusMode: 'continuous', // Auto-focus for documents
+        whiteBalanceMode: 'auto',
+        exposureMode: 'auto'
+      };
+    }
+
+    // iOS optimizations
+    if (deviceInfo.isIOS) {
+      console.log('🍎 iOS device - optimizing camera for document capture');
+      constraints.video.width = { ideal: 1920, max: 4032 };
+      constraints.video.height = { ideal: 1080, max: 3024 };
+    }
+
+    return { constraints, deviceInfo };
+  };
+
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user'
+      const { constraints, deviceInfo } = getCameraConstraints();
+      console.log('📱 Starting camera with device-specific constraints:', deviceInfo);
+      
+      let stream;
+      
+      // Try primary camera constraints
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('✅ Primary camera constraints successful');
+      } catch (primaryError) {
+        console.warn('⚠️ Primary camera failed, trying fallback:', primaryError.message);
+        
+        // Android fallback - try basic back camera
+        if (deviceInfo.isAndroid) {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'environment' }
+            });
+            console.log('✅ Android back camera fallback successful');
+          } catch (backCameraError) {
+            // Try any camera as last resort
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: true
+            });
+            console.log('✅ Android any camera fallback successful');
+          }
+        } else {
+          throw primaryError;
         }
-      });
+      }
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         cameraRef.current = stream;
         setIsCameraActive(true);
+        
+        // Show helper toast for Android users
+        if (deviceInfo.isAndroid) {
+          toast.info('📱 Tip: Use back camera for better document quality', {
+            position: 'top-center',
+            autoClose: 3000
+          });
+        }
       }
     } catch (error) {
       console.error('Camera access failed:', error);
-      toast.error('Unable to access camera. Please check permissions.');
+      
+      let errorMessage = 'Unable to access camera. Please check permissions.';
+      const deviceInfo = getDeviceInfo();
+      
+      if (deviceInfo.isAndroid) {
+        if (error.name === 'NotAllowedError') {
+          errorMessage = 'Camera permission denied. Please allow camera access and try again.';
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = 'No camera found on your device.';
+        } else if (error.name === 'NotReadableError') {
+          errorMessage = 'Camera is being used by another app. Please close other camera apps.';
+        }
+      }
+      
+      toast.error(errorMessage);
     }
   };
 

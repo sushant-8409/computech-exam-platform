@@ -1194,6 +1194,37 @@ const TraditionalTestInterface = () => {
     }
   }, [isBetterViewer, pdfScale]);
 
+  // Fullscreen enforcement functions
+  const enterFullscreen = async () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+        setShowFullscreenPrompt(false);
+        toast.success('✅ Fullscreen mode activated');
+      }
+    } catch (error) {
+      console.warn('Failed to enter fullscreen:', error);
+      toast.error('⚠️ Fullscreen mode required for this test');
+    }
+  };
+
+  const handleFullscreenEnforce = () => {
+    if (!document.fullscreenElement && testStarted && !isSubmitted) {
+      setTimeout(() => {
+        if (!document.fullscreenElement) {
+          setShowFullscreenPrompt(true);
+        }
+      }, 2000); // Show prompt after 2 seconds if still not in fullscreen
+    }
+  };
+
+  // Auto-enforce fullscreen on test start if required
+  useEffect(() => {
+    if (testStarted && test?.proctoringSettings?.requireFullscreen && !document.fullscreenElement && !isSubmitted) {
+      handleFullscreenEnforce();
+    }
+  }, [testStarted, test?.proctoringSettings?.requireFullscreen, isSubmitted]);
+
   // Cleanup on unmount
   if (loading) {
     return (
@@ -1468,6 +1499,29 @@ const TraditionalTestInterface = () => {
           </div>
         )}
       </div>
+
+      {/* Fullscreen Enforcement Prompt */}
+      {showFullscreenPrompt && test?.proctoringSettings?.requireFullscreen && (
+        <div className={styles.fullscreenOverlay}>
+          <div className={styles.fullscreenPrompt}>
+            <div className={styles.fullscreenIcon}>⛔</div>
+            <h3>Fullscreen Mode Required</h3>
+            <p>This test requires fullscreen mode for security purposes.</p>
+            <p>Please click the button below to continue in fullscreen mode.</p>
+            <div className={styles.fullscreenActions}>
+              <button 
+                onClick={enterFullscreen}
+                className={styles.fullscreenButton}
+              >
+                📺 Enter Fullscreen
+              </button>
+            </div>
+            <div className={styles.fullscreenWarning}>
+              <small>⚠️ Exiting fullscreen mode will be recorded as a violation</small>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hidden monitoring elements */}
       {test?.cameraMonitoring?.enabled && (

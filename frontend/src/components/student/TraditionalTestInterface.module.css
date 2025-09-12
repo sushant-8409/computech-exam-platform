@@ -1,5 +1,13 @@
 /* TraditionalTestInterface.module.css */
 
+/* Mobile viewport and safe area support */
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+}
+
 .container {
   min-height: 100vh;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -821,8 +829,8 @@
 
 .betterViewerClose {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: calc(20px + var(--safe-area-inset-top));
+  right: calc(20px + var(--safe-area-inset-right));
   width: 50px;
   height: 50px;
   border: none;
@@ -1207,6 +1215,25 @@
     min-height: 250px;
   }
 
+  /* Better Viewer Mobile Positioning */
+  .betterViewerClose {
+    top: calc(15px + var(--safe-area-inset-top));
+    right: calc(15px + var(--safe-area-inset-right));
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+    z-index: 10002;
+    background: rgba(220, 38, 38, 0.95);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .betterViewerClose:hover {
+    background: rgba(185, 28, 28, 0.95);
+  }
+
   .betterViewerZoom {
     position: relative;
     top: auto;
@@ -1257,5 +1284,116 @@
   .betterViewerClose,
   .zoomBtn {
     border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Fullscreen Enforcement Styles */
+.fullscreenOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.fullscreenPrompt {
+  background: linear-gradient(135deg, #ffffff, #f8f9fa);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 500px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  border: 2px solid #e9ecef;
+}
+
+.fullscreenIcon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.fullscreenPrompt h3 {
+  color: #dc3545;
+  margin-bottom: 16px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.fullscreenPrompt p {
+  color: #495057;
+  margin-bottom: 12px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.fullscreenActions {
+  margin: 30px 0;
+}
+
+.fullscreenButton {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+  border: none;
+  padding: 14px 30px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+  min-width: 200px;
+}
+
+.fullscreenButton:hover {
+  background: linear-gradient(135deg, #20c997, #17a2b8);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+.fullscreenButton:active {
+  transform: translateY(0);
+}
+
+.fullscreenWarning {
+  margin-top: 20px;
+  padding: 12px;
+  background: rgba(255, 193, 7, 0.1);
+  border-radius: 8px;
+  border: 1px solid #ffc107;
+}
+
+.fullscreenWarning small {
+  color: #856404;
+  font-weight: 500;
+}
+
+/* Mobile fullscreen prompt adjustments */
+@media (max-width: 768px) {
+  .fullscreenPrompt {
+    padding: 30px 20px;
+    margin: 20px;
+  }
+  
+  .fullscreenIcon {
+    font-size: 36px;
+    margin-bottom: 15px;
+  }
+  
+  .fullscreenPrompt h3 {
+    font-size: 20px;
+  }
+  
+  .fullscreenButton {
+    padding: 12px 25px;
+    font-size: 15px;
+    min-width: 180px;
   }
 }

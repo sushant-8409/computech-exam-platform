@@ -102,10 +102,19 @@ class MonitoringService {
     }
 
     try {
-      // Generate filename
+      // Generate filename with monitoring folder structure
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `monitoring-${sessionId}-${timestamp}.jpg`;
-      const filepath = path.join(__dirname, '../tmp', filename);
+      const filename = `monitoring-${session.testId}-${session.studentId}-${timestamp}.jpg`;
+      const monitoringDir = path.join(__dirname, '../tmp/monitoring');
+      
+      // Ensure monitoring directory exists
+      try {
+        await fs.mkdir(monitoringDir, { recursive: true });
+      } catch (mkdirErr) {
+        console.warn('📁 Directory already exists or creation failed:', mkdirErr.message);
+      }
+      
+      const filepath = path.join(monitoringDir, filename);
 
       console.log(`📸 Storing monitoring image: ${filename}`);
 
@@ -118,8 +127,8 @@ class MonitoringService {
       }
 
       const monitoringImage = {
-        url: `/tmp/${filename}`,
-        data: null, // Don't store large base64 in memory
+        url: `/tmp/monitoring/${filename}`,
+        data: null, // Don't store large base64 in memory for performance
         timestamp: new Date(),
         type,
         flagged,
@@ -128,26 +137,61 @@ class MonitoringService {
         filename: filename
       };
 
+      // Get admin's Google Drive tokens for upload
+      const User = require('../models/User');
+      const adminUser = await User.findOne({ role: 'admin' });
+      
+      // Upload to Google Drive using admin tokens if available
+      if (adminUser && adminUser.googleTokens && imageBuffer) {
+        try {
+          const { uploadToGDrive } = require('./oauthDrive');
+          console.log('📤 Uploading monitoring image to Google Drive...');
+          
+          const driveResult = await uploadToGDrive(
+            adminUser.googleTokens,
+            imageBuffer,
+            `exam-monitoring/${session.testId}/${session.studentId}/${filename}`,
+            'image/jpeg'
+          );
+          
+          if (driveResult) {
+            monitoringImage.driveFileId = driveResult.id;
+            monitoringImage.driveLink = driveResult.webViewLink;
+            console.log('✅ Monitoring image uploaded to Drive:', driveResult.id);
+          }
+        } catch (driveError) {
+          console.warn('⚠️ Failed to upload monitoring image to Google Drive:', driveError.message);
+        }
+      }
+
+      // Add to session for immediate tracking
       session.monitoringImages.push(monitoringImage);
       session.stats.lastActivity = new Date();
 
-      // Upload to Google Drive if enabled
+      // Save monitoring image to database immediately for admin review
       try {
-        const monitoringRoutes = require('../routes/monitoring');
-        const { uploadToGoogleDrive } = monitoringRoutes;
-        if (typeof uploadToGoogleDrive === 'function' && imageBuffer) {
-          console.log('📤 Uploading image to Google Drive...');
-          const driveResult = await uploadToGoogleDrive(
-            imageBuffer,
-            filename,
-            'image/jpeg'
-          );
-          if (driveResult) {
-            monitoringImage.driveFileId = driveResult.fileId;
-            monitoringImage.driveLink = driveResult.webViewLink;
-            console.log('✅ Image uploaded to Drive:', driveResult.fileId);
-          }
+        const updatedResult = await Result.findOneAndUpdate(
+          { studentId: session.studentId, testId: session.testId },
+          { 
+            $push: { monitoringImages: monitoringImage },
+            $set: { 
+              cameraMonitoring: session.settings.cameraMonitoring,
+              totalViolations: session.stats.totalViolations,
+              tabSwitchCount: session.stats.tabSwitchCount,
+              fullscreenViolations: session.stats.fullscreenViolations
+            }
+          },
+          { new: true, upsert: false }
+        );
+
+        if (updatedResult) {
+          console.log(`✅ Monitoring image saved to database for student ${session.studentId}`);
+        } else {
+          console.warn(`⚠️ Result not found for student ${session.studentId}, test ${session.testId}`);
         }
+      } catch (dbError) {
+        console.error('❌ Error saving monitoring image to database:', dbError.message);
+      }
       } catch (driveError) {
         console.warn('⚠️ Failed to upload to Google Drive:', driveError.message);
         // Continue without drive upload

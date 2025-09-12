@@ -165,57 +165,226 @@ class TestMonitoringSystem {
     });
   }
 
+  // Detect device type and platform
+  detectDeviceInfo() {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+    const isAndroid = /android/i.test(userAgent);
+    const isIOS = /iphone|ipad|ipod/i.test(userAgent);
+    
+    return { isMobile, isAndroid, isIOS, userAgent };
+  }
+
+  // Get optimal camera constraints based on device
+  getCameraConstraints() {
+    const deviceInfo = this.detectDeviceInfo();
+    
+    // Base constraints
+    let constraints = {
+      video: {
+        facingMode: 'user', // Front camera preferred for monitoring
+        width: { ideal: 640, min: 320 },
+        height: { ideal: 480, min: 240 }
+      },
+      audio: false
+    };
+
+    // Android-specific optimizations
+    if (deviceInfo.isAndroid) {
+      console.log('🤖 Android device detected - applying optimizations');
+      constraints.video = {
+        ...constraints.video,
+        width: { ideal: 480, min: 240, max: 720 },
+        height: { ideal: 360, min: 180, max: 540 },
+        frameRate: { ideal: 15, max: 30 }, // Lower frame rate for better performance
+        aspectRatio: 4/3, // Better for Android compatibility
+        facingMode: { ideal: 'user', exact: undefined } // More flexible facing mode
+      };
+    }
+    
+    // iOS-specific optimizations
+    if (deviceInfo.isIOS) {
+      console.log('🍎 iOS device detected - applying optimizations');
+      constraints.video = {
+        ...constraints.video,
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 720 },
+        frameRate: { ideal: 30 }
+      };
+    }
+    
+    // Mobile general optimizations
+    if (deviceInfo.isMobile) {
+      constraints.video.resizeMode = 'crop-and-scale';
+    }
+    
+    return { constraints, deviceInfo };
+  }
+
   // Start camera monitoring
   async startCameraMonitoring() {
     try {
       console.log('📹 Requesting camera access...');
       
-      // Request camera permission
-      this.stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 640 }, 
-          height: { ideal: 480 },
-          facingMode: 'user'
-        },
-        audio: false 
-      });
+      const { constraints, deviceInfo } = this.getCameraConstraints();
+      console.log('📱 Device info:', deviceInfo);
+      console.log('🎥 Camera constraints:', constraints);
+      
+      // Try to get available video devices first (Android compatibility)
+      let devices = [];
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+          devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          console.log('📷 Available cameras:', videoDevices.length, videoDevices.map(d => d.label || 'Camera'));
+          
+          // If on Android and multiple cameras, prefer front camera
+          if (deviceInfo.isAndroid && videoDevices.length > 1) {
+            const frontCamera = videoDevices.find(device => 
+              device.label.toLowerCase().includes('front') || 
+              device.label.toLowerCase().includes('facing')
+            );
+            if (frontCamera) {
+              constraints.video.deviceId = { ideal: frontCamera.deviceId };
+              console.log('🎯 Using preferred front camera:', frontCamera.label);
+            }
+          }
+        }
+      } catch (enumError) {
+        console.warn('⚠️ Could not enumerate devices:', enumError);
+      }
+      
+      // Request camera permission with optimized constraints
+      this.stream = await navigator.mediaDevices.getUserMedia(constraints);
 
       console.log('📹 Camera access granted, stream:', this.stream);
 
-      // Create video element to preview camera (hidden)
-      this.videoElement = document.createElement('video');
-      this.videoElement.srcObject = this.stream;
-      this.videoElement.autoplay = true;
-      this.videoElement.style.display = 'none';
-      this.videoElement.muted = true; // Prevent audio feedback
-      document.body.appendChild(this.videoElement);
-
-      // Wait for video to load
-      await new Promise((resolve) => {
-        this.videoElement.onloadedmetadata = () => {
-          console.log('📹 Video metadata loaded, ready to capture');
-          resolve();
-        };
-      });
-
-      // Start periodic screenshots after video is ready
-      const screenshotInterval = setInterval(() => {
-        if (this.isMonitoring && this.stream) {
-          this.captureScreenshot();
-        }
-      }, this.settings.screenshotInterval || 30000); // Default 30 seconds
-
-      this.intervalIds.push(screenshotInterval);
-
-      console.log('📸 Camera monitoring started with interval:', this.settings.screenshotInterval);
-      return true;
+      // Setup video element and monitoring
+      return await this.setupVideoElement();
     } catch (error) {
-      console.warn('⚠️ Camera access denied or failed:', error);
+      console.warn('⚠️ Camera access failed:', error);
       
-      // Record as suspicious activity
-      this.recordSuspiciousActivity('camera_denied', 0.8, 'Student denied camera access');
-      return false;
+      // Try fallback approaches for different devices
+      const { deviceInfo } = this.getCameraConstraints();
+      
+      // Android-specific fallback attempts
+      if (deviceInfo.isAndroid) {
+        console.log('🤖 Trying Android fallback camera options...');
+        
+        // Fallback 1: Basic constraints
+        try {
+          console.log('🔄 Fallback 1: Basic camera constraints');
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' },
+            audio: false
+          });
+          console.log('✅ Android fallback 1 successful');
+          return await this.setupVideoElement();
+        } catch (fallback1Error) {
+          console.warn('❌ Android fallback 1 failed:', fallback1Error.message);
+        }
+        
+        // Fallback 2: Any available camera
+        try {
+          console.log('🔄 Fallback 2: Any available camera');
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          });
+          console.log('✅ Android fallback 2 successful');
+          return await this.setupVideoElement();
+        } catch (fallback2Error) {
+          console.warn('❌ Android fallback 2 failed:', fallback2Error.message);
+        }
+        
+        // Fallback 3: Legacy API for older Android browsers
+        try {
+          console.log('🔄 Fallback 3: Legacy camera API');
+          if (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia) {
+            const getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+            
+            return new Promise((resolve) => {
+              getUserMedia.call(navigator, 
+                { video: true, audio: false },
+                (stream) => {
+                  this.stream = stream;
+                  this.setupVideoElement().then(() => {
+                    console.log('✅ Android legacy API successful');
+                    resolve(true);
+                  });
+                },
+                (legacyError) => {
+                  console.warn('❌ Android legacy API failed:', legacyError);
+                  this.handleCameraFailure(error, deviceInfo);
+                  resolve(false);
+                }
+              );
+            });
+          }
+        } catch (legacyError) {
+          console.warn('❌ Android legacy API not available:', legacyError.message);
+        }
+      }
+      
+      // Final fallback handling
+      return this.handleCameraFailure(error, deviceInfo);
     }
+  }
+
+  // Setup video element after getting stream
+  async setupVideoElement() {
+    if (!this.stream) return false;
+
+    // Create video element to preview camera (hidden)
+    this.videoElement = document.createElement('video');
+    this.videoElement.srcObject = this.stream;
+    this.videoElement.autoplay = true;
+    this.videoElement.style.display = 'none';
+    this.videoElement.muted = true;
+
+    // Wait for video to be ready
+    await new Promise((resolve) => {
+      this.videoElement.addEventListener('loadedmetadata', resolve, { once: true });
+    });
+
+    document.body.appendChild(this.videoElement);
+
+    // Start periodic screenshots
+    const screenshotInterval = setInterval(() => {
+      if (this.isMonitoring && this.stream) {
+        this.captureScreenshot();
+      }
+    }, this.settings.screenshotInterval || 30000);
+
+    this.intervalIds.push(screenshotInterval);
+    console.log('📸 Camera monitoring started with interval:', this.settings.screenshotInterval);
+    return true;
+  }
+
+  // Handle camera failure with device-specific messaging
+  handleCameraFailure(error, deviceInfo) {
+    let errorMessage = 'Camera access denied or failed';
+    let activityType = 'camera_denied';
+    
+    if (deviceInfo.isAndroid) {
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Camera permission denied on Android device';
+        activityType = 'android_camera_permission_denied';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = 'No camera found on Android device';
+        activityType = 'android_camera_not_found';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = 'Android camera is being used by another app';
+        activityType = 'android_camera_in_use';
+      } else {
+        errorMessage = 'Android camera failed to initialize';
+        activityType = 'android_camera_failed';
+      }
+    }
+    
+    console.warn(`⚠️ ${errorMessage}:`, error);
+    this.recordSuspiciousActivity(activityType, 0.8, errorMessage);
+    return false;
   }
 
   // Capture screenshot from camera
