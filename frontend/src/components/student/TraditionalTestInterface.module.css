@@ -1566,24 +1566,73 @@
 @media (max-width: 768px) {
   .cameraModal {
     padding: 10px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .cameraModalContent {
     max-width: 95vw;
     max-height: 95vh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
   }
   
   .cameraVideo {
     max-width: 100%;
+    width: 100%;
+    height: auto;
+    max-height: 60vh;
+    object-fit: cover;
+    border-radius: 8px;
   }
   
   .cameraControls {
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 0 0 12px 12px;
+    position: sticky;
+    bottom: 0;
+    z-index: 10000;
   }
   
   .captureBtn, .cancelBtn {
     width: 100%;
-    padding: 14px;
+    padding: 16px;
+    font-size: 18px;
+    font-weight: 700;
+    border-radius: 12px;
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+  
+  .captureBtn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  }
+  
+  .captureBtn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: none; /* Remove transform on mobile for better touch response */
+  }
+  
+  .cameraHint {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    margin-top: 8px;
+    text-align: center;
   }
 }

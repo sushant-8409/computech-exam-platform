@@ -7,8 +7,10 @@ const Test = require('../models/Test');
 const Result = require('../models/Result');
 const Student = require('../models/Student');
 const User = require('../models/User');
+const MonitoringImage = require('../models/MonitoringImage');
 const { authenticateStudent } = require('../middleware/auth');
 const { uploadToGDrive: uploadViaOauth } = require('../services/oauthDrive');
+const { uploadToGoogleDrive } = require('../services/gdrive');
 
 // Configure multer for answer sheet uploads
 const storage = multer.diskStorage({
@@ -680,22 +682,68 @@ router.post('/exit-test/:testId', authenticateStudent, async (req, res) => {
         : violation.details || ''
     }));
 
-    // Process monitoring images to match schema (imageData -> data)
-    const processedMonitoringImages = monitoringImages.map(image => ({
-      ...image,
-      data: image.imageData || image.data, // Map imageData to data for schema compatibility
-      imageData: undefined // Remove imageData to avoid duplication
-    }));
+    // Process and upload monitoring images to Google Drive
+    const processedMonitoringImages = [];
+    if (monitoringImages && monitoringImages.length > 0) {
+      console.log('🖼️ Processing monitoring images:', { count: monitoringImages.length });
+      
+      for (const image of monitoringImages) {
+        try {
+          // Convert base64 to buffer if needed
+          let imageBuffer;
+          if (image.imageData && image.imageData.startsWith('data:image/')) {
+            const base64Data = image.imageData.replace(/^data:image\/\w+;base64,/, '');
+            imageBuffer = Buffer.from(base64Data, 'base64');
+          } else if (image.data) {
+            imageBuffer = Buffer.from(image.data, 'base64');
+          } else {
+            console.warn('⚠️ Skipping monitoring image without data:', image.timestamp);
+            continue;
+          }
+
+          // Upload to Google Drive
+          const timestamp = new Date(image.timestamp).toISOString().replace(/[:.]/g, '-');
+          const filename = `monitoring-${studentId}-${testId}-${timestamp}.jpg`;
+          
+          const fileId = await uploadToGoogleDrive(imageBuffer, filename, 'image/jpeg');
+          console.log('� Uploaded monitoring image to Google Drive:', { filename, fileId });
+
+          // Save to MongoDB
+          const monitoringDoc = new MonitoringImage({
+            studentId,
+            testId,
+            timestamp: new Date(image.timestamp),
+            purpose: image.type || 'monitoring',
+            driveFileId: fileId,
+            fileName: filename,
+            webViewLink: `https://drive.google.com/file/d/${fileId}/view`,
+            webContentLink: `https://drive.google.com/uc?id=${fileId}`,
+            directLink: `https://drive.google.com/file/d/${fileId}/preview`
+          });
+          
+          await monitoringDoc.save();
+          console.log('💾 Saved monitoring image to MongoDB:', monitoringDoc._id);
+
+          // Add to processed array for result
+          processedMonitoringImages.push({
+            timestamp: image.timestamp,
+            purpose: image.type || 'monitoring',
+            driveFileId: fileId,
+            fileName: filename,
+            monitoringImageId: monitoringDoc._id
+          });
+
+        } catch (uploadError) {
+          console.error('❌ Failed to upload monitoring image:', uploadError);
+          // Continue with other images even if one fails
+        }
+      }
+    }
 
     console.log('🖼️ Processing monitoring images:', {
       originalCount: monitoringImages.length,
-      processedCount: processedMonitoringImages.length,
-      sampleImage: processedMonitoringImages[0] ? {
-        hasData: !!processedMonitoringImages[0].data,
-        hasUrl: !!processedMonitoringImages[0].url,
-        timestamp: processedMonitoringImages[0].timestamp,
-        type: processedMonitoringImages[0].type
-      } : 'No images'
+      uploadedCount: processedMonitoringImages.length,
+      uploadedToGoogleDrive: true
     });
 
     // Update result with exit status

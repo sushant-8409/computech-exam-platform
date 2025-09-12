@@ -42,7 +42,9 @@ const AnswerSheetUploader = React.memo(({
   isUploading, 
   isRequired,
   onFilePickerOpen,
-  onFilePickerClose
+  onFilePickerClose,
+  onCameraOpen,
+  onCameraClose
 }) => {
   const fileInputRef = useRef(null);
   const [selectedPages, setSelectedPages] = useState([]);
@@ -212,12 +214,8 @@ const AnswerSheetUploader = React.memo(({
   };
 
   const handleCameraClick = () => {
-    // Stop monitoring temporarily when using back camera
-    if (isMonitoring && monitoringIntervalRef.current) {
-      clearInterval(monitoringIntervalRef.current);
-      monitoringIntervalRef.current = null;
-      console.log('📸 Monitoring paused for camera capture');
-    }
+    // Call the monitoring pause function from parent
+    if (onCameraOpen) onCameraOpen();
     
     setShowCameraModal(true);
     setTimeout(() => startCamera(), 100);
@@ -227,13 +225,8 @@ const AnswerSheetUploader = React.memo(({
     stopCamera();
     setShowCameraModal(false);
     
-    // Restart monitoring after camera usage
-    if (isMonitoring && test?.cameraMonitoring?.enabled && !monitoringIntervalRef.current) {
-      monitoringIntervalRef.current = setInterval(() => {
-        captureMonitoringImage();
-      }, test.cameraMonitoring.captureInterval || 30000);
-      console.log('📸 Monitoring resumed after camera capture');
-    }
+    // Call the monitoring resume function from parent
+    if (onCameraClose) onCameraClose();
   };
 
   return (
@@ -716,6 +709,26 @@ const TraditionalTestInterface = () => {
       return newViolations;
     });
   }, [maxViolations]);
+
+  // Camera functions for answer sheet capture
+  const handleCameraClick = useCallback(() => {
+    // Stop monitoring temporarily when using back camera
+    if (isMonitoring && monitoringIntervalRef.current) {
+      clearInterval(monitoringIntervalRef.current);
+      monitoringIntervalRef.current = null;
+      console.log('📸 Monitoring paused for camera capture');
+    }
+  }, [isMonitoring]);
+
+  const handleCameraClose = useCallback(() => {
+    // Restart monitoring after camera usage
+    if (isMonitoring && test?.cameraMonitoring?.enabled && !monitoringIntervalRef.current) {
+      monitoringIntervalRef.current = setInterval(() => {
+        captureMonitoringImage();
+      }, test.cameraMonitoring.captureInterval || 30000);
+      console.log('📸 Monitoring resumed after camera capture');
+    }
+  }, [isMonitoring, test, captureMonitoringImage]);
 
   // Monitor page visibility and focus
   useEffect(() => {
@@ -1632,6 +1645,8 @@ const TraditionalTestInterface = () => {
                 isRequired={test?.paperSubmissionRequired}
                 onFilePickerOpen={() => setIsFilePickerOpen(true)}
                 onFilePickerClose={() => setIsFilePickerOpen(false)}
+                onCameraOpen={handleCameraClick}
+                onCameraClose={handleCameraClose}
               />
               
               {/* Test Actions */}
