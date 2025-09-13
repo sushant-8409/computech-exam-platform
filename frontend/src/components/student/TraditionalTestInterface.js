@@ -666,9 +666,14 @@ const TraditionalTestInterface = () => {
       
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
       
-      const imageData = canvas.toDataURL('image/jpeg', 0.7);
+      // Apply brightness and contrast adjustments for better image quality
+      ctx.filter = 'brightness(1.1) contrast(1.2)';
+      ctx.drawImage(video, 0, 0);
+      ctx.filter = 'none'; // Reset filter
+      
+      // Use higher quality (0.9) for monitoring images
+      const imageData = canvas.toDataURL('image/jpeg', 0.9);
       const timestamp = new Date().toISOString();
       
       setMonitoringImages(prev => [...prev, {
@@ -718,15 +723,44 @@ const TraditionalTestInterface = () => {
       monitoringIntervalRef.current = null;
       console.log('📸 Monitoring paused for camera capture');
     }
+    
+    // Also stop the monitoring camera stream to free up resources
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+      console.log('📹 Monitoring camera stream stopped');
+    }
   }, [isMonitoring]);
 
-  const handleCameraClose = useCallback(() => {
+  const handleCameraClose = useCallback(async () => {
     // Restart monitoring after camera usage
     if (isMonitoring && test?.cameraMonitoring?.enabled && !monitoringIntervalRef.current) {
-      monitoringIntervalRef.current = setInterval(() => {
-        captureMonitoringImage();
-      }, test.cameraMonitoring.captureInterval || 30000);
-      console.log('📸 Monitoring resumed after camera capture');
+      try {
+        // Reinitialize monitoring camera stream
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'user',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          } 
+        });
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          console.log('📹 Monitoring camera stream restarted');
+        }
+        
+        // Resume interval capture
+        monitoringIntervalRef.current = setInterval(() => {
+          captureMonitoringImage();
+        }, test.cameraMonitoring.captureInterval || 30000);
+        console.log('📸 Monitoring resumed after camera capture');
+        
+      } catch (err) {
+        console.error('Failed to restart monitoring camera:', err);
+        toast.warn('Camera monitoring could not be resumed');
+      }
     }
   }, [isMonitoring, test, captureMonitoringImage]);
 

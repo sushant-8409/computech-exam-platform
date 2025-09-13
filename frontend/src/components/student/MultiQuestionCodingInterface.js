@@ -206,7 +206,86 @@ const MultiQuestionCodingInterface = () => {
       };
       editor.setPosition(newPosition);
     });
-  }, []);
+
+    // Add enhanced auto-completion for Python and Java
+    const currentLang = getLanguageForBoard(test?.board);
+    
+    if (currentLang === 'python') {
+      // Python-specific completions
+      monaco.languages.registerCompletionItemProvider('python', {
+        provideCompletionItems: (model, position) => {
+          const suggestions = [
+            {
+              label: 'for_range',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'for ${1:i} in range(${2:n}):\n    ${3:pass}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'For loop with range'
+            },
+            {
+              label: 'if_main',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'if __name__ == "__main__":\n    ${1:pass}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Main guard'
+            },
+            {
+              label: 'list_comp',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: '[${1:expr} for ${2:item} in ${3:iterable}]',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'List comprehension'
+            },
+            {
+              label: 'try_except',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'try:\n    ${1:pass}\nexcept ${2:Exception} as ${3:e}:\n    ${4:pass}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Try-except block'
+            }
+          ];
+          return { suggestions };
+        }
+      });
+    } else if (currentLang === 'java') {
+      // Java-specific completions
+      monaco.languages.registerCompletionItemProvider('java', {
+        provideCompletionItems: (model, position) => {
+          const suggestions = [
+            {
+              label: 'main_method',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'public static void main(String[] args) {\n    ${1:// Your code here}\n}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Main method'
+            },
+            {
+              label: 'for_loop',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'for (int ${1:i} = 0; ${1:i} < ${2:n}; ${1:i}++) {\n    ${3:// Your code here}\n}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'For loop'
+            },
+            {
+              label: 'scanner_input',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'Scanner ${1:sc} = new Scanner(System.in);\n${2:int} ${3:input} = ${1:sc}.next${4:Int}();',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Scanner input'
+            },
+            {
+              label: 'arraylist',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'ArrayList<${1:Integer}> ${2:list} = new ArrayList<>();',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'ArrayList declaration'
+            }
+          ];
+          return { suggestions };
+        }
+      });
+    }
+  }, [test]);
 
   // Run example test case (Ctrl+')
   const runExampleTestCase = useCallback(async () => {
@@ -1436,8 +1515,8 @@ const MultiQuestionCodingInterface = () => {
                 }
               }}
               options={{
-                fontSize: 14,
-                minimap: { enabled: true },
+                fontSize: isMobile ? 16 : 14,
+                minimap: { enabled: !isMobile },
                 scrollBeyondLastLine: false,
                 automaticLayout: true,
                 wordWrap: 'on',
@@ -1451,6 +1530,58 @@ const MultiQuestionCodingInterface = () => {
                 guides: {
                   indentation: true,
                   bracketPairs: true
+                },
+                // Enhanced IntelliSense and suggestions
+                suggestOnTriggerCharacters: true,
+                acceptSuggestionOnCommitCharacter: true,
+                acceptSuggestionOnEnter: 'on',
+                tabCompletion: 'on',
+                wordBasedSuggestions: true,
+                quickSuggestions: {
+                  other: true,
+                  comments: true,
+                  strings: true
+                },
+                quickSuggestionsDelay: 100,
+                suggest: {
+                  showWords: true,
+                  showKeywords: true,
+                  showSnippets: true,
+                  showClasses: true,
+                  showFunctions: true,
+                  showConstructors: true,
+                  showFields: true,
+                  showVariables: true,
+                  showInterfaces: true,
+                  showModules: true,
+                  showProperties: true,
+                  showEvents: true,
+                  showValues: true,
+                  showConstants: true,
+                  showEnums: true,
+                  showMethods: true,
+                  filterGraceful: true,
+                  snippetsPreventQuickSuggestions: false
+                },
+                // Mobile optimizations
+                scrollbar: {
+                  verticalScrollbarSize: isMobile ? 8 : 14,
+                  horizontalScrollbarSize: isMobile ? 8 : 14
+                },
+                mouseWheelZoom: !isMobile,
+                // Better touch support
+                selectOnLineNumbers: !isMobile,
+                glyphMargin: !isMobile,
+                folding: !isMobile,
+                // Code completion improvements
+                parameterHints: {
+                  enabled: true,
+                  cycle: true
+                },
+                hover: {
+                  enabled: true,
+                  delay: 300,
+                  sticky: true
                 }
               }}
             />

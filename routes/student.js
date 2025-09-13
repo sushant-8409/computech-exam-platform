@@ -988,13 +988,28 @@ router.post('/upload-answer-sheet', authenticateStudent, upload.single('answerSh
             });
         }
 
-        // Upload to Google Drive
+        // Upload to Google Drive using OAuth (admin's drive for centralized management)
         const fileName = `answer-sheet-${req.student.name.replace(/[^a-zA-Z0-9]/g, '-')}-${testId}-${Date.now()}.pdf`;
-        const uploadResult = await uploadToGDrive(
-            req.file.buffer,
-            fileName,
-            req.file.mimetype
-        );
+        
+        let uploadResult;
+        
+        // Get admin user for OAuth tokens
+        const User = require('../models/User');
+        const adminUser = await User.findOne({ role: 'admin' });
+        
+        // Always use admin OAuth tokens for centralized file management
+        if (adminUser && adminUser.googleTokens && adminUser.googleTokens.refresh_token) {
+            const oauthDrive = require('../services/oauthDrive');
+            console.log('📤 Using admin OAuth for answer sheet upload:', fileName);
+            uploadResult = await oauthDrive.uploadToGDrive(adminUser.googleTokens, req.file.buffer, fileName, req.file.mimetype);
+        } else {
+            // No admin OAuth tokens available - system not configured
+            return res.status(500).json({
+                success: false,
+                message: 'Google Drive not configured. Please contact administrator to set up Google OAuth.',
+                error: 'GOOGLE_OAUTH_NOT_CONFIGURED'
+            });
+        }
 
         // Update or create result with answer sheet URL
         let result = await Result.findOne({ studentId: req.student._id, testId });

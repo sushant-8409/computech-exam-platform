@@ -29,6 +29,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import offlineHandler from './utils/offlineHandler';
 import autoRefreshManager from './utils/autoRefresh';
 import MockTestCreator from './components/student/MockTestCreator';
+import MobileUploadInterface from './components/mobile/MobileUploadInterface';
 import { useDevToolsProtection } from './hooks/useDevToolsProtection'; // Security protection
 
 // Set axios base URL
@@ -490,6 +491,9 @@ export default function App() {
               } />
 
             </Route>
+
+            {/* Mobile Upload Interface - Public route with token validation */}
+            <Route path="/mobile-upload/:token" element={<MobileUploadInterface />} />
 
             {/* ✅ UNIVERSAL CATCH-ALL: Any unmatched URL redirects to login if not authenticated */}
             <Route path="*" element={<UniversalRedirect />} />

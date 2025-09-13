@@ -15,13 +15,16 @@ const { authenticateAdmin } = require('../middleware/auth');
    ========================================================================== */
 router.get('/results-for-review', authenticateAdmin, async (req, res) => {
     try {
-        // Include 'done' status for coding tests that are attempted but not reviewed
+        // Include only unreviewed results, exclude completed/reviewed
         const pending = await Result.find({ 
             status: { $in: ['pending', 'done', 'exited'] },
             resumeAllowed: { $ne: true }  // Exclude tests that are allowed for resume
         }).populate('studentId', 'name').populate('testId', 'title type coding').lean();
         
-        const under = await ReviewResult.find({ status: 'under review' }).populate('studentId', 'name').populate('testId', 'title type coding').lean();
+        // Only include review results that are still under review, not completed
+        const under = await ReviewResult.find({ 
+            status: 'under review' 
+        }).populate('studentId', 'name').populate('testId', 'title type coding').lean();
 
         const makeItem = (row, reviewMode = false) => ({
             _id: row._id, reviewMode, status: row.status,

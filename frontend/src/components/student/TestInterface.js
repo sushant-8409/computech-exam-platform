@@ -254,6 +254,42 @@ const TestInterface = () => {
     }
   }, []);
 
+  // Request mobile upload link for answer sheet
+  const requestMobileUploadLink = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/mobile-upload/request', {
+        email: user.email,
+        testId: testId,
+        uploadType: 'answer-sheet',
+        expiryMinutes: 10
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        await Swal.fire({
+          title: '📱 Mobile Upload Link Sent!',
+          html: `
+            <div style="text-align: left; margin: 1rem 0;">
+              <p><strong>Upload link has been sent to:</strong></p>
+              <p>${user.email}</p>
+              <br>
+              <p><strong>⏱️ Link expires in 10 minutes</strong></p>
+              <p>Please check your email and use the link to upload your answer sheet from your mobile device.</p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonText: 'Got it!',
+          confirmButtonColor: '#10b981'
+        });
+      }
+    } catch (error) {
+      console.error('Error requesting mobile upload link:', error);
+      toast.error('Failed to send mobile upload link. Please try again.');
+    }
+  }, [user.email, testId]);
+
   // Show Google Drive warning before starting test
   const showGoogleDriveWarning = async () => {
     const result = await Swal.fire({
@@ -4829,6 +4865,14 @@ const TestInterface = () => {
                     >
                       {isUploading ? '⏳ Converting & Uploading...' : '📤 Convert to PDF & Upload'}
                     </button>
+                    <button
+                      className="btn-mobile-upload"
+                      onClick={requestMobileUploadLink}
+                      disabled={isUploading || answerSheetUrl}
+                      title="Send upload link to your email for mobile upload"
+                    >
+                      📱 Mobile Upload
+                    </button>
                   </div>
                 </div>
               )}
@@ -4856,6 +4900,25 @@ const TestInterface = () => {
                   <li>All pages will be merged into a single PDF file</li>
                   <li>Supported formats: JPG, JPEG</li>
                 </ul>
+                
+                {/* Mobile Upload Alternative */}
+                {uploadedPages.length === 0 && (
+                  <div className="mobile-upload-alternative">
+                    <hr style={{ margin: '1rem 0', opacity: 0.3 }} />
+                    <h6>📱 Alternative: Mobile Upload</h6>
+                    <p>Don't have your answer sheets ready on this device? Request a mobile upload link!</p>
+                    <button
+                      className="btn-mobile-upload"
+                      onClick={requestMobileUploadLink}
+                      disabled={isUploading || answerSheetUrl}
+                    >
+                      📱 Send Mobile Upload Link
+                    </button>
+                    <small style={{ display: 'block', marginTop: '0.5rem', color: '#6c757d' }}>
+                      Link will be sent to {user.email} and expires in 10 minutes
+                    </small>
+                  </div>
+                )}
               </div>
 
               {/* Early Paper Upload Option */}

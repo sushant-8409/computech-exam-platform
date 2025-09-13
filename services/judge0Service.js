@@ -30,6 +30,14 @@ class Judge0Service {
       }
     ];
     
+    // OnlineCompiler.io API configuration
+    this.onlineCompilerConfig = {
+      name: 'OnlineCompiler.io',
+      baseURL: 'https://onlinecompiler.io',
+      apiKey: '12662d20bfe0dc0a5294c3de4b90a742',
+      callbackUrl: 'https://computech-exam-platform/api/compiler-callback'
+    };
+    
     // Track current API index
     this.currentApiIndex = 0;
     
@@ -113,30 +121,127 @@ class Judge0Service {
   }
 
   async submitCode(sourceCode, languageId, input = '', expectedOutput = '') {
-    return this.tryWithFallback(async (config) => {
-      console.log(`🚀 Submitting code with ${config.name} Judge0 API`);
-      
-      const data = {
-        source_code: sourceCode,
-        language_id: languageId,
-        stdin: input,
-        expected_output: expectedOutput
+    try {
+      // First try Judge0 APIs
+      return await this.tryWithFallback(async (config) => {
+        console.log(`🚀 Submitting code with ${config.name} Judge0 API`);
+        
+        const data = {
+          source_code: sourceCode,
+          language_id: languageId,
+          stdin: input,
+          expected_output: expectedOutput
+        };
+
+        const response = await axios({
+          method: 'POST',
+          url: `${config.baseURL}/submissions?base64_encoded=false&wait=true`,
+          headers: {
+            'x-rapidapi-key': config.rapidApiKey,
+            'x-rapidapi-host': config.rapidApiHost,
+            'Content-Type': 'application/json'
+          },
+          data: data
+        });
+
+        console.log(`✅ Code submitted successfully using ${config.name}`);
+        return response.data;
+      });
+    } catch (error) {
+      console.log('⚠️ All Judge0 APIs failed, trying OnlineCompiler.io fallback...');
+      return await this.tryOnlineCompiler(sourceCode, languageId, input);
+    }
+  }
+
+  // OnlineCompiler.io fallback method (Updated API)
+  async tryOnlineCompiler(sourceCode, languageId, input = '') {
+    try {
+      // Map Judge0 language IDs to OnlineCompiler.io languages
+      const languageMap = {
+        71: 'python3',    // Python 3
+        62: 'java',       // Java
+        50: 'c',          // C
+        54: 'cpp',        // C++
+        63: 'javascript'  // JavaScript
       };
 
-      const response = await axios({
-        method: 'POST',
-        url: `${config.baseURL}/submissions?base64_encoded=false&wait=true`,
-        headers: {
-          'x-rapidapi-key': config.rapidApiKey,
-          'x-rapidapi-host': config.rapidApiHost,
-          'Content-Type': 'application/json'
-        },
-        data: data
-      });
+      const language = languageMap[languageId];
+      if (!language) {
+        console.log(`⚠️ Language ID ${languageId} not supported by OnlineCompiler.io fallback`);
+        throw new Error(`Language ID ${languageId} not supported by OnlineCompiler.io`);
+      }
 
-      console.log(`✅ Code submitted successfully using ${config.name}`);
-      return response.data;
-    });
+      console.log(`🔄 Attempting OnlineCompiler.io fallback for ${language}`);
+
+      // Try different API endpoint structures that OnlineCompiler.io might use
+      const possibleEndpoints = [
+        '/api/v1/execute',
+        '/api/execute',
+        '/execute',
+        '/api/v1/compile'
+      ];
+
+      let lastError;
+      
+      for (const endpoint of possibleEndpoints) {
+        try {
+          console.log(`🔍 Trying endpoint: ${this.onlineCompilerConfig.baseURL}${endpoint}`);
+          
+          const response = await axios({
+            method: 'POST',
+            url: `${this.onlineCompilerConfig.baseURL}${endpoint}`,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.onlineCompilerConfig.apiKey}`,
+              'X-API-Key': this.onlineCompilerConfig.apiKey
+            },
+            data: {
+              language: language,
+              code: sourceCode,
+              input: input,
+              stdin: input
+            },
+            timeout: 15000
+          });
+
+          console.log('✅ OnlineCompiler.io execution successful');
+          
+          // Format response to match Judge0 format
+          return {
+            stdout: response.data.output || response.data.stdout || '',
+            stderr: response.data.error || response.data.stderr || '',
+            status: {
+              id: response.data.error || response.data.stderr ? 6 : 3,
+              description: response.data.error || response.data.stderr ? 'Runtime Error' : 'Accepted'
+            },
+            time: response.data.time || response.data.execution_time || '0',
+            memory: response.data.memory || response.data.memory_usage || '0'
+          };
+          
+        } catch (endpointError) {
+          lastError = endpointError;
+          console.log(`❌ Endpoint ${endpoint} failed:`, endpointError.response?.status || endpointError.message);
+          continue;
+        }
+      }
+      
+      throw lastError;
+
+    } catch (error) {
+      console.error('💥 OnlineCompiler.io fallback failed:', error.response?.status || error.message);
+      
+      // Return a user-friendly error instead of throwing
+      return {
+        stdout: '',
+        stderr: `OnlineCompiler.io service temporarily unavailable: ${error.message}`,
+        status: {
+          id: 11, // Internal Error
+          description: 'Compiler Service Error'
+        },
+        time: '0',
+        memory: '0'
+      };
+    }
   }
 
   async runTestCases(sourceCode, language, testCases) {

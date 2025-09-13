@@ -88,6 +88,8 @@ app.use('/api/cronjob', require('./routes/cronjob')); // Cronjob endpoints
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/admin', require('./routes/manualTestEntry')); // Manual test entry routes
 app.use('/api/admin', require('./routes/googleSetup')); // Google setup helper
+app.use('/api/admin', require('./routes/oauthAdmin')); // OAuth credentials management
+app.use('/api/mobile-upload', require('./routes/mobileUpload')); // Mobile upload functionality
 app.use('/api/admin', require('./routes/adminReviewResults')); // Restored this route
 app.use('/api/admin', require('./routes/reviewRoutes'));    // Restored this route
 app.use('/api/admin', require('./routes/adminReview')); 

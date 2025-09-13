@@ -830,7 +830,13 @@ router.get('/dashboard/charts', async (req, res) => {
 
     res.json({
       success: true,
-      charts
+      charts: {
+        monthly: charts.testSubmissions.data,
+        distribution: charts.studentGrades.data,
+        labels: charts.testSubmissions.labels,
+        monthlyLabels: charts.testSubmissions.labels,
+        distributionLabels: charts.studentGrades.labels
+      }
     });
   } catch (error) {
     console.error('❌ Chart data error:', error);
@@ -1093,14 +1099,17 @@ router.post('/upload/question-paper/:testId', upload.single('question-paper'), a
   try {
     console.log('📄 Question paper upload for test:', req.params.testId);
     
-    const tokens = req.session.googleTokens || req.session.tokens;
-    if (!tokens) {
+    // Get admin user OAuth tokens from database (consistent approach)
+    const adminUser = await User.findOne({ role: 'admin' });
+    if (!adminUser || !adminUser.googleTokens) {
       return res.status(401).json({ 
         success: false, 
         message: 'Google Drive authentication required. Please connect to Google Drive first.',
         needsAuth: true
       });
     }
+    
+    const tokens = adminUser.googleTokens;
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
@@ -1149,14 +1158,17 @@ router.post('/upload/answer-sheet/:testId', upload.single('answer-sheet'), async
   try {
     console.log('📋 Answer sheet upload for test:', req.params.testId);
     
-    const tokens = req.session.googleTokens || req.session.tokens;
-    if (!tokens) {
+    // Get admin user OAuth tokens from database (consistent approach)
+    const adminUser = await User.findOne({ role: 'admin' });
+    if (!adminUser || !adminUser.googleTokens) {
       return res.status(401).json({ 
         success: false, 
         message: 'Google Drive authentication required. Please connect to Google Drive first.',
         needsAuth: true
       });
     }
+    
+    const tokens = adminUser.googleTokens;
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });

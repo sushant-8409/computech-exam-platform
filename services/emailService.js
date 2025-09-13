@@ -333,6 +333,239 @@ CompuTech Exam Platform`
       </html>
     `;
   }
+
+  // Mobile Upload Email Methods
+  async sendMobileUploadLink(options) {
+    const { to, uploadRequest, requesterName } = options;
+    
+    if (!this.transporter) {
+      return { success: false, error: 'Email transporter not initialized' };
+    }
+
+    try {
+      console.log(`📧 Sending mobile upload link to: ${to}`);
+
+      const mailOptions = {
+        from: `"CompuTech Exam Platform" <${process.env.EMAIL_USER}>`,
+        to: to,
+        subject: `📱 Mobile Upload Link - ${uploadRequest.uploadContext.testName}`,
+        html: this.getMobileUploadLinkTemplate(uploadRequest, requesterName),
+        text: `Hello,
+
+${requesterName} has sent you a mobile upload link for: ${uploadRequest.uploadContext.testName}
+
+Upload your document here: ${uploadRequest.uploadUrl}
+
+This link will expire in ${uploadRequest.timeRemaining.minutes} minutes.
+
+Instructions: ${uploadRequest.uploadContext.instructions}
+
+Best regards,
+CompuTech Exam Platform`
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Mobile upload link sent to ${to}:`, result.messageId);
+      return { success: true, messageId: result.messageId };
+      
+    } catch (error) {
+      console.error(`❌ Failed to send mobile upload link to ${to}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async sendMobileUploadNotification(options) {
+    const { to, uploaderEmail, uploadRequest, fileName, fileSize } = options;
+    
+    if (!this.transporter) {
+      return { success: false, error: 'Email transporter not initialized' };
+    }
+
+    try {
+      console.log(`📧 Sending mobile upload notification to: ${to}`);
+
+      const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+
+      const mailOptions = {
+        from: `"CompuTech Exam Platform" <${process.env.EMAIL_USER}>`,
+        to: to,
+        subject: `📤 File Uploaded Successfully - ${uploadRequest.uploadContext.testName}`,
+        html: this.getMobileUploadNotificationTemplate(uploaderEmail, uploadRequest, fileName, fileSizeMB),
+        text: `Hello,
+
+A file has been successfully uploaded via your mobile upload link.
+
+Details:
+- Uploader: ${uploaderEmail}
+- Context: ${uploadRequest.uploadContext.testName}
+- File: ${fileName}
+- Size: ${fileSizeMB} MB
+- Uploaded: ${new Date().toLocaleString()}
+
+The file has been saved to your Google Drive.
+
+Best regards,
+CompuTech Exam Platform`
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Mobile upload notification sent to ${to}:`, result.messageId);
+      return { success: true, messageId: result.messageId };
+      
+    } catch (error) {
+      console.error(`❌ Failed to send mobile upload notification to ${to}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  getMobileUploadLinkTemplate(uploadRequest, requesterName) {
+    const timeRemaining = uploadRequest.timeRemaining;
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Mobile Upload Link</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0; font-size: 28px;">📱 Mobile Upload Link</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 16px;">${uploadRequest.uploadContext.testName}</p>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; margin-bottom: 20px;">
+            Hello! 👋
+          </p>
+          
+          <p style="font-size: 16px; margin-bottom: 20px;">
+            <strong>${requesterName}</strong> has sent you a mobile upload link. Please use your mobile device to upload the required document.
+          </p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea; margin: 25px 0;">
+            <h3 style="margin-top: 0; color: #667eea;">📋 Upload Details</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin-bottom: 8px;"><strong>Context:</strong> ${uploadRequest.uploadContext.testName}</li>
+              <li style="margin-bottom: 8px;"><strong>Subject:</strong> ${uploadRequest.uploadContext.subject}</li>
+              <li style="margin-bottom: 8px;"><strong>Type:</strong> ${uploadRequest.uploadType.replace('-', ' ').toUpperCase()}</li>
+              <li style="margin-bottom: 8px;"><strong>Max Files:</strong> ${uploadRequest.uploadContext.maxFiles}</li>
+              <li style="margin-bottom: 8px;"><strong>Allowed Types:</strong> ${uploadRequest.uploadContext.allowedTypes.join(', ').toUpperCase()}</li>
+            </ul>
+          </div>
+          
+          <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; color: #856404;">
+              ⏰ <strong>Time Remaining:</strong> ${timeRemaining.minutes} minutes ${timeRemaining.seconds} seconds
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${uploadRequest.uploadUrl}" 
+               style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 25px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+              📱 Upload via Mobile
+            </a>
+          </div>
+          
+          <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="margin-top: 0; color: #1976d2;">📝 Instructions</h4>
+            <p style="margin-bottom: 0; color: #424242;">
+              ${uploadRequest.uploadContext.instructions}
+            </p>
+          </div>
+          
+          <div style="background: #f3e5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="margin-top: 0; color: #7b1fa2;">📱 Mobile Tips</h4>
+            <ul style="color: #424242; margin-bottom: 0;">
+              <li>Use your mobile device for the best experience</li>
+              <li>Ensure good lighting when taking photos</li>
+              <li>Keep documents flat and centered</li>
+              <li>Check file size (max 10MB)</li>
+            </ul>
+          </div>
+          
+          <p style="color: #6b7280; font-size: 14px; margin-top: 30px; text-align: center;">
+            If you can't click the button, copy this link: <br>
+            <code style="background: #f1f5f9; padding: 5px; border-radius: 4px; word-break: break-all;">${uploadRequest.uploadUrl}</code>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+          
+          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+            This is an automated message from CompuTech Exam Platform.<br>
+            This link will expire automatically after the time limit.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  getMobileUploadNotificationTemplate(uploaderEmail, uploadRequest, fileName, fileSizeMB) {
+    return `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>File Upload Notification</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0; font-size: 28px;">📤 File Uploaded Successfully</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 16px;">Mobile Upload Notification</p>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; margin-bottom: 20px;">
+            Great news! 🎉
+          </p>
+          
+          <p style="font-size: 16px; margin-bottom: 20px;">
+            A file has been successfully uploaded via your mobile upload link.
+          </p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #48bb78; margin: 25px 0;">
+            <h3 style="margin-top: 0; color: #48bb78;">📄 Upload Details</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin-bottom: 8px;"><strong>Uploader:</strong> ${uploaderEmail}</li>
+              <li style="margin-bottom: 8px;"><strong>Context:</strong> ${uploadRequest.uploadContext.testName}</li>
+              <li style="margin-bottom: 8px;"><strong>Subject:</strong> ${uploadRequest.uploadContext.subject}</li>
+              <li style="margin-bottom: 8px;"><strong>File Name:</strong> ${fileName}</li>
+              <li style="margin-bottom: 8px;"><strong>File Size:</strong> ${fileSizeMB} MB</li>
+              <li style="margin-bottom: 8px;"><strong>Uploaded:</strong> ${new Date().toLocaleString()}</li>
+            </ul>
+          </div>
+          
+          <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; color: #155724;">
+              ✅ <strong>Status:</strong> File saved to Google Drive successfully
+            </p>
+          </div>
+          
+          <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="margin-top: 0; color: #1976d2;">🔍 What's Next?</h4>
+            <ul style="color: #424242; margin-bottom: 0;">
+              <li>The file has been saved to your Google Drive</li>
+              <li>You can access it through your Drive dashboard</li>
+              <li>The upload link has been automatically deactivated</li>
+              <li>All upload activity has been logged for your records</li>
+            </ul>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+          
+          <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+            This is an automated message from CompuTech Exam Platform.<br>
+            Please do not reply to this email.
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
 }
 
 module.exports = new EmailService();

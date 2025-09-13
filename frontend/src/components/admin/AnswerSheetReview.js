@@ -302,19 +302,27 @@ export default function AnswerSheetReview() {
     <div className={`${styles.page} ${darkMode ? styles.dark : styles.light}`}>
       <aside className={styles.left}>
         <h2>Pending / Under-review</h2>
-        <ul className={styles.rows}>
-          {(list || []).map(r => (
-            <li key={r._id} onClick={() => open(r)} className={active?._id === r._id ? styles.sel : ''}>
-              <span>{r.studentName} – {r.testTitle}</span>
-              <div className={styles.listMeta}>
-                <span className={`${styles.testType} ${r.status === 'done' ? styles.coding : styles.traditional}`}>
-                  {r.status === 'done' ? '💻 Coding' : '📄 Traditional'}
-                </span>
-                <span className={`${styles.tag} ${r.status === 'pending' ? styles.pending : styles.under}`}>{r.status}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {(list || []).length === 0 ? (
+          <div className={styles.noPapers}>
+            <div className={styles.noPapersIcon}>📋</div>
+            <h3>No Papers to Review</h3>
+            <p>All submitted papers have been reviewed and graded.</p>
+          </div>
+        ) : (
+          <ul className={styles.rows}>
+            {(list || []).map(r => (
+              <li key={r._id} onClick={() => open(r)} className={active?._id === r._id ? styles.sel : ''}>
+                <span>{r.studentName} – {r.testTitle}</span>
+                <div className={styles.listMeta}>
+                  <span className={`${styles.testType} ${r.status === 'done' ? styles.coding : styles.traditional}`}>
+                    {r.status === 'done' ? '💻 Coding' : '📄 Traditional'}
+                  </span>
+                  <span className={`${styles.tag} ${r.status === 'pending' ? styles.pending : styles.under}`}>{r.status}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </aside>
       {active && (
         <section className={styles.right}>

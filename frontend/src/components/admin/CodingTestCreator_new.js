@@ -346,12 +346,15 @@ function ${functionName}() {
     try {
       const testData = {
         ...formData,
+        type: 'coding',
+        isCodingTest: true,
         coding: {
           language: formData.codingLanguage,
           starterCode: {
             [formData.codingLanguage]: starterCode
           },
           questions: [{
+            id: Date.now().toString(),
             title: formData.problemTitle,
             description: formData.problemDescription,
             inputFormat: formData.inputFormat,
@@ -359,13 +362,20 @@ function ${functionName}() {
             constraints: formData.constraints,
             examples: formData.examples,
             testCases: formData.testCases,
+            starterCode: {
+              [formData.codingLanguage]: starterCode
+            },
+            marks: formData.totalMarks || 10,
             timeLimit: formData.timeLimit,
             memoryLimit: formData.memoryLimit
           }]
         }
       };
 
-      const response = await axios.post('/api/tests', testData);
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/admin/tests', testData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
       if (response.data.success) {
         toast.success('🎉 Coding test created successfully!');

@@ -1,5 +1,4 @@
-// ✅ FIXED: Add useReducer to your React imports
-import React, { useEffect, useState, useRef, useCallback, useMemo, useReducer } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import axios from 'axios';
@@ -23,6 +22,8 @@ import {
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import NotificationCenter from './NotificationCenter';
 import NotificationSettings from './NotificationSettings';
+import OAuthSettings from './OAuthSettings';
+import MobileUploadManager from './MobileUploadManager';
 import CodingTestCreator from './CodingTestCreatorMulti';
 import ExampleBox from './ExampleBox';
 import { CLASS_OPTIONS, BOARD_OPTIONS } from '../../constants/classBoardOptions';
@@ -454,15 +455,29 @@ const AdminDashboard = () => {
   const fetchAnalyticsData = async () => {
     try {
       console.log('📊 Fetching analytics data...');
-      const response = await axios.get('/api/admin/analytics');
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('❌ No token found for analytics');
+        toast.error('Authentication required');
+        return;
+      }
+
+      const response = await axios.get('/api/admin/analytics', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setAnalyticsData(response.data);
       console.log('✅ Analytics data loaded:', response.data);
     } catch (error) {
       console.error('❌ Failed to fetch analytics:', error);
       if (error.response?.status === 401) {
         console.log('🔒 Unauthorized access to analytics');
+        toast.error('Authentication failed. Please login again.');
+      } else if (error.response?.status === 403) {
+        console.log('🔒 Forbidden access to analytics');
+        toast.error('Access denied. Admin privileges required.');
+      } else {
+        toast.error('Failed to load analytics data');
       }
-      toast.error('Failed to load analytics data');
     }
   };
 
@@ -3380,6 +3395,195 @@ const AdminDashboard = () => {
               })}
             </tbody>
           </table>
+
+          {/* Mobile Card Layout */}
+          <div className="mobile-results-container">
+            {paginatedResults.map(r => {
+              const isCodingTest = r.testId?.type === 'coding' || 
+                                 r.submissionType === 'multi_question_coding' || 
+                                 r.codingResults ||
+                                 r.testTitle?.toLowerCase().includes('cpcode') ||
+                                 r.testTitle?.toLowerCase().includes('coding') ||
+                                 r.testTitle?.toLowerCase().includes('program');
+
+              return (
+                <div key={`mobile-${r._id}`} className="mobile-result-card">
+                  {bulkActionMode && (
+                    <div className="mobile-bulk-select">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.includes(r._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedItems([...selectedItems, r._id]);
+                          } else {
+                            setSelectedItems(selectedItems.filter(id => id !== r._id));
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="mobile-result-header">
+                    <div className="mobile-student-info">
+                      <h4>{r.studentId?.name || 'Unknown'}</h4>
+                      <small>{r.studentId?.email || 'No email'}</small>
+                      <small>Roll: {r.studentId?.rollNo || 'N/A'}</small>
+                    </div>
+                    <span className={`test-type-badge ${isCodingTest ? 'coding' : 'traditional'}`}>
+                      {isCodingTest ? '💻 Coding' : '📄 Traditional'}
+                    </span>
+                  </div>
+
+                  <div className="mobile-result-body">
+                    <div className="mobile-result-field">
+                      <label>Test</label>
+                      <div className="value">
+                        <strong>{r.testTitle || 'Unknown Test'}</strong>
+                        <br />
+                        <small>{r.testSubject || 'N/A'}</small>
+                      </div>
+                    </div>
+
+                    <div className="mobile-result-field">
+                      <label>Status</label>
+                      <div className="value">
+                        <span className={`status-badge status-${r.status}`}>
+                          {r.status === 'pending' ? '⏳ Pending' :
+                           r.status === 'reviewed' ? '👁️ Reviewed' :
+                           r.status === 'published' ? '✅ Published' :
+                           r.status === 'completed' ? '🏁 Completed' :
+                           '❓ Unknown'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mobile-result-field">
+                      <label>Submitted</label>
+                      <div className="value">
+                        {r.submittedAt ? (
+                          <>
+                            {new Date(r.submittedAt).toLocaleDateString('en-IN')}
+                            <br />
+                            <small>{new Date(r.submittedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</small>
+                          </>
+                        ) : 'N/A'}
+                      </div>
+                    </div>
+
+                    <div className="mobile-result-field">
+                      <label>Violations</label>
+                      <div className="value">
+                        {r.violations?.length > 0 ? (
+                          <span className="violations-count warning">
+                            ⚠️ {r.violations.length}
+                          </span>
+                        ) : (
+                          <span className="violations-count clean">✅ None</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mobile-score-display">
+                      {isCodingTest ? (
+                        r.codingResults ? (
+                          <>
+                            <div className="mobile-score-primary">
+                              {r.codingResults.totalScore || r.marksObtained || 0}/{r.codingResults.maxScore || r.totalMarks || 0}
+                            </div>
+                            <div className="mobile-score-secondary">
+                              {r.codingResults.passedTestCases || 0}/{r.codingResults.totalTestCases || 0} Tests Passed
+                            </div>
+                            <div className="mobile-score-percentage">
+                              {r.percentage ? `${r.percentage.toFixed(1)}%` : '0%'}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="score-pending">Processing...</span>
+                        )
+                      ) : (
+                        r.marksObtained != null ? (
+                          <>
+                            <div className="mobile-score-primary">
+                              {r.marksObtained}/{r.totalMarks}
+                            </div>
+                            <div className="mobile-score-percentage">
+                              {r.percentage ? `${r.percentage.toFixed(1)}%` : 
+                               r.totalMarks > 0 ? `${((r.marksObtained / r.totalMarks) * 100).toFixed(1)}%` : '0%'}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="score-pending">Pending</span>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mobile-actions">
+                    {isCodingTest ? (
+                      <>
+                        <button
+                          className="btn btn-sm btn-success"
+                          onClick={() =>
+                            navigate('/admin/answer-review', { state: { fromResult: r, defaultTab: 'coding' } })
+                          }
+                        >
+                          📝 Mark
+                        </button>
+                        <button
+                          className="btn btn-sm btn-info"
+                          onClick={() => navigate(`/admin/coding-review/${r._id}`)}
+                        >
+                          💻 Code
+                        </button>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => navigate(`/admin/result-details/${r._id}`)}
+                        >
+                          👁️ Details
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="btn btn-sm btn-success"
+                          onClick={() =>
+                            navigate('/admin/answer-review', { state: { fromResult: r } })
+                          }
+                        >
+                          📝 Mark
+                        </button>
+                        {(r.answerSheetURL || r.answerSheetUrl) && (
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={() =>
+                              window.open((r.answerSheetURL || r.answerSheetUrl), '_blank')
+                            }
+                          >
+                            📄 Sheet
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-sm btn-info"
+                          onClick={() => navigate(`/admin/result-details/${r._id}`)}
+                        >
+                          👁️ Details
+                        </button>
+                      </>
+                    )}
+                    {r.violations?.length > 0 && (
+                      <button
+                        className="btn btn-sm btn-warning"
+                        onClick={() => navigate(`/admin/violations/${r._id}`)}
+                      >
+                        ⚠️ Violations
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Pagination */}
@@ -4468,6 +4672,26 @@ const AdminDashboard = () => {
               <span className="nav-icon">⚙️</span>
               <span className="nav-text">Settings</span>
             </button>
+            <button
+              className={`nav-item ${activeTab === 'oauth-settings' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('oauth-settings');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <span className="nav-icon">🔐</span>
+              <span className="nav-text">OAuth Config</span>
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'mobile-upload' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('mobile-upload');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <span className="nav-icon">📱</span>
+              <span className="nav-text">Mobile Upload</span>
+            </button>
           </div>
         </nav>
 
@@ -4524,6 +4748,8 @@ const AdminDashboard = () => {
               {activeTab === 'analytics' && '📈 Analytics'}
               {activeTab === 'notifications' && '📢 Notification Center'}
               {activeTab === 'settings' && '⚙️ System Settings'}
+              {activeTab === 'oauth-settings' && '🔐 OAuth Configuration'}
+              {activeTab === 'mobile-upload' && '📱 Mobile Upload Manager'}
             </h1>
           </div>
 
@@ -4580,6 +4806,8 @@ const AdminDashboard = () => {
           {activeTab === 'analytics' && renderAnalytics()}
           {activeTab === 'notifications' && <NotificationCenter />}
           {activeTab === 'settings' && <NotificationSettings />}
+          {activeTab === 'oauth-settings' && <OAuthSettings />}
+          {activeTab === 'mobile-upload' && <MobileUploadManager />}
         </div>
         
         {/* Coding Test Creator Modal */}

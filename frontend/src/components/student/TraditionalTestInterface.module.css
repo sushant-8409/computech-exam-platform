@@ -1596,7 +1596,7 @@
   }
   
   .cameraControls {
-    flex-direction: column;
+    flex-direction: row;
     gap: 12px;
     padding: 16px;
     background: rgba(255, 255, 255, 0.95);
@@ -1604,16 +1604,18 @@
     position: sticky;
     bottom: 0;
     z-index: 10000;
+    justify-content: space-between;
   }
   
   .captureBtn, .cancelBtn {
-    width: 100%;
+    flex: 1;
     padding: 16px;
     font-size: 18px;
     font-weight: 700;
     border-radius: 12px;
     min-height: 48px;
     touch-action: manipulation;
+    max-width: calc(50% - 6px);
   }
   
   .captureBtn {

@@ -327,4 +327,76 @@ router.get('/students/search', async (req, res) => {
   }
 });
 
+/* -------------------------------------------------
+   GET  /api/admin/analytics/subject-performance
+   -------------------------------------------------*/
+router.get('/admin/analytics/subject-performance', authenticateAdmin, async (req, res) => {
+  try {
+    console.log('📊  /admin/analytics/subject-performance hit');
+
+    // Aggregate subject performance data
+    const subjectPerformance = await Result.aggregate([
+      // Convert testId to ObjectId if it's a string
+      { $addFields: { testId: { $convert: { input: '$testId', to: 'objectId', onError: '$testId', onNull: '$testId' } } } },
+      
+      // Match valid results
+      { $match: { totalMarks: { $gt: 0 }, marksObtained: { $gte: 0 } } },
+
+      // Join with tests to get subject information
+      { $lookup: { from: 'tests', localField: 'testId', foreignField: '_id', as: 'test' } },
+      { $unwind: '$test' },
+
+      // Group by subject
+      {
+        $group: {
+          _id: '$test.subject',
+          totalTests: { $sum: 1 },
+          averageScore: {
+            $avg: { $multiply: [{ $divide: ['$marksObtained', '$totalMarks'] }, 100] }
+          },
+          totalMarks: { $sum: '$totalMarks' },
+          totalObtained: { $sum: '$marksObtained' },
+          passCount: {
+            $sum: {
+              $cond: [{ $gte: ['$marksObtained', '$test.passingMarks'] }, 1, 0]
+            }
+          }
+        }
+      },
+
+      // Calculate pass rate and format output
+      {
+        $project: {
+          _id: 0,
+          subject: '$_id',
+          totalTests: 1,
+          averageScore: { $round: ['$averageScore', 2] },
+          passRate: {
+            $round: [
+              { $multiply: [{ $divide: ['$passCount', '$totalTests'] }, 100] },
+              2
+            ]
+          },
+          totalMarks: 1,
+          totalObtained: 1
+        }
+      },
+
+      // Sort by average score descending
+      { $sort: { averageScore: -1 } }
+    ]);
+
+    console.log('✅ Subject performance data:', subjectPerformance);
+    res.json(subjectPerformance);
+
+  } catch (err) {
+    console.error('❌ Subject performance error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch subject performance',
+      error: err.message 
+    });
+  }
+});
+
 module.exports = router;
