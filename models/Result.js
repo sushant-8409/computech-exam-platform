@@ -31,7 +31,17 @@ const resultSchema = new mongoose.Schema({
   },
   submittedAt: { 
     type: Date, 
-    default: null 
+    default: null,
+    // Ensure submittedAt is set when result is saved with certain statuses
+    validate: {
+      validator: function(value) {
+        // If status indicates completion but no submittedAt, warn (but don't fail)
+        if (['completed', 'done', 'published', 'reviewed'].includes(this.status) && !value) {
+          console.warn(`Result ${this._id} has completion status but no submittedAt`);
+        }
+        return true;
+      }
+    }
   },
   answerSheetUrl: { 
     type: String, 

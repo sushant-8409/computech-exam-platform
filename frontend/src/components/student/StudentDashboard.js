@@ -242,6 +242,18 @@ const StudentDashboard = () => {
     avgCodingScore
   } = getAnalytics();
 
+  // Safe date formatter used across the dashboard
+  const formatDate = (value) => {
+    if (!value) return ' - ';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return ' - ';
+    try {
+      return d.toLocaleString('en-IN');
+    } catch (e) {
+      return d.toString();
+    }
+  };
+
   const handleStartTest = (testId, isResume = false, testType = 'traditional') => {
     if (testId) {
       // Route to appropriate interface based on test type
@@ -653,9 +665,7 @@ const StudentDashboard = () => {
                           </span>
                         </td>
                         <td>
-                          {r.submittedAt
-                            ? new Date(r.submittedAt).toLocaleDateString()
-                            : 'N/A'}
+                          {formatDate(r.submittedAt || r.createdAt || r.updatedAt)}
                         </td>
                         <td>
                           <div className={styles.actionButtons}>

@@ -19,7 +19,7 @@ const aw = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(n
 
 /* ─────────── 1. List results needing review ─────────── */
 router.get('/reviews', guard, aw(async (_req, res) => {
-  const rows = await Result.find({ status: { $in: ['pending', 'under review'] } })
+  const rows = await Result.find({ status: { $in: ['pending', 'under review', 'done'] } })
     .populate({ path: 'student', select: 'name email' })
     .populate({ path: 'test',    select: 'title' })
     .lean();
@@ -79,6 +79,24 @@ router.get('/reviews/:id/questions', guard, aw(async (req, res) => {
       // ReviewResult stores questions in questionWiseMarks array
       questions = rev.questionWiseMarks.map(r => r.questionNo);
       maxMarks  = rev.questionWiseMarks.map(r => r.maxMarks || 0);
+    }
+  } else if (result.status === 'done') {
+    /* ── DONE: Show existing questions from questionWiseMarks ── */
+    if (result.questionWiseMarks && result.questionWiseMarks.length > 0) {
+      questions = result.questionWiseMarks.map(r => r.questionNo);
+      maxMarks = result.questionWiseMarks.map(r => r.maxMarks || 0);
+    } else {
+      // Fallback to test structure if no questionWiseMarks exist
+      const test = await Test.findById(result.testId).lean();
+      if (test) {
+        const totalQuestions = test.questionsCount || 0;
+        const totalTestMarks = test.totalMarks || 0;
+        if (totalQuestions > 0) {
+          questions = Array.from({ length: totalQuestions }, (_, i) => i + 1);
+          const marksPerQuestion = totalTestMarks / totalQuestions;
+          maxMarks = Array(totalQuestions).fill(marksPerQuestion);
+        }
+      }
     }
   }
 
@@ -154,6 +172,8 @@ router.put('/reviews/:id/grade', guard, aw(async (req, res) => {
       studentId: result.studentId, 
       testId: result.testId 
     });
+  } else if (result.status === 'done') {
+    result.status = 'completed';
   }
 
   await result.save();
