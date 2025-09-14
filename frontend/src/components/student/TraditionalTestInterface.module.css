@@ -1638,3 +1638,114 @@
     text-align: center;
   }
 }
+
+/* Capture toast animation */
+:global(.Toastify__toast.captureToast) {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  color: white !important;
+  font-weight: 600;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+  animation: captureAnimation 0.5s ease-out;
+}
+
+@keyframes captureAnimation {
+  0% {
+    transform: scale(0.8) translateY(-20px);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05) translateY(-10px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+:global(.Toastify__toast.captureToast .Toastify__toast-body) {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+:global(.Toastify__toast.captureToast .Toastify__progress-bar) {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Mobile upload styles */
+.mobileUploadBtn {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.mobileUploadBtn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+}
+
+.mobileUploadBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.mobileUploadBtn.linkSent {
+  background: linear-gradient(135deg, #10b981, #059669);
+  cursor: default;
+}
+
+.mobileUploadStatus {
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border: 2px solid #0ea5e9;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  animation: slideInUp 0.5s ease-out;
+}
+
+.mobileUploadStatus .statusIcon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.mobileUploadStatus .statusText {
+  flex: 1;
+  color: #0c4a6e;
+}
+
+.mobileUploadStatus .statusText strong {
+  color: #0369a1;
+}
+
+.mobileUploadStatus .statusText small {
+  color: #0891b2;
+  display: block;
+  margin-top: 4px;
+}
+
+@keyframes slideInUp {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

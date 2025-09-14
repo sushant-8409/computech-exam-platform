@@ -211,10 +211,11 @@ const MultiQuestionCodingInterface = () => {
     const currentLang = getLanguageForBoard(test?.board);
     
     if (currentLang === 'python') {
-      // Python-specific completions
+      // Enhanced Python-specific completions with algorithm patterns
       monaco.languages.registerCompletionItemProvider('python', {
         provideCompletionItems: (model, position) => {
           const suggestions = [
+            // Basic patterns
             {
               label: 'for_range',
               kind: monaco.languages.CompletionItemKind.Snippet,
@@ -242,16 +243,67 @@ const MultiQuestionCodingInterface = () => {
               insertText: 'try:\n    ${1:pass}\nexcept ${2:Exception} as ${3:e}:\n    ${4:pass}',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               documentation: 'Try-except block'
+            },
+            // Algorithm-specific patterns
+            {
+              label: 'binary_search',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'def binary_search(${1:arr}, ${2:target}):\n    left, right = 0, len(${1:arr}) - 1\n    while left <= right:\n        mid = (left + right) // 2\n        if ${1:arr}[mid] == ${2:target}:\n            return mid\n        elif ${1:arr}[mid] < ${2:target}:\n            left = mid + 1\n        else:\n            right = mid - 1\n    return -1',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Binary search implementation'
+            },
+            {
+              label: 'two_pointers',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'left, right = 0, len(${1:arr}) - 1\nwhile left < right:\n    if ${1:arr}[left] + ${1:arr}[right] == ${2:target}:\n        return [left, right]\n    elif ${1:arr}[left] + ${1:arr}[right] < ${2:target}:\n        left += 1\n    else:\n        right -= 1',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Two pointers technique'
+            },
+            {
+              label: 'sliding_window',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'left = 0\nfor right in range(len(${1:arr})):\n    # Add ${1:arr}[right] to window\n    ${2:# Update window state}\n    \n    while ${3:# Window is invalid}:\n        # Remove ${1:arr}[left] from window\n        ${4:# Update window state}\n        left += 1\n    \n    # Process valid window\n    ${5:pass}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Sliding window pattern'
+            },
+            {
+              label: 'dfs_recursive',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'def dfs(${1:node}, ${2:visited}):\n    if ${1:node} in ${2:visited}:\n        return\n    \n    ${2:visited}.add(${1:node})\n    ${3:# Process node}\n    \n    for ${4:neighbor} in ${5:graph}[${1:node}]:\n        dfs(${4:neighbor}, ${2:visited})',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Depth-first search recursive'
+            },
+            {
+              label: 'bfs_queue',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'from collections import deque\n\ndef bfs(${1:start}):\n    queue = deque([${1:start}])\n    visited = {${1:start}}\n    \n    while queue:\n        ${2:node} = queue.popleft()\n        ${3:# Process node}\n        \n        for ${4:neighbor} in ${5:graph}[${2:node}]:\n            if ${4:neighbor} not in visited:\n                visited.add(${4:neighbor})\n                queue.append(${4:neighbor})',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Breadth-first search with queue'
+            },
+            {
+              label: 'dp_memoization',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'from functools import lru_cache\n\n@lru_cache(maxsize=None)\ndef ${1:dp_function}(${2:params}):\n    # Base case\n    if ${3:base_condition}:\n        return ${4:base_value}\n    \n    # Recursive case with memoization\n    return ${5:# recursive_call}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Dynamic programming with memoization'
+            },
+            {
+              label: 'quicksort',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'def quicksort(${1:arr}, ${2:low}, ${3:high}):\n    if ${2:low} < ${3:high}:\n        pi = partition(${1:arr}, ${2:low}, ${3:high})\n        quicksort(${1:arr}, ${2:low}, pi - 1)\n        quicksort(${1:arr}, pi + 1, ${3:high})\n\ndef partition(${1:arr}, ${2:low}, ${3:high}):\n    pivot = ${1:arr}[${3:high}]\n    i = ${2:low} - 1\n    for j in range(${2:low}, ${3:high}):\n        if ${1:arr}[j] <= pivot:\n            i += 1\n            ${1:arr}[i], ${1:arr}[j] = ${1:arr}[j], ${1:arr}[i]\n    ${1:arr}[i + 1], ${1:arr}[${3:high}] = ${1:arr}[${3:high}], ${1:arr}[i + 1]\n    return i + 1',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Quick sort implementation'
             }
           ];
           return { suggestions };
         }
       });
     } else if (currentLang === 'java') {
-      // Java-specific completions
+      // Enhanced Java-specific completions with algorithm patterns
       monaco.languages.registerCompletionItemProvider('java', {
         provideCompletionItems: (model, position) => {
           const suggestions = [
+            // Basic patterns
             {
               label: 'main_method',
               kind: monaco.languages.CompletionItemKind.Snippet,
@@ -279,11 +331,151 @@ const MultiQuestionCodingInterface = () => {
               insertText: 'ArrayList<${1:Integer}> ${2:list} = new ArrayList<>();',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               documentation: 'ArrayList declaration'
+            },
+            // Algorithm-specific patterns
+            {
+              label: 'binary_search',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'public static int binarySearch(int[] ${1:arr}, int ${2:target}) {\n    int left = 0, right = ${1:arr}.length - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (${1:arr}[mid] == ${2:target}) {\n            return mid;\n        } else if (${1:arr}[mid] < ${2:target}) {\n            left = mid + 1;\n        } else {\n            right = mid - 1;\n        }\n    }\n    return -1;\n}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Binary search implementation'
+            },
+            {
+              label: 'two_pointers',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'int left = 0, right = ${1:arr}.length - 1;\nwhile (left < right) {\n    int sum = ${1:arr}[left] + ${1:arr}[right];\n    if (sum == ${2:target}) {\n        return new int[]{left, right};\n    } else if (sum < ${2:target}) {\n        left++;\n    } else {\n        right--;\n    }\n}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Two pointers technique'
+            },
+            {
+              label: 'sliding_window',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'int left = 0;\nfor (int right = 0; right < ${1:arr}.length; right++) {\n    // Add ${1:arr}[right] to window\n    ${2:// Update window state}\n    \n    while (${3:/* Window is invalid */}) {\n        // Remove ${1:arr}[left] from window\n        ${4:// Update window state}\n        left++;\n    }\n    \n    // Process valid window\n    ${5:// Your code here}\n}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Sliding window pattern'
+            },
+            {
+              label: 'dfs_recursive',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'public void dfs(${1:int} ${2:node}, boolean[] ${3:visited}, List<List<Integer>> ${4:graph}) {\n    if (${3:visited}[${2:node}]) return;\n    \n    ${3:visited}[${2:node}] = true;\n    // Process node\n    ${5:// Your code here}\n    \n    for (int ${6:neighbor} : ${4:graph}.get(${2:node})) {\n        dfs(${6:neighbor}, ${3:visited}, ${4:graph});\n    }\n}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Depth-first search recursive'
+            },
+            {
+              label: 'bfs_queue',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'Queue<Integer> queue = new LinkedList<>();\nboolean[] visited = new boolean[${1:n}];\nqueue.offer(${2:start});\nvisited[${2:start}] = true;\n\nwhile (!queue.isEmpty()) {\n    int ${3:node} = queue.poll();\n    // Process node\n    ${4:// Your code here}\n    \n    for (int ${5:neighbor} : ${6:graph}.get(${3:node})) {\n        if (!visited[${5:neighbor}]) {\n            visited[${5:neighbor}] = true;\n            queue.offer(${5:neighbor});\n        }\n    }\n}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Breadth-first search with queue'
+            },
+            {
+              label: 'dp_memoization',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'Map<String, Integer> memo = new HashMap<>();\n\npublic int ${1:dpFunction}(${2:int param}) {\n    String key = String.valueOf(${2:param});\n    if (memo.containsKey(key)) {\n        return memo.get(key);\n    }\n    \n    // Base case\n    if (${3:/* base condition */}) {\n        return ${4:/* base value */};\n    }\n    \n    // Recursive case with memoization\n    int result = ${5:/* recursive call */};\n    memo.put(key, result);\n    return result;\n}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Dynamic programming with memoization'
+            },
+            {
+              label: 'quicksort',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'public void quickSort(int[] ${1:arr}, int ${2:low}, int ${3:high}) {\n    if (${2:low} < ${3:high}) {\n        int pi = partition(${1:arr}, ${2:low}, ${3:high});\n        quickSort(${1:arr}, ${2:low}, pi - 1);\n        quickSort(${1:arr}, pi + 1, ${3:high});\n    }\n}\n\npublic int partition(int[] ${1:arr}, int ${2:low}, int ${3:high}) {\n    int pivot = ${1:arr}[${3:high}];\n    int i = ${2:low} - 1;\n    \n    for (int j = ${2:low}; j < ${3:high}; j++) {\n        if (${1:arr}[j] <= pivot) {\n            i++;\n            int temp = ${1:arr}[i];\n            ${1:arr}[i] = ${1:arr}[j];\n            ${1:arr}[j] = temp;\n        }\n    }\n    \n    int temp = ${1:arr}[i + 1];\n    ${1:arr}[i + 1] = ${1:arr}[${3:high}];\n    ${1:arr}[${3:high}] = temp;\n    return i + 1;\n}',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'Quick sort implementation'
+            },
+            {
+              label: 'hashmap',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'Map<${1:String}, ${2:Integer}> ${3:map} = new HashMap<>();',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'HashMap declaration'
+            },
+            {
+              label: 'priority_queue',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: 'PriorityQueue<${1:Integer}> ${2:pq} = new PriorityQueue<>();',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: 'PriorityQueue declaration'
             }
           ];
           return { suggestions };
         }
       });
+    }
+
+    // Add intelligent context-aware suggestions based on problem keywords
+    const addContextAwareSuggestions = () => {
+      const problemDescription = currentQuestion?.description?.toLowerCase() || '';
+      const problemTitle = currentQuestion?.title?.toLowerCase() || '';
+      const fullContext = (problemDescription + ' ' + problemTitle).toLowerCase();
+
+      // Detect algorithm types based on keywords
+      const contextSuggestions = [];
+      
+      if (fullContext.includes('sort') || fullContext.includes('sorted')) {
+        if (currentLang === 'python') {
+          contextSuggestions.push({
+            label: 'sort_array',
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertText: '${1:arr}.sort()  # In-place sort\n# OR\nsorted_arr = sorted(${1:arr})  # Returns new sorted array',
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            documentation: 'Array sorting methods'
+          });
+        } else if (currentLang === 'java') {
+          contextSuggestions.push({
+            label: 'sort_array',
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertText: 'Arrays.sort(${1:arr});  // In-place sort\n// OR\nList<Integer> list = Arrays.asList(${1:arr});\nCollections.sort(list);',
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            documentation: 'Array sorting methods'
+          });
+        }
+      }
+
+      if (fullContext.includes('tree') || fullContext.includes('binary tree')) {
+        if (currentLang === 'python') {
+          contextSuggestions.push({
+            label: 'tree_node',
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertText: 'class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right',
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            documentation: 'Binary tree node definition'
+          });
+        } else if (currentLang === 'java') {
+          contextSuggestions.push({
+            label: 'tree_node',
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertText: 'class TreeNode {\n    int val;\n    TreeNode left;\n    TreeNode right;\n    TreeNode() {}\n    TreeNode(int val) { this.val = val; }\n    TreeNode(int val, TreeNode left, TreeNode right) {\n        this.val = val;\n        this.left = left;\n        this.right = right;\n    }\n}',
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            documentation: 'Binary tree node definition'
+          });
+        }
+      }
+
+      if (fullContext.includes('graph') || fullContext.includes('path') || fullContext.includes('connected')) {
+        if (currentLang === 'python') {
+          contextSuggestions.push({
+            label: 'graph_adjacency',
+            kind: monaco.languages.CompletionItemKind.Snippet,
+            insertText: '# Adjacency list representation\ngraph = {}\nfor i in range(${1:n}):\n    graph[i] = []\n\n# Add edge\ngraph[${2:u}].append(${3:v})\ngraph[${3:v}].append(${2:u})  # For undirected graph',
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            documentation: 'Graph adjacency list setup'
+          });
+        }
+      }
+
+      return contextSuggestions;
+    };
+
+    // Register context-aware suggestions
+    if (currentQuestion && (currentLang === 'python' || currentLang === 'java')) {
+      const contextSuggestions = addContextAwareSuggestions();
+      if (contextSuggestions.length > 0) {
+        monaco.languages.registerCompletionItemProvider(currentLang, {
+          provideCompletionItems: (model, position) => {
+            return { suggestions: contextSuggestions };
+          }
+        });
+      }
     }
   }, [test]);
 

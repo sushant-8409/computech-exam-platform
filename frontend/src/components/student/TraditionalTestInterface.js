@@ -41,6 +41,7 @@ const AnswerSheetUploader = React.memo(({
   onUpload, 
   isUploading, 
   isRequired,
+  testId,
   onFilePickerOpen,
   onFilePickerClose,
   onCameraOpen,
@@ -56,6 +57,10 @@ const AnswerSheetUploader = React.memo(({
   const cameraRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  
+  // Mobile upload states
+  const [mobileUploadRequested, setMobileUploadRequested] = useState(false);
+  const [mobileUploadExpiry, setMobileUploadExpiry] = useState(null);
   
   const handleFileSelect = useCallback((event) => {
     // File picker is closing
@@ -208,7 +213,18 @@ const AnswerSheetUploader = React.memo(({
         };
         
         setSelectedPages(prev => [...prev, newPage]);
-        toast.success('Photo captured successfully!');
+        
+        // Show animated "Page captured" feedback
+        const pageNumber = selectedPages.length + 1;
+        toast.success(`📄 Page ${pageNumber} captured!`, {
+          position: 'top-center',
+          autoClose: 2000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          className: styles.captureToast
+        });
       }
     }, 'image/jpeg', 0.8);
   };
@@ -228,6 +244,44 @@ const AnswerSheetUploader = React.memo(({
     // Call the monitoring resume function from parent
     if (onCameraClose) onCameraClose();
   };
+
+  // Mobile upload request function
+  const handleMobileUploadRequest = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/mobile-upload/request', {
+        testId: testId,
+        uploadType: 'answer-sheet',
+        uploadContext: {
+          testName: window.testName || 'Answer Sheet Upload',
+          subject: 'Traditional Test',
+          instructions: 'Please upload clear images of your answer sheet using your mobile device back camera.',
+          maxFiles: 10,
+          allowedTypes: ['jpg', 'jpeg', 'png']
+        },
+        validityMinutes: 10
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        setMobileUploadRequested(true);
+        setMobileUploadExpiry(new Date(Date.now() + 10 * 60 * 1000)); // 10 minutes from now
+        
+        toast.success('📱 Mobile upload link sent to your registered email!', {
+          position: 'top-center',
+          autoClose: 5000
+        });
+        
+        console.log('Mobile upload link sent:', response.data.token);
+      } else {
+        throw new Error(response.data.error || 'Failed to send mobile link');
+      }
+    } catch (error) {
+      console.error('Mobile upload request failed:', error);
+      toast.error(error.response?.data?.error || 'Failed to send mobile upload link');
+    }
+  }, [testId]);
 
   return (
     <div className={styles.answerUploader}>
@@ -301,6 +355,19 @@ const AnswerSheetUploader = React.memo(({
                         {isAndroid ? 'Use Back Camera' : 'Take Photo'}
                       </button>
                     )}
+                    
+                    {!isMobile && (
+                      <button 
+                        onClick={handleMobileUploadRequest}
+                        className={`${styles.mobileUploadBtn} ${mobileUploadRequested ? styles.linkSent : ''}`}
+                        disabled={isUploading || mobileUploadRequested}
+                      >
+                        <span className={styles.uploadIcon}>
+                          {mobileUploadRequested ? '✅' : '📱'}
+                        </span>
+                        {mobileUploadRequested ? 'Link Sent!' : 'Send Mobile Link'}
+                      </button>
+                    )}
                   </>
                 )}
                 
@@ -329,6 +396,19 @@ const AnswerSheetUploader = React.memo(({
             <p className={styles.uploadHint}>
               Upload JPG/JPEG images as pages. Images will be merged into a PDF in the order shown. (Max 10MB per image)
             </p>
+            
+            {mobileUploadRequested && mobileUploadExpiry && (
+              <div className={styles.mobileUploadStatus}>
+                <div className={styles.statusIcon}>📱</div>
+                <div className={styles.statusText}>
+                  <strong>Mobile upload link sent to your email!</strong>
+                  <br />
+                  <small>Link expires at {mobileUploadExpiry.toLocaleTimeString()}</small>
+                  <br />
+                  <small>Use your mobile device's back camera to capture answer sheets</small>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
@@ -429,6 +509,7 @@ const TraditionalTestInterface = () => {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [suspiciousActivities, setSuspiciousActivities] = useState([]);
   const [monitoringImages, setMonitoringImages] = useState([]);
+  const [monitoringSessionId, setMonitoringSessionId] = useState(null);
   
   // Refs for monitoring
   const videoRef = useRef(null);
@@ -656,7 +737,7 @@ const TraditionalTestInterface = () => {
   }, [test, navigate]);
 
   // Capture monitoring image
-  const captureMonitoringImage = useCallback(() => {
+  const captureMonitoringImage = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || !isMonitoring) return;
     
     try {
@@ -676,25 +757,76 @@ const TraditionalTestInterface = () => {
       const imageData = canvas.toDataURL('image/jpeg', 0.9);
       const timestamp = new Date().toISOString();
       
+      // Store locally for immediate UI feedback
       setMonitoringImages(prev => [...prev, {
         timestamp,
         imageData,
         type: 'monitoring'
       }]);
       
+      // Upload to server for permanent storage and violation detection
+      try {
+        console.log('📤 Uploading monitoring image to server...');
+        
+        // Convert base64 to blob
+        const blob = await fetch(imageData).then(r => r.blob());
+        const formData = new FormData();
+        formData.append('monitoringImage', blob, `monitoring_${Date.now()}.jpg`);
+        formData.append('timestamp', timestamp);
+        formData.append('testId', testId);
+        formData.append('purpose', 'monitoring');
+        formData.append('testType', 'traditional');
+        formData.append('saveToGoogleDrive', 'true');
+
+        const token = localStorage.getItem('token');
+        const response = await axios.post('/api/student/monitoring/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`
+          }
+        });
+        
+        console.log('✅ Monitoring image uploaded successfully:', response.data);
+      } catch (uploadError) {
+        console.error('❌ Failed to upload monitoring image:', uploadError);
+        // Don't block the monitoring flow if upload fails
+      }
+      
     } catch (err) {
       console.error('Image capture failed:', err);
     }
-  }, [isMonitoring]);
+  }, [isMonitoring, testId]);
 
   // Handle violations
-  const handleViolation = useCallback((type, details) => {
+  const handleViolation = useCallback(async (type, details) => {
     const violation = {
       type,
       timestamp: new Date().toISOString(),
       details: details || `${type} violation detected`,
+      testType: 'traditional',
       ...details
     };
+    
+    // Send violation to server for permanent recording
+    if (monitoringSessionId) {
+      try {
+        const token = localStorage.getItem('token');
+        await axios.post('/api/student/monitoring/violation', {
+          sessionId: monitoringSessionId,
+          type,
+          details: violation.details,
+          severity: 'medium'
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log('✅ Violation recorded on server:', violation);
+      } catch (error) {
+        console.error('❌ Failed to record violation on server:', error);
+        // Continue with local recording even if server fails
+      }
+    } else {
+      console.warn('⚠️ No monitoring session ID - violation not sent to server');
+    }
     
     setViolations(prev => {
       const newViolations = [...prev, violation];
@@ -713,7 +845,7 @@ const TraditionalTestInterface = () => {
       
       return newViolations;
     });
-  }, [maxViolations]);
+  }, [maxViolations, testId, monitoringSessionId]);
 
   // Camera functions for answer sheet capture
   const handleCameraClick = useCallback(() => {
@@ -1010,6 +1142,21 @@ const TraditionalTestInterface = () => {
           tracks.forEach(track => track.stop());
         }
         
+        // End monitoring session
+        if (monitoringSessionId) {
+          try {
+            await axios.post('/api/student/monitoring/end', {
+              sessionId: monitoringSessionId
+            }, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            console.log('✅ Monitoring session ended');
+          } catch (endError) {
+            console.error('❌ Failed to end monitoring session:', endError);
+            // Don't block submission if monitoring cleanup fails
+          }
+        }
+        
         toast.success('Test ended successfully!');
         
         setTimeout(() => {
@@ -1135,6 +1282,22 @@ const TraditionalTestInterface = () => {
         // Initialize monitoring directly
         if (test?.cameraMonitoring?.enabled) {
           try {
+            // Create monitoring session first
+            const sessionResponse = await axios.post('/api/student/monitoring/start', {
+              testId,
+              settings: {
+                captureInterval: test.cameraMonitoring.captureInterval || 30000,
+                testType: 'traditional'
+              }
+            }, {
+              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
+            
+            if (sessionResponse.data.success) {
+              setMonitoringSessionId(sessionResponse.data.sessionId);
+              console.log('✅ Monitoring session created:', sessionResponse.data.sessionId);
+            }
+            
             const stream = await navigator.mediaDevices.getUserMedia({ 
               video: { 
                 width: 640, 
@@ -1525,6 +1688,34 @@ const TraditionalTestInterface = () => {
   }, [testStarted, test?.proctoringSettings?.requireFullscreen, isSubmitted]);
 
   // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup monitoring when component unmounts
+      if (monitoringIntervalRef.current) {
+        clearInterval(monitoringIntervalRef.current);
+      }
+      
+      if (videoRef.current?.srcObject) {
+        const tracks = videoRef.current.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+      }
+      
+      // End monitoring session if active
+      if (monitoringSessionId) {
+        const token = localStorage.getItem('token');
+        if (token) {
+          axios.post('/api/student/monitoring/end', {
+            sessionId: monitoringSessionId
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).catch(error => {
+            console.error('❌ Failed to cleanup monitoring session on unmount:', error);
+          });
+        }
+      }
+    };
+  }, [monitoringSessionId]);
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -1677,6 +1868,7 @@ const TraditionalTestInterface = () => {
                 onUpload={uploadAnswerSheet}
                 isUploading={isUploading}
                 isRequired={test?.paperSubmissionRequired}
+                testId={testId}
                 onFilePickerOpen={() => setIsFilePickerOpen(true)}
                 onFilePickerClose={() => setIsFilePickerOpen(false)}
                 onCameraOpen={handleCameraClick}

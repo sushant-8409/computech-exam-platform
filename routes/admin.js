@@ -2390,6 +2390,34 @@ router.get('/monitoring-details/:resultId', async (req, res) => {
   }
 });
 
+// OAuth Disconnect endpoint
+router.delete('/oauth-disconnect', async (req, res) => {
+  try {
+    console.log('🔒 OAuth disconnect requested');
+    
+    // Clear any OAuth tokens or sessions
+    // Note: Adjust this based on your OAuth implementation
+    if (req.session) {
+      req.session.oauthTokens = null;
+      req.session.googleCredentials = null;
+    }
+    
+    console.log('✅ OAuth disconnected successfully');
+    res.json({
+      success: true,
+      message: 'OAuth disconnected successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error disconnecting OAuth:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to disconnect OAuth',
+      error: error.message
+    });
+  }
+});
+
 console.log('📝 Admin routes module loaded successfully');
 
 module.exports = router;
