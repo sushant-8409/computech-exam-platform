@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import TestMonitoringSystem from '../../utils/TestMonitoringSystem';
 import './LeetCodeInterface.css';
 
@@ -682,12 +683,16 @@ const MultiQuestionCodingInterface = () => {
         console.warn('Failed to clear saved codes from localStorage:', error);
       }
       
-      toast.success('Test submitted successfully!');
-      
-      // Redirect after short delay
-      setTimeout(() => {
-        navigate('/student/dashboard');
-      }, 2000);
+      // Show prominent SweetAlert success
+      await Swal.fire({
+        title: 'Submitted!',
+        text: 'Your coding test was submitted successfully.',
+        icon: 'success',
+        confirmButtonText: 'Go to Dashboard'
+      });
+
+      // Redirect to dashboard
+      navigate('/student/dashboard');
       
     } catch (error) {
       console.error('💥 Error submitting test:', error);

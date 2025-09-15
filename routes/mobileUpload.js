@@ -95,13 +95,16 @@ const validateUploadToken = async (req, res, next) => {
 router.post('/request', authenticateStudent, async (req, res) => {
   try {
     const {
-      email,
+      email: emailFromBody,
       testId,
       uploadType = 'test-paper',
       uploadContext = {},
       validityMinutes = 10
     } = req.body;
-    
+
+    // Use authenticated student's email if not provided in body
+    const email = emailFromBody || req.user?.email;
+
     // Validate required fields
     if (!email) {
       return res.status(400).json({
@@ -109,7 +112,7 @@ router.post('/request', authenticateStudent, async (req, res) => {
         error: 'Email is required'
       });
     }
-    
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {

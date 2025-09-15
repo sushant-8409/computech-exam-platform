@@ -30,13 +30,7 @@ class Judge0Service {
       }
     ];
     
-    // OnlineCompiler.io API configuration
-    this.onlineCompilerConfig = {
-      name: 'OnlineCompiler.io',
-      baseURL: 'https://onlinecompiler.io',
-      apiKey: '12662d20bfe0dc0a5294c3de4b90a742',
-      callbackUrl: 'https://computech-exam-platform/api/compiler-callback'
-    };
+    // (Removed OnlineCompiler.io) We'll use Piston (emkc.org) as a reliable public fallback
     
     // Track current API index
     this.currentApiIndex = 0;
@@ -148,94 +142,75 @@ class Judge0Service {
         return response.data;
       });
     } catch (error) {
-      console.log('⚠️ All Judge0 APIs failed, trying OnlineCompiler.io fallback...');
-      return await this.tryOnlineCompiler(sourceCode, languageId, input);
+      console.log('⚠️ All Judge0 APIs failed, trying Piston (emkc.org) fallback...');
+      return await this.tryPiston(sourceCode, languageId, input);
     }
   }
 
-  // OnlineCompiler.io fallback method (Updated API)
-  async tryOnlineCompiler(sourceCode, languageId, input = '') {
+  // Piston (emkc.org) fallback method
+  async tryPiston(sourceCode, languageId, input = '') {
     try {
-      // Map Judge0 language IDs to OnlineCompiler.io languages
+      // Map Judge0 language IDs to Piston language aliases
       const languageMap = {
-        71: 'python3',    // Python 3
-        62: 'java',       // Java
-        50: 'c',          // C
-        54: 'cpp',        // C++
-        63: 'javascript'  // JavaScript
+        71: 'python',    // Python 3.10 available on Piston
+        62: 'java',
+        50: 'c',
+        54: 'cpp',
+        63: 'javascript'
       };
 
       const language = languageMap[languageId];
       if (!language) {
-        console.log(`⚠️ Language ID ${languageId} not supported by OnlineCompiler.io fallback`);
-        throw new Error(`Language ID ${languageId} not supported by OnlineCompiler.io`);
+        console.log(`⚠️ Language ID ${languageId} not supported by Piston fallback`);
+        throw new Error(`Language ID ${languageId} not supported by Piston`);
       }
 
-      console.log(`🔄 Attempting OnlineCompiler.io fallback for ${language}`);
+      console.log(`🔄 Attempting Piston fallback for ${language}`);
 
-      // Try different API endpoint structures that OnlineCompiler.io might use
-      const possibleEndpoints = [
-        '/api/v1/execute',
-        '/api/execute',
-        '/execute',
-        '/api/v1/compile'
-      ];
+      // Piston execute endpoint
+      const url = 'https://emkc.org/api/v2/piston/execute';
 
-      let lastError;
-      
-      for (const endpoint of possibleEndpoints) {
-        try {
-          console.log(`🔍 Trying endpoint: ${this.onlineCompilerConfig.baseURL}${endpoint}`);
-          
-          const response = await axios({
-            method: 'POST',
-            url: `${this.onlineCompilerConfig.baseURL}${endpoint}`,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.onlineCompilerConfig.apiKey}`,
-              'X-API-Key': this.onlineCompilerConfig.apiKey
-            },
-            data: {
-              language: language,
-              code: sourceCode,
-              input: input,
-              stdin: input
-            },
-            timeout: 15000
-          });
+      // Build payload using Piston's `files` format
+      const payload = {
+        language: language,
+        version: '',
+        files: [
+          { name: 'main', content: sourceCode }
+        ],
+        stdin: input
+      };
 
-          console.log('✅ OnlineCompiler.io execution successful');
-          
-          // Format response to match Judge0 format
-          return {
-            stdout: response.data.output || response.data.stdout || '',
-            stderr: response.data.error || response.data.stderr || '',
-            status: {
-              id: response.data.error || response.data.stderr ? 6 : 3,
-              description: response.data.error || response.data.stderr ? 'Runtime Error' : 'Accepted'
-            },
-            time: response.data.time || response.data.execution_time || '0',
-            memory: response.data.memory || response.data.memory_usage || '0'
-          };
-          
-        } catch (endpointError) {
-          lastError = endpointError;
-          console.log(`❌ Endpoint ${endpoint} failed:`, endpointError.response?.status || endpointError.message);
-          continue;
-        }
-      }
-      
-      throw lastError;
+      const response = await axios({
+        method: 'POST',
+        url: url,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        data: payload,
+        timeout: 20000
+      });
+
+      console.log('✅ Piston execution successful');
+
+      // Normalize Piston response to Judge0-like structure
+      return {
+        stdout: response.data.run?.stdout || response.data.output || '',
+        stderr: response.data.run?.stderr || response.data.stderr || '',
+        status: {
+          id: response.data.run?.code === 0 ? 3 : 6,
+          description: response.data.run?.code === 0 ? 'Accepted' : 'Runtime Error'
+        },
+        time: response.data.run?.time || response.data.run?.stats?.duration || '0',
+        memory: response.data.run?.memory || '0'
+      };
 
     } catch (error) {
-      console.error('💥 OnlineCompiler.io fallback failed:', error.response?.status || error.message);
-      
-      // Return a user-friendly error instead of throwing
+      console.error('💥 Piston fallback failed:', error.response?.status || error.message);
       return {
         stdout: '',
-        stderr: `OnlineCompiler.io service temporarily unavailable: ${error.message}`,
+        stderr: `Piston service temporarily unavailable: ${error.message}`,
         status: {
-          id: 11, // Internal Error
+          id: 11,
           description: 'Compiler Service Error'
         },
         time: '0',
