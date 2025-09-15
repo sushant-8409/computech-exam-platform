@@ -19,7 +19,7 @@ const OAuthSettings = () => {
   const [formData, setFormData] = useState({
     clientId: '',
     clientSecret: '',
-    redirectUri: 'http://localhost:5000/auth/google/callback',
+    redirectUri: process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL.replace(/\/$/, '')}/auth/google/callback` : 'http://localhost:5000/auth/google/callback',
     scopes: [
       'profile',
       'email',
@@ -459,7 +459,7 @@ const OAuthSettings = () => {
                 value={formData.redirectUri}
                 onChange={(e) => setFormData(prev => ({ ...prev, redirectUri: e.target.value }))}
                 className={errors.redirectUri ? styles.error : ''}
-                placeholder="http://localhost:5000/auth/google/callback"
+                placeholder={process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL.replace(/\/$/, '')}/auth/google/callback` : 'http://localhost:5000/auth/google/callback'}
               />
               {errors.redirectUri && <span className={styles.errorText}>{errors.redirectUri}</span>}
             </div>

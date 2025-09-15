@@ -167,12 +167,10 @@ const AdminDashboard = () => {
     return;
   }
 
-  // More robust URL detection
-  const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-  const serverUrl = isProduction 
-    ? 'https://computech-exam-platform.onrender.com' 
-    : 'http://localhost:5000';
-  
+  // Prefer environment variable, fall back to sensible defaults
+  const DEFAULT_PROD_API = 'https://computech-exam-platform.onrender.com';
+  const DEFAULT_LOCAL_API = 'http://localhost:5000';
+  const serverUrl = process.env.REACT_APP_API_URL || (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? DEFAULT_PROD_API : DEFAULT_LOCAL_API);
   const authUrl = `${serverUrl}/auth/google?token=${encodeURIComponent(token)}`;
   console.log('🔗 Opening OAuth popup:', authUrl);
   
@@ -190,8 +188,9 @@ const AdminDashboard = () => {
 
   // Listen for messages from the popup
   const handleMessage = (event) => {
-    // Security check
-    if (event.origin !== serverUrl) {
+    // Security check: allow either configured API origin or the window.location origin (for proxy setups)
+    const allowedOrigin = new URL(serverUrl).origin;
+    if (event.origin !== allowedOrigin && event.origin !== window.location.origin) {
       console.warn('Received message from unexpected origin:', event.origin);
       return;
     }

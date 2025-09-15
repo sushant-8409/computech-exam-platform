@@ -6,6 +6,10 @@
 
 [build.environment]
   CI = "false"
+  # Frontend site base URL used in generated PDFs and links
+  REACT_APP_BASE_URL = "https://computechexamplatform.netlify.app"
+  # Optional: set this to your backend API in production (uncomment and set if available)
+  # REACT_APP_API_URL = "https://computech-exam-platform.onrender.com"
 
   ## Uncomment to use this redirect for Single Page Applications like create-react-app.
   ## Not needed for static site generators.

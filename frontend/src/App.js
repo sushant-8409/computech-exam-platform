@@ -32,13 +32,12 @@ import MockTestCreator from './components/student/MockTestCreator';
 import MobileUploadInterface from './components/mobile/MobileUploadInterface';
 import { useDevToolsProtection } from './hooks/useDevToolsProtection'; // Security protection
 
-// Set axios base URL
-// Set axios base URL based on environment
-if (process.env.NODE_ENV === 'production') {
-  axios.defaults.baseURL = 'https://computech-exam-platform.onrender.com';
-} else {
-  axios.defaults.baseURL = 'http://localhost:5000';
-}
+// Set axios base URL using REACT_APP_API_URL (set in Netlify or local .env)
+// Fallbacks: production default (render) or localhost for development
+const DEFAULT_PROD_API = 'https://computech-exam-platform.onrender.com';
+const DEFAULT_LOCAL_API = 'http://localhost:5000';
+const apiBase = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? DEFAULT_PROD_API : DEFAULT_LOCAL_API);
+axios.defaults.baseURL = apiBase;
 axios.defaults.withCredentials = true;
 // Change to your server URL
 

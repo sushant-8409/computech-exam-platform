@@ -680,9 +680,10 @@ const ResultDetail = () => {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       pdf.setTextColor(0, 51, 102);
+      const baseSite = process.env.REACT_APP_BASE_URL || 'https://computechexamplatform.netlify.app';
       pdf.text('Online Verification Available at:', 25, yPosition);
-      pdf.textWithLink('https://computech-exam-platform.onrender.com', 25, yPosition + 6, { 
-        url: `https://computech-exam-platform.onrender.com/result/${resultId}` 
+      pdf.textWithLink(baseSite, 25, yPosition + 6, { 
+        url: `${baseSite.replace(/\/$/, '')}/result/${resultId}` 
       });
       yPosition += 20;
     }
