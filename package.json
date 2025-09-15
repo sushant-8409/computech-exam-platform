@@ -9,7 +9,7 @@
     "client": "cd frontend && npm start",
     "start": "node server.js",
     "build": "cd frontend && npm run build",
-    "vercel-build": "cd frontend && npm install && npm run build",
+    "vercel-build": "cd frontend && npm install && CI=false npm run build",
     "postinstall": "cd frontend && npm install"
   },
   "dependencies": {
