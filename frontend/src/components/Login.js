@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth }      from '../App';
 import { useNavigate, Navigate } from 'react-router-dom';
-
-import { ToastContainer, toast } from 'react-toastify';     // ← NEW
+import Swal from 'sweetalert2';
+import { ToastContainer, toast } from 'react-toastify';     // ← Keep toast for success
 import 'react-toastify/dist/ReactToastify.css';             // ← NEW
 
 const Login = () => {
@@ -26,15 +26,47 @@ const Login = () => {
       const result = await login(credentials.email, credentials.password);
 
       if (result?.success) {
-        toast.dismiss();                                     // clear old errors
-        toast.success('Login successful 🎉', { autoClose: 2000 });
+        // Show success message with SweetAlert
+        await Swal.fire({
+          icon: 'success',
+          title: 'Login Successful!',
+          text: `Welcome back, ${result.user.name || 'User'}!`,
+          timer: 2000,
+          showConfirmButton: false,
+          background: 'var(--bg-primary)',
+          color: 'var(--text-primary)'
+        });
         navigate(result.user.role === 'admin' ? '/admin' : '/student');
       } else {
-        /* result could be null or { success:false, message:'…' }   */
-        toast.error(result?.message || 'Invalid email / password');
+        // Show error with SweetAlert for incorrect credentials
+        await Swal.fire({
+          icon: 'error',
+          title: 'Login Failed',
+          text: result?.message || 'Invalid email or password. Please check your credentials and try again.',
+          confirmButtonText: 'Try Again',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-primary)',
+          confirmButtonColor: 'var(--primary)'
+        });
       }
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Server error. Try again.');
+      // Show server error with SweetAlert
+      const errorMessage = err?.response?.data?.message || 'Server error. Please try again later.';
+      await Swal.fire({
+        icon: 'error',
+        title: 'Connection Error',
+        text: errorMessage,
+        html: `
+          <p>${errorMessage}</p>
+          <small style="color: var(--text-secondary);">
+            If this problem persists, please contact support.
+          </small>
+        `,
+        confirmButtonText: 'Retry',
+        background: 'var(--bg-primary)',
+        color: 'var(--text-primary)',
+        confirmButtonColor: 'var(--primary)'
+      });
     } finally {
       setLoading(false);
     }
@@ -88,7 +120,7 @@ const Login = () => {
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
             Don&apos;t have an account?{' '}
             <a
-              href="https://computech-07f0.onrender.com/signup.html"
+              href={`${process.env.REACT_APP_BASE_URL || 'https://computechexamplatform.netlify.app'}/signup.html`}
               style={{ color: 'var(--primary)', textDecoration: 'none' }}
             >
               Sign up here
@@ -97,7 +129,7 @@ const Login = () => {
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
             Forgot password?{' '}
             <a
-              href="https://computech-07f0.onrender.com/forget-password.html"
+              href={`${process.env.REACT_APP_BASE_URL || 'https://computechexamplatform.netlify.app'}/forget-password.html`}
               style={{ color: 'var(--primary)', textDecoration: 'none' }}
             >
               Reset here

@@ -20,7 +20,11 @@ const { cleanupTmpDirectory } = require('./services/tmpCleanup');
 // In your server.js, update CORS config
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://computech-exam-platform.onrender.com'] 
+    ? [
+        'https://computech-exam-platform.onrender.com',
+        'https://computechexamplatform.netlify.app',
+        'https://68c7f60439c4a6e13be296cf--computechexamplatform.netlify.app' // Deploy URL
+      ]
     : ['http://localhost:3000', 'http://localhost:5000'], // Add port 5000
   methods: 'GET,POST,PUT,DELETE,PATCH',
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -111,7 +115,34 @@ app.use(express.static(path.join(__dirname, 'frontend', 'build'), {
 
 // Fallback to the React app for any route not caught by the API
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
+  const buildPath = path.join(__dirname, 'frontend', 'build', 'index.html');
+  
+  // Check if build files exist (for production)
+  const fs = require('fs');
+  if (fs.existsSync(buildPath)) {
+    res.sendFile(buildPath);
+  } else {
+    // In development or if build doesn't exist, return a helpful message
+    if (process.env.NODE_ENV === 'development') {
+      res.status(200).send(`
+        <html>
+          <head><title>Development Server</title></head>
+          <body>
+            <h1>ComputTech Exam Platform - Development Server</h1>
+            <p>Frontend build not found. This is normal in development mode.</p>
+            <p>The React frontend should be running on port 3000.</p>
+            <p>API server is running on port ${PORT}</p>
+            <p><a href="http://localhost:3000">Go to Frontend (Port 3000)</a></p>
+          </body>
+        </html>
+      `);
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Frontend build not found. Please build the frontend first.'
+      });
+    }
+  }
 });
 
 // ================== Global Error Handler ==================
@@ -124,7 +155,8 @@ app.use((error, req, res, next) => {
 });
 
 // ================== Server Startup ==================
-const PORT = process.env.PORT || 5000;
+// Use port 5000 for backend in development, respect PORT env var in production
+const PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 3000 : 5000);
 
 const startServer = async () => {
   try {
