@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import styles from './TraditionalTestInterface.module.css';
+import QRCode from 'react-qr-code';
 
 // Optimized components
 const TimerDisplay = React.memo(({ timeLeft, isWarning }) => {
@@ -61,6 +62,8 @@ const AnswerSheetUploader = React.memo(({
   // Mobile upload states
   const [mobileUploadRequested, setMobileUploadRequested] = useState(false);
   const [mobileUploadExpiry, setMobileUploadExpiry] = useState(null);
+  const [mobileUploadUrl, setMobileUploadUrl] = useState(null);
+  const [showQRCode, setShowQRCode] = useState(false);
   
   const handleFileSelect = useCallback((event) => {
     // File picker is closing
@@ -265,8 +268,13 @@ const AnswerSheetUploader = React.memo(({
       });
       
       if (response.data.success) {
+        const uploadToken = response.data.token;
+        const mobileUrl = `${window.location.origin}/mobile-upload/${uploadToken}`;
+        
         setMobileUploadRequested(true);
         setMobileUploadExpiry(new Date(Date.now() + 10 * 60 * 1000)); // 10 minutes from now
+        setMobileUploadUrl(mobileUrl);
+        setShowQRCode(true);
         
         toast.success('📱 Mobile upload link sent to your registered email!', {
           position: 'top-center',
@@ -406,6 +414,43 @@ const AnswerSheetUploader = React.memo(({
                   <small>Link expires at {mobileUploadExpiry.toLocaleTimeString()}</small>
                   <br />
                   <small>Use your mobile device's back camera to capture answer sheets</small>
+                  
+                  {/* QR Code Display */}
+                  {showQRCode && mobileUploadUrl && new Date() < mobileUploadExpiry && (
+                    <div style={{ 
+                      marginTop: '1rem', 
+                      textAlign: 'center',
+                      padding: '1rem',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      border: '1px solid #dee2e6'
+                    }}>
+                      <div style={{ marginBottom: '0.5rem', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>
+                        📱 Scan QR Code with Mobile Camera
+                      </div>
+                      <div style={{ 
+                        display: 'inline-block', 
+                        padding: '8px', 
+                        backgroundColor: 'white', 
+                        borderRadius: '6px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}>
+                        <QRCode
+                          value={mobileUploadUrl}
+                          size={150}
+                          style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                          viewBox="0 0 256 256"
+                        />
+                      </div>
+                      <div style={{ 
+                        fontSize: '11px', 
+                        color: '#6c757d', 
+                        marginTop: '0.5rem'
+                      }}>
+                        Expires in {Math.max(0, Math.ceil((mobileUploadExpiry - new Date()) / 60000))} minutes
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

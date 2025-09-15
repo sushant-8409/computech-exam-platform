@@ -16,6 +16,7 @@ import Swal from 'sweetalert2';
 import { confirmDelete, confirmAction, successAlert, errorAlert } from '../../utils/SweetAlerts';
 import { enhanceEmbedUrl } from '../../utils/googleDriveUtils';
 import TestMonitoringSystem from '../../utils/TestMonitoringSystem';
+import QRCode from 'react-qr-code';
 const TestInterface = () => {
   const { testId } = useParams();
   const { user } = useAuth();
@@ -147,6 +148,11 @@ const TestInterface = () => {
     setDebugLogs(prev => [...prev.slice(-4), log]); // Keep only last 5 logs
   };
 
+  // Mobile upload QR code state
+  const [mobileUploadUrl, setMobileUploadUrl] = useState(null);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrCodeExpiry, setQrCodeExpiry] = useState(null);
+
   // Device detection
   const isMobileDevice = useCallback(() => {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -268,20 +274,49 @@ const TestInterface = () => {
       });
 
       if (response.data.success) {
+        const uploadToken = response.data.token;
+        const mobileUrl = `${window.location.origin}/mobile-upload/${uploadToken}`;
+        
+        // Set mobile upload state for QR code
+        setMobileUploadUrl(mobileUrl);
+        setShowQRCode(true);
+        setQrCodeExpiry(new Date(Date.now() + 10 * 60 * 1000)); // 10 minutes from now
+
         await Swal.fire({
-          title: '📱 Mobile Upload Link Sent!',
+          title: '📱 Mobile Upload Ready!',
           html: `
             <div style="text-align: left; margin: 1rem 0;">
-              <p><strong>Upload link has been sent to:</strong></p>
-              <p>${user.email}</p>
+              <p><strong>✅ Upload link has been sent to:</strong></p>
+              <p style="background: #f0f9ff; padding: 8px; border-radius: 4px; font-family: monospace;">${user.email}</p>
+              <br>
+              <p><strong>📱 Or scan the QR code below:</strong></p>
+              <div style="text-align: center; margin: 1rem 0;">
+                <div id="qr-code-container" style="display: inline-block; padding: 16px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
+              </div>
               <br>
               <p><strong>⏱️ Link expires in 10 minutes</strong></p>
-              <p>Please check your email and use the link to upload your answer sheet from your mobile device.</p>
+              <p style="font-size: 14px; color: #666;">Use your mobile device's camera to scan the QR code or check your email for the upload link.</p>
             </div>
           `,
           icon: 'success',
           confirmButtonText: 'Got it!',
-          confirmButtonColor: '#10b981'
+          confirmButtonColor: '#10b981',
+          width: '500px',
+          didOpen: () => {
+            // Render QR code in the modal
+            const qrContainer = document.getElementById('qr-code-container');
+            if (qrContainer) {
+              import('react-dom/client').then(({ createRoot }) => {
+                const root = createRoot(qrContainer);
+                root.render(React.createElement(QRCode, {
+                  value: mobileUrl,
+                  size: 200,
+                  style: { height: "auto", maxWidth: "100%", width: "100%" },
+                  viewBox: "0 0 256 256"
+                }));
+              });
+            }
+          }
         });
       }
     } catch (error) {
@@ -4917,6 +4952,45 @@ const TestInterface = () => {
                     <small style={{ display: 'block', marginTop: '0.5rem', color: '#6c757d' }}>
                       Link will be sent to {user.email} and expires in 10 minutes
                     </small>
+                    
+                    {/* QR Code Display */}
+                    {showQRCode && mobileUploadUrl && qrCodeExpiry && new Date() < qrCodeExpiry && (
+                      <div className="qr-code-section" style={{ 
+                        marginTop: '1rem', 
+                        padding: '1rem', 
+                        backgroundColor: '#f8f9fa', 
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        border: '2px dashed #dee2e6'
+                      }}>
+                        <h6 style={{ color: '#495057', marginBottom: '0.5rem' }}>📱 Scan QR Code</h6>
+                        <div style={{ 
+                          display: 'inline-block', 
+                          padding: '12px', 
+                          backgroundColor: 'white', 
+                          borderRadius: '8px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                        }}>
+                          <QRCode
+                            value={mobileUploadUrl}
+                            size={180}
+                            style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                            viewBox="0 0 256 256"
+                          />
+                        </div>
+                        <p style={{ 
+                          fontSize: '12px', 
+                          color: '#6c757d', 
+                          marginTop: '0.5rem',
+                          marginBottom: '0'
+                        }}>
+                          Scan with your mobile camera or check email
+                        </p>
+                        <small style={{ color: '#dc3545', fontSize: '11px' }}>
+                          Expires in {Math.max(0, Math.ceil((qrCodeExpiry - new Date()) / 60000))} minutes
+                        </small>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
