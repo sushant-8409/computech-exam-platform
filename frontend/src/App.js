@@ -178,7 +178,9 @@ function AuthProvider({ children }) {
   // inside AuthProvider
 const login = async (email, password) => {
   try {
-    const { data } = await axios.post('/api/auth/login', { email, password });
+    console.log('🔍 Login attempt - Base URL:', axios.defaults.baseURL);
+    console.log('🔍 Environment:', process.env.NODE_ENV);
+    const { data } = await axios.post('https://computechexamplatform.vercel.app/api/auth/login', { email, password });
 
     if (data.success) {
       localStorage.setItem('token', data.token);
