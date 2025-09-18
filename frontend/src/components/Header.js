@@ -50,10 +50,10 @@ const Header = () => {
                 🧪 Mock Tests
               </Link>
               <Link 
-                to="/student/results" 
-                className={`${styles.navLink} ${location.pathname.includes('/results') ? styles.active : ''}`}
+                to="/student/coding-practice" 
+                className={`${styles.navLink} ${location.pathname.includes('/coding-practice') ? styles.active : ''}`}
               >
-                📋 My Results
+                � Coding Practice
               </Link>
             </>
           )}
@@ -123,11 +123,11 @@ const Header = () => {
                 🧪 Mock Tests
               </Link>
               <Link 
-                to="/student/results" 
-                className={`${styles.mobileNavLink} ${location.pathname.includes('/results') ? styles.active : ''}`}
+                to="/student/coding-practice" 
+                className={`${styles.mobileNavLink} ${location.pathname.includes('/coding-practice') ? styles.active : ''}`}
                 onClick={() => setShowMobileNav(false)}
               >
-                📋 My Results
+                � Coding Practice
               </Link>
             </>
           )}

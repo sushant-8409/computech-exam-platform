@@ -77,6 +77,7 @@ app.use(require('./routes/googleAuth')); // Google OAuth routes - must come befo
 app.use('/api/student', require('./routes/student'));
 app.use('/api/tests', require('./routes/tests'));
 app.use('/api/coding-test', require('./routes/codingTest')); // Coding test routes
+app.use('/api/coding-practice', require('./routes/codingPractice')); // Coding practice routes
 app.use('/api', require('./routes/analytics'));
 app.use('/api/files', require('./routes/files'));
 app.use('/api/student/mock-tests', require('./routes/mockTest'));
@@ -160,8 +161,16 @@ const PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 3000 :
 
 const startServer = async () => {
   try {
+    // Connect to primary database
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
+    console.log('✅ Connected to primary MongoDB (MONGODB_URI)');
+    
+    // Create separate connection for questions database
+    const questionsDb = mongoose.createConnection(process.env.MONGOURI2);
+    console.log('✅ Connected to questions MongoDB (MONGOURI2)');
+    
+    // Make questions database globally available
+    global.questionsDb = questionsDb;
     
     const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on PORT ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);

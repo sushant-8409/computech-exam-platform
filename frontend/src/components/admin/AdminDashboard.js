@@ -4647,6 +4647,16 @@ const AdminDashboard = () => {
               <span className="nav-icon">📋</span>
               <span className="nav-text">Manual Entry</span>
             </button>
+            <button
+              className={`nav-item ${activeTab === 'coding-practice' ? 'active' : ''}`}
+              onClick={() => {
+                navigate('/admin/coding-practice');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <span className="nav-icon">💻</span>
+              <span className="nav-text">Coding Practice</span>
+            </button>
           </div>
 
           <div className="nav-section">

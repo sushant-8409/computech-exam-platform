@@ -179,7 +179,7 @@ router.post('/generate', async (req, res) => {
         return res.status(400).json({ success: false, message: "Your profile is missing Class or Board information, which is required to generate a test." });
     }
     const prompt = createGeminiPrompt({ subject, chapters, numberOfQuestions, questionType, difficultyLevel, studentClass, studentBoard });
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     const result = await model.generateContent(prompt);
     const parsedTest = parseGeminiResponse(result.response.text());
     const mockTest = new MockTest({

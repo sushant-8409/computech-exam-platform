@@ -53,13 +53,15 @@ app.use(session({
 
 // MongoDB connection with connection pooling for serverless
 let cachedConnection = null;
+let cachedQuestionsDb = null;
 
 async function connectToMongoDB() {
-  if (cachedConnection) {
-    return cachedConnection;
+  if (cachedConnection && cachedQuestionsDb) {
+    return { connection: cachedConnection, questionsDb: cachedQuestionsDb };
   }
 
   try {
+    // Connect to primary database
     const connection = await mongoose.connect(process.env.MONGODB_URI, {
       bufferCommands: false,
       maxPoolSize: 10,
@@ -67,9 +69,24 @@ async function connectToMongoDB() {
       socketTimeoutMS: 45000,
     });
     
+    // Connect to questions database (for coding practice)
+    const questionsDb = mongoose.createConnection(process.env.MONGOURI2, {
+      bufferCommands: false,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    
     cachedConnection = connection;
+    cachedQuestionsDb = questionsDb;
+    
+    // Make questions database globally available
+    global.questionsDb = questionsDb;
+    
     console.log('✅ Connected to MongoDB (cached)');
-    return connection;
+    console.log('✅ Connected to questions MongoDB (cached)');
+    
+    return { connection, questionsDb };
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);
     throw error;
@@ -100,6 +117,9 @@ app.use('/admin', require('../routes/reviewRoutes'));
 app.use('/admin', require('../routes/adminReview'));
 app.use('/', require('../routes/adminCleanup'));
 
+// Coding Practice routes
+app.use('/coding-practice', require('../routes/codingPractice'));
+
 // Google OAuth routes (special handling)
 app.use('/', require('../routes/googleAuth'));
 
@@ -122,7 +142,13 @@ module.exports = async (req, res) => {
   try {
     // Connect to MongoDB on each request (serverless requirement)
     await connectToMongoDB();
-    
+    // Normalize path: strip leading '/api' so Express routes like '/auth', '/admin' match
+    if (req.url === '/api') {
+      req.url = '/';
+    } else if (req.url && req.url.startsWith('/api/')) {
+      req.url = req.url.replace(/^\/api\//, '/');
+    }
+
     // Handle the request with Express
     return app(req, res);
   } catch (error) {

@@ -124,11 +124,10 @@ const mobileUploadRequestSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for efficient queries
+// Indexes for efficient queries (expiresAt index auto-created by TTL)
 mobileUploadRequestSchema.index({ userId: 1, createdAt: -1 });
 mobileUploadRequestSchema.index({ email: 1, createdAt: -1 });
 mobileUploadRequestSchema.index({ status: 1, createdAt: -1 });
-mobileUploadRequestSchema.index({ expiresAt: 1 }); // For TTL
 
 // Instance methods
 mobileUploadRequestSchema.methods.isExpired = function() {

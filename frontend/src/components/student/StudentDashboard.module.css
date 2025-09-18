@@ -248,6 +248,18 @@ html {
   box-shadow: 0 16px 48px rgba(245, 158, 11, 0.3);
 }
 
+.codingPracticeCard {
+  border-left: 4px solid #8b5cf6;
+  background: linear-gradient(135deg, var(--card-bg), rgba(139, 92, 246, 0.1));
+  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.2);
+  cursor: pointer;
+}
+
+.codingPracticeCard:hover {
+  box-shadow: 0 16px 48px rgba(139, 92, 246, 0.3);
+  transform: translateY(-2px);
+}
+
 .statsCard h3 {
   font-size: 2.5rem;
   font-weight: 700;
@@ -1966,6 +1978,12 @@ html {
   border: 1px solid var(--border-light);
 }
 
+.analyticsButtons {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
 .analyticsBtn {
   background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
   color: white;
@@ -1976,7 +1994,7 @@ html {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  width: 100%;
+  flex: 1;
   box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
 }
 
@@ -1995,6 +2013,32 @@ html {
 
 .analyticsBtn:disabled:hover {
   transform: none;
+}
+
+.codingPracticeBtn {
+  background: linear-gradient(135deg, var(--success-color), var(--success-hover));
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+}
+
+.codingPracticeBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, var(--success-hover), var(--success-color));
+}
+
+@media (max-width: 768px) {
+  .analyticsButtons {
+    flex-direction: column;
+  }
 }
 
 /* ============================================
@@ -2263,6 +2307,126 @@ html {
   }
   
   .testTypeCount {
+    font-size: 1.5rem;
+  }
+}
+
+/* Section Header Styles */
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.codingPracticeButton {
+  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
+  color: white !important;
+  border: 2px solid #4338ca !important;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+.codingPracticeButton:hover {
+  background: linear-gradient(135deg, #4f46e5, #4338ca) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4) !important;
+  text-decoration: none;
+  color: white !important;
+}
+
+.codingPracticeButton:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+/* Rank Card Styles */
+.rankCard {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b) !important;
+  border: 2px solid #d97706 !important;
+  color: white !important;
+}
+
+.rankCard:hover {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(251, 191, 36, 0.4) !important;
+}
+
+.rankCard h3 {
+  color: white !important;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.rankCard p {
+  color: rgba(255, 255, 255, 0.95) !important;
+  font-weight: 600;
+}
+
+.rankCard small {
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-weight: 500;
+}
+
+.dark .rankCard {
+  background: linear-gradient(135deg, #92400e, #b45309) !important;
+  border-color: #d97706 !important;
+}
+
+.dark .rankCard:hover {
+  background: linear-gradient(135deg, #b45309, #d97706) !important;
+}
+
+/* Dark mode for section header */
+.dark .sectionHeader {
+  border-bottom-color: var(--border-color);
+}
+
+.dark .sectionTitle {
+  color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+  .sectionHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .codingPracticeButton {
+    width: 100%;
+    justify-content: center;
+    padding: 1rem;
+  }
+  
+  .sectionTitle {
+    font-size: 1.25rem;
+    text-align: center;
+  }
+
+  .rankCard h3 {
     font-size: 1.5rem;
   }
 }

@@ -9,7 +9,7 @@
     "client": "cd frontend && npm start",
     "start": "node server.js",
     "build": "cd frontend && npm run build",
-    "vercel-build": "cd frontend && npm install && CI=false npm run build",
+    "vercel-build": "cd frontend && npm install && cross-env CI=false npm run build",
     "postinstall": "cd frontend && npm install"
   },
   "dependencies": {
@@ -44,6 +44,7 @@
     "react-scripts": "^4.0.3",
     "sharp": "^0.34.3",
     "uuid": "^13.0.0",
+    "cross-env": "^7.0.3",
     "web-push": "^3.6.7"
   ,
   "node-cron": "^3.0.2"

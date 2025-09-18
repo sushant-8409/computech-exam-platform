@@ -7,7 +7,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "api/clean.js",
+      "src": "api/index.js",
       "use": "@vercel/node",
       "config": {
         "maxLambdaSize": "50mb"
@@ -17,7 +17,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/clean.js"
+      "dest": "/api/index.js"
     },
     {
       "src": "/tmp/(.*)",

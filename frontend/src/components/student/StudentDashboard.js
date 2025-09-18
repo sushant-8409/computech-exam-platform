@@ -395,11 +395,10 @@ const StudentDashboard = () => {
             </div>
             <button 
               className={styles.analyticsBtn}
-              onClick={() => setShowAnalytics(true)}
-              disabled={results.length === 0}
-              title={results.length === 0 ? 'Complete some tests to view analytics' : 'View detailed performance analytics'}
+              onClick={() => navigate('/student/coding-practice')}
+              title="Practice coding problems and improve your programming skills"
             >
-              {results.length === 0 ? '📊 No Data Yet' : '📊 View Analytics'}
+              � Coding Practice
             </button>
           </div>
         </div>

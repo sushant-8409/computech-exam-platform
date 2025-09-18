@@ -4,6 +4,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { ToastContainer, toast } from 'react-toastify';     // ← Keep toast for success
 import 'react-toastify/dist/ReactToastify.css';             // ← NEW
+import './Login.css';
 
 const Login = () => {
   const { login, user } = useAuth();
@@ -116,21 +117,19 @@ const Login = () => {
         </form>
 
         {/* Links */}
-        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+        <div className="login-links">
+          <p>
             Don&apos;t have an account?{' '}
             <a
               href={`${process.env.REACT_APP_BASE_URL || 'https://computechexamplatform.netlify.app'}/signup.html`}
-              style={{ color: 'var(--primary)', textDecoration: 'none' }}
             >
               Sign up here
             </a>
           </p>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+          <p>
             Forgot password?{' '}
             <a
               href={`${process.env.REACT_APP_BASE_URL || 'https://computechexamplatform.netlify.app'}/forget-password.html`}
-              style={{ color: 'var(--primary)', textDecoration: 'none' }}
             >
               Reset here
             </a>

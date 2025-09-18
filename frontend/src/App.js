@@ -18,10 +18,13 @@ import StudentDetail from './components/admin/StudentDetail';
 import EditStudentPage from './components/admin/EditStudentPage';
 import ManualTestEntry from './components/admin/ManualTestEntry';
 import CodingTestReview from './components/admin/CodingTestReview';
+import CodingPracticeAdmin from './components/admin/CodingPracticeAdmin';
 import StudentDashboard from './components/student/StudentDashboard';
 import TestInterface from './components/student/TestInterface';
 import TraditionalTestInterface from './components/student/TraditionalTestInterface';
 import CodingTestInterface from './components/student/CodingTestInterface';
+import CodingPracticeContainer from './components/student/CodingPracticeContainer';
+import CodingInterface from './components/student/CodingInterface';
 import ResultDetail from './components/student/ResultDetail';
 import LoadingSpinner from './components/LoadingSpinner';
 import Analytics from './components/admin/Analytics';
@@ -33,11 +36,9 @@ import MobileUploadInterface from './components/mobile/MobileUploadInterface';
 import { useDevToolsProtection } from './hooks/useDevToolsProtection'; // Security protection
 
 // Set axios base URL for Vercel deployment
-// In production: uses /api (same domain), in development: localhost:5000
+// In production: same-origin (no base prefix), in development: localhost:5000 or REACT_APP_API_URL
 const DEFAULT_LOCAL_API = 'http://localhost:5000';
-const apiBase = process.env.NODE_ENV === 'production' 
-  ? '/api'  // Vercel serverless functions
-  : (process.env.REACT_APP_API_URL || DEFAULT_LOCAL_API);
+const apiBase = process.env.NODE_ENV === 'production' ? '' : (process.env.REACT_APP_API_URL || DEFAULT_LOCAL_API);
 axios.defaults.baseURL = apiBase;
 axios.defaults.withCredentials = true;
 // Change to your server URL
@@ -180,17 +181,19 @@ const login = async (email, password) => {
   try {
     console.log('🔍 Login attempt - Base URL:', axios.defaults.baseURL);
     console.log('🔍 Environment:', process.env.NODE_ENV);
-    const { data } = await axios.post('https://computechexamplatform.vercel.app/api/auth/login', { email, password });
+
+    // Keep endpoint with '/api/...'; baseURL is '' in prod, 'http://localhost:5000' in dev
+    const { data } = await axios.post('/api/auth/login', { email, password });
 
     if (data.success) {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
-
-      return { success: true, user: data.user };   // ← key change
+      return { success: true, user: data.user };
     }
     return { success: false, message: data.message || 'Login failed' };
   } catch (err) {
+    console.error('Login error:', err?.response?.data || err.message);
     return { success: false, message: 'Server error. Try again.' };
   }
 };
@@ -452,6 +455,15 @@ export default function App() {
               <Route index element={<CodingTestInterface />} />
             </Route>
 
+            {/* ✅ PROTECTED ROUTES: CodingInterface WITHOUT Header */}
+            <Route path="/student/coding-interface/:problemId" element={
+              <ProtectedRoute>
+                <AppLayoutWithoutHeader />
+              </ProtectedRoute>
+            }>
+              <Route index element={<CodingInterface />} />
+            </Route>
+
             {/* ✅ PROTECTED ROUTES: All other routes WITH Header */}
             <Route path="/" element={
               <ProtectedRoute>
@@ -473,12 +485,14 @@ export default function App() {
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="coding-review/:resultId" element={<CodingTestReview />} />
                 <Route path="result-details/:resultId" element={<ResultDetail />} />
+                <Route path="coding-practice" element={<CodingPracticeAdmin />} />
               </Route>
 
               {/* Student section */}
               <Route path="student" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
                 <Route index element={<StudentDashboard />} />
                 <Route path="mock-test" element={<MockTestCreator />} />
+                <Route path="coding-practice" element={<CodingPracticeContainer />} />
                 <Route path="result/:resultId" element={<ResultDetail />} />
                 <Route path="result/:resultId/code-review" element={<StudentCodeReview />} />
                 <Route path="request-review/:resultId" element={<ReviewRequestPage />} />
