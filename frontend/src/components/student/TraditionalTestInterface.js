@@ -260,133 +260,6 @@ const AnswerSheetUploader = React.memo(({
     if (onCameraClose) onCameraClose();
   };
 
-  // Mobile upload request function
-  const handleMobileUploadRequest = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/api/mobile-upload/request', {
-        testId: testId,
-        uploadType: 'answer-sheet',
-        uploadContext: {
-          testName: window.testName || 'Answer Sheet Upload',
-          subject: 'Traditional Test',
-          instructions: 'Please upload clear images of your answer sheet using your mobile device back camera.',
-          maxFiles: 10,
-          allowedTypes: ['jpg', 'jpeg', 'png']
-        },
-        validityMinutes: 10
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (response.data.success) {
-        const uploadToken = response.data.token;
-        const mobileUrl = `${window.location.origin}/mobile-upload/${uploadToken}`;
-        
-        setMobileUploadRequested(true);
-        setMobileUploadExpiry(new Date(Date.now() + 10 * 60 * 1000)); // 10 minutes from now
-        setMobileUploadUrl(mobileUrl);
-        setShowQRCode(true);
-
-        await Swal.fire({
-          title: '📱 Mobile Upload Ready!',
-          html: `
-            <div style="text-align: left; margin: 1rem 0;">
-              <p><strong>✅ Upload link has been sent to:</strong></p>
-              <p style="background: #f0f9ff; padding: 8px; border-radius: 4px; font-family: monospace;">${user?.email || 'your registered email'}</p>
-              <br>
-              <p><strong>📱 Or scan the QR code below:</strong></p>
-              <div style="text-align: center; margin: 1rem 0;">
-                <div id="qr-code-container" style="display: inline-block; padding: 16px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
-              </div>
-              <br>
-              <p><strong>⏱️ Link expires in 10 minutes</strong></p>
-              <p style="font-size: 14px; color: #666;">Use your mobile device's camera to scan the QR code or check your email for the upload link.</p>
-            </div>
-          `,
-          icon: 'success',
-          confirmButtonText: 'Got it!',
-          confirmButtonColor: '#10b981',
-          width: 500,
-          didOpen: () => {
-            // Render QR code in the modal
-            const qrContainer = document.getElementById('qr-code-container');
-            if (qrContainer) {
-              const root = createRoot(qrContainer);
-              root.render(React.createElement(QRCode, {
-                value: mobileUrl,
-                size: 200,
-                level: 'M'
-              }));
-            }
-          }
-        });
-        
-        console.log('Mobile upload link sent:', response.data.token);
-      } else {
-        throw new Error(response.data.error || 'Failed to send mobile link');
-      }
-    } catch (error) {
-      console.error('Mobile upload request failed:', error);
-      toast.error(error.response?.data?.error || 'Failed to send mobile upload link');
-    }
-  }, [testId]);
-
-  // Check mobile upload status periodically
-  const checkMobileUploadStatus = useCallback(async () => {
-    if (!testId || isSubmitted) return;
-    
-    try {
-      const response = await axios.get(`/api/mobile-upload/status/${testId}`);
-      if (response.data.success && response.data.hasUploads) {
-        const { uploadCount, latestUpload } = response.data;
-        
-        // Only show notification if this is a new upload we haven't seen
-        if (uploadCount > mobileUploadCount) {
-          setMobileUploadDetected(true);
-          setMobileUploadCount(uploadCount);
-          setLastUploadCheck(new Date());
-          
-          // Show notification about mobile upload
-          toast.success(
-            `📱 Mobile Upload Detected! ${uploadCount} file(s) uploaded. ` +
-            `You can now submit your test when ready.`,
-            {
-              duration: 8000,
-              position: 'top-center',
-              style: {
-                background: '#10b981',
-                color: 'white',
-                fontSize: '16px',
-                fontWeight: '600',
-                borderRadius: '12px',
-                padding: '16px 24px',
-                boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)'
-              }
-            }
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Error checking mobile upload status:', error);
-    }
-  }, [testId, isSubmitted, mobileUploadCount]);
-
-  // Set up periodic mobile upload checking
-  useEffect(() => {
-    if (!testStarted || isSubmitted) return;
-    
-    // Check immediately
-    checkMobileUploadStatus();
-    
-    // Check every 30 seconds during test
-    const interval = setInterval(() => {
-      checkMobileUploadStatus();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [testStarted, isSubmitted, checkMobileUploadStatus]);
-
   return (
     <div className={styles.answerUploader}>
       <div className={styles.uploaderContent}>
@@ -1409,6 +1282,127 @@ const TraditionalTestInterface = () => {
     stopTimer, 
     navigate
   ]);
+
+  // Mobile upload request function
+  const handleMobileUploadRequest = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/mobile-upload/request', {
+        email: user?.email,
+        testId: testId,
+        uploadType: 'answer-sheet',
+        expiryMinutes: 10
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        const uploadToken = response.data.token;
+        const mobileUrl = `${window.location.origin}/mobile-upload/${uploadToken}`;
+        
+        setMobileUploadRequested(true);
+        setMobileUploadExpiry(new Date(Date.now() + 10 * 60 * 1000)); // 10 minutes from now
+        setMobileUploadUrl(mobileUrl);
+        setShowQRCode(true);
+
+        await Swal.fire({
+          title: '📱 Mobile Upload Ready!',
+          html: `
+            <div style="text-align: left; margin: 1rem 0;">
+              <p><strong>✅ Upload link has been sent to:</strong></p>
+              <p style="background: #f0f9ff; padding: 8px; border-radius: 4px; font-family: monospace;">${user?.email || 'your registered email'}</p>
+              <br>
+              <p><strong>📱 Or scan the QR code below:</strong></p>
+              <div style="text-align: center; margin: 1rem 0;">
+                <div id="qr-code-container" style="display: inline-block; padding: 16px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
+              </div>
+              <br>
+              <p><strong>⏱️ Link expires in 10 minutes</strong></p>
+              <p style="font-size: 14px; color: #666;">Use your mobile device's camera to scan the QR code or check your email for the upload link.</p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonText: 'Got it!',
+          confirmButtonColor: '#10b981',
+          width: 500,
+          didOpen: () => {
+            // Render QR code in the modal
+            const qrContainer = document.getElementById('qr-code-container');
+            if (qrContainer) {
+              const root = createRoot(qrContainer);
+              root.render(React.createElement(QRCode, {
+                value: mobileUrl,
+                size: 200,
+                level: 'M'
+              }));
+            }
+          }
+        });
+        
+        console.log('Mobile upload link sent:', response.data.token);
+      } else {
+        throw new Error(response.data.error || 'Failed to send mobile link');
+      }
+    } catch (error) {
+      console.error('Mobile upload request failed:', error);
+      toast.error(error.response?.data?.error || 'Failed to send mobile upload link');
+    }
+  }, [testId, user]);
+
+  // Check mobile upload status periodically
+  const checkMobileUploadStatus = useCallback(async () => {
+    if (!testId || isSubmitted) return;
+    
+    try {
+      const response = await axios.get(`/api/mobile-upload/status/${testId}`);
+      if (response.data.success && response.data.hasUploads) {
+        const { uploadCount, latestUpload } = response.data;
+        
+        // Only show notification if this is a new upload we haven't seen
+        if (uploadCount > mobileUploadCount) {
+          setMobileUploadDetected(true);
+          setMobileUploadCount(uploadCount);
+          setLastUploadCheck(new Date());
+          
+          // Show notification about mobile upload
+          toast.success(
+            `📱 Mobile Upload Detected! ${uploadCount} file(s) uploaded. ` +
+            `You can now submit your test when ready.`,
+            {
+              duration: 8000,
+              position: 'top-center',
+              style: {
+                background: '#10b981',
+                color: 'white',
+                fontSize: '16px',
+                fontWeight: '600',
+                borderRadius: '12px',
+                padding: '16px 24px',
+                boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)'
+              }
+            }
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error checking mobile upload status:', error);
+    }
+  }, [testId, isSubmitted, mobileUploadCount]);
+
+  // Set up periodic mobile upload checking
+  useEffect(() => {
+    if (!testStarted || isSubmitted) return;
+    
+    // Check immediately
+    checkMobileUploadStatus();
+    
+    // Check every 30 seconds during test
+    const interval = setInterval(() => {
+      checkMobileUploadStatus();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [testStarted, isSubmitted, checkMobileUploadStatus]);
 
   // Start test
   const handleStartTest = useCallback(async () => {
