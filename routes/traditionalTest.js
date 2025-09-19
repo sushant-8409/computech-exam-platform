@@ -16,9 +16,17 @@ const oauthDrive = require('../services/oauthDrive');
 // Configure multer for answer sheet uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const tmpDir = path.join(__dirname, '..', 'tmp');
-    // Ensure directory exists
-    require('fs').mkdirSync(tmpDir, { recursive: true });
+    // Use /tmp for Vercel serverless compatibility
+    const tmpDir = '/tmp';
+    // Ensure directory exists (should exist in serverless environments)
+    try {
+      require('fs').mkdirSync(tmpDir, { recursive: true });
+    } catch (error) {
+      // Directory might already exist, which is fine
+      if (error.code !== 'EEXIST') {
+        console.warn('Warning: Could not create tmp directory:', error.message);
+      }
+    }
     cb(null, tmpDir);
   },
   filename: function (req, file, cb) {

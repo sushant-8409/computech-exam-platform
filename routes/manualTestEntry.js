@@ -98,11 +98,11 @@ router.post('/manual-test/upload', authenticateAdmin, upload.single('file'), asy
             console.log('❌ Google Drive upload failed, using local storage fallback');
             console.error('Drive error details:', driveError.message);
             
-            // Fallback: Save file locally in tmp directory
+            // Fallback: Save file locally in tmp directory (Vercel compatible)
             const fs = require('fs').promises;
             const path = require('path');
             
-            const tmpDir = path.join(__dirname, '..', 'tmp');
+            const tmpDir = '/tmp';
             const localFilePath = path.join(tmpDir, fileName);
             
             // Ensure tmp directory exists

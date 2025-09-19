@@ -34,7 +34,7 @@ const mobileUploadRequestSchema = new mongoose.Schema({
   // Type of upload request
   uploadType: {
     type: String,
-    enum: ['test-paper', 'document', 'assignment'],
+    enum: ['test-paper', 'document', 'assignment', 'answer-sheet'],
     default: 'test-paper'
   },
   

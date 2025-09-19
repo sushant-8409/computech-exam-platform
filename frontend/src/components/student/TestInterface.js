@@ -4973,9 +4973,9 @@ const TestInterface = () => {
                       className="btn-mobile-upload"
                       onClick={requestMobileUploadLink}
                       disabled={isUploading || answerSheetUrl || mobileUploadDetected}
-                      title={mobileUploadDetected ? "Mobile upload already completed" : "Send upload link to your email for mobile upload"}
+                      title={mobileUploadDetected ? "Mobile upload already completed" : "Get mobile upload link via email or QR code"}
                     >
-                      {mobileUploadDetected ? '✅ Upload Complete' : '📱 Mobile Upload'}
+                      {mobileUploadDetected ? '✅ Upload Complete' : '📱 Mobile Upload (Email + QR)'}
                     </button>
                   </div>
                 </div>
@@ -5010,13 +5010,13 @@ const TestInterface = () => {
                   <div className="mobile-upload-alternative">
                     <hr style={{ margin: '1rem 0', opacity: 0.3 }} />
                     <h6>📱 Alternative: Mobile Upload</h6>
-                    <p>Don't have your answer sheets ready on this device? Request a mobile upload link!</p>
+                    <p>Don't have your answer sheets ready on this device? Get upload link via email or QR code!</p>
                     <button
                       className="btn-mobile-upload"
                       onClick={requestMobileUploadLink}
                       disabled={isUploading || answerSheetUrl || mobileUploadDetected}
                     >
-                      {mobileUploadDetected ? '✅ Mobile Upload Complete' : '📱 Send Mobile Upload Link'}
+                      {mobileUploadDetected ? '✅ Mobile Upload Complete' : '📱 Get Upload Link (Email + QR)'}
                     </button>
                     <small style={{ display: 'block', marginTop: '0.5rem', color: '#6c757d' }}>
                       Link will be sent to {user.email} and expires in 10 minutes

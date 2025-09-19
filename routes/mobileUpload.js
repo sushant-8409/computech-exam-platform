@@ -12,12 +12,18 @@ const gdriveService = require('../services/gdrive');
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../tmp');
+    // Use /tmp for Vercel serverless compatibility
+    const uploadDir = '/tmp';
     try {
       await fs.mkdir(uploadDir, { recursive: true });
       cb(null, uploadDir);
     } catch (error) {
-      cb(error);
+      // Directory might already exist in serverless environments
+      if (error.code === 'EEXIST') {
+        cb(null, uploadDir);
+      } else {
+        cb(error);
+      }
     }
   },
   filename: (req, file, cb) => {
