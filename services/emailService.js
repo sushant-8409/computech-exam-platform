@@ -316,7 +316,7 @@ CompuTech Exam Platform`
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.FRONTEND_URL || 'https://computech-exam-platform.onrender.com'}/student" 
+            <a href="${process.env.FRONTEND_URL || 'https://auctutor.app'}/student" 
                style="background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
               📊 View Detailed Results
             </a>

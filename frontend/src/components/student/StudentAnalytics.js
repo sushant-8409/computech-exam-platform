@@ -913,7 +913,7 @@ const StudentAnalytics = ({ results = [], tests = [], isVisible, onClose }) => {
       
       // Split contact info into two lines for better readability
       pdf.text('📞 Contact: +91 8100648132 | 📧 Email: computechmailer@gmail.com', pageWidth / 2, yPosition + 30, { align: 'right' });
-      pdf.text('🌐 Website: https://computech-07f0.onrender.com', pageWidth / 2, yPosition + 35, { align: 'right' });
+  pdf.text('🌐 Website: https://auctutor.app', pageWidth / 2, yPosition + 35, { align: 'right' });
       
       // Save PDF with formal naming
       const dateStamp = new Date().toISOString().split('T')[0];

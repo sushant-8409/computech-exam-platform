@@ -12,7 +12,7 @@ const getRedirectUri = () => {
   
   // Default redirect URIs for development and production
   if (process.env.NODE_ENV === 'production') {
-    return 'https://computech-exam-platform.onrender.com/auth/google/callback';
+  return 'https://auctutor.app/auth/google/callback';
   } else {
     return 'http://localhost:5000/auth/google/callback';
   }
@@ -55,7 +55,18 @@ async function uploadToGDrive(tokens, fileBuffer, fileName, mimeType) {
     hasFolderId: !!process.env.GOOGLE_DRIVE_FOLDER_ID
   });
 
-  oauth2Client.setCredentials(tokens);
+  // Use environment tokens if available and no session tokens provided
+  const finalTokens = tokens || {
+    access_token: process.env.GOOGLE_ACCESS_TOKEN,
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+    expiry_date: process.env.GOOGLE_TOKEN_EXPIRY
+  };
+
+  if (!finalTokens.access_token) {
+    throw new Error('No Google Drive tokens available. Please connect Google Drive first.');
+  }
+
+  oauth2Client.setCredentials(finalTokens);
   const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
   try {

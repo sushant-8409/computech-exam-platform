@@ -146,7 +146,7 @@ const StudentDashboard = () => {
   
   // Prefer configured API URL, fall back to localhost for development
   const DEFAULT_LOCAL_API = 'http://localhost:5000';
-  const DEFAULT_PROD_API = 'https://computech-exam-platform.onrender.com';
+  const DEFAULT_PROD_API = 'https://auctutor.app';
   const backendUrl = process.env.REACT_APP_API_URL || (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? DEFAULT_PROD_API : DEFAULT_LOCAL_API);
   const oauthUrl = `${backendUrl}/auth/google?token=${encodeURIComponent(token)}`;
   
@@ -486,7 +486,7 @@ const StudentDashboard = () => {
                 <p>Pay your fees securely and track payment history</p>
                 <button 
                   className={styles.portalButton}
-                  onClick={() => window.open('https://computech-07f0.onrender.com/', '_blank')}
+                  onClick={() => window.open('https://auctutor.app/', '_blank')}
                 >
                   Open Payment Portal
                 </button>

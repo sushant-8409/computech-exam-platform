@@ -305,6 +305,300 @@ const CPD_CSS = `
     max-height: 85vh;
   }
 }
+
+/* LeetCode-style Study Plan Cards */
+.lc-explore-section {
+  padding: 24px 0;
+}
+
+.lc-section-header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.lc-section-header h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f66 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.lc-section-header p {
+  color: #a6a6a6;
+  font-size: 16px;
+  margin: 0;
+}
+
+.lc-explore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.lc-study-plan-card {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 24px;
+  min-height: 450px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.lc-study-plan-card:hover {
+  border-color: #ff6b35;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(255, 107, 53, 0.25);
+  background: #1f1f1f;
+}
+
+.lc-study-plan-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f66 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.lc-study-plan-card:hover::before {
+  opacity: 1;
+}
+
+.lc-card-header {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lc-plan-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lc-plan-description {
+  color: #a6a6a6;
+  font-size: 14px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+.lc-progress-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.lc-circular-progress {
+  width: 80px;
+  height: 80px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lc-circular-progress svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.lc-progress-bg {
+  fill: none;
+  stroke: #333;
+  stroke-width: 6;
+}
+
+.lc-progress-fill {
+  fill: none;
+  stroke: #ff6b35;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s ease;
+}
+
+.lc-progress-text {
+  position: absolute;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ff6b35;
+}
+
+.lc-card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.lc-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.lc-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #a6a6a6;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.lc-stat-icon {
+  font-size: 14px;
+}
+
+.lc-stat-value {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lc-card-actions {
+  margin-top: auto;
+  padding-top: 20px;
+}
+
+.lc-study-plan-btn {
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lc-study-plan-btn.lc-start {
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f66 100%);
+  color: white;
+}
+
+.lc-study-plan-btn.lc-start:hover {
+  background: linear-gradient(135deg, #e55a2b 0%, #e57a55 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 107, 53, 0.4);
+}
+
+.lc-study-plan-btn.lc-continue {
+  background: #0066cc;
+  color: white;
+}
+
+.lc-study-plan-btn.lc-continue:hover {
+  background: #0052a3;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 102, 204, 0.4);
+}
+
+.lc-study-plan-btn.lc-completed {
+  background: #00b894;
+  color: white;
+  cursor: default;
+}
+
+.lc-empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: #a6a6a6;
+  grid-column: 1 / -1;
+}
+
+.lc-empty-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.lc-empty-state h3 {
+  font-size: 1.5rem;
+  margin: 0 0 12px 0;
+  color: #ffffff;
+}
+
+.lc-empty-state p {
+  font-size: 16px;
+  margin: 0;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* Responsive Design for Study Plan Cards */
+@media (max-width: 768px) {
+  .lc-explore-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 0 16px;
+  }
+  
+  .lc-study-plan-card {
+    aspect-ratio: auto;
+    min-height: 380px;
+  }
+  
+  .lc-section-header h2 {
+    font-size: 1.6rem;
+  }
+  
+  .lc-plan-title {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .lc-study-plan-card {
+    padding: 20px;
+    min-height: 360px;
+  }
+  
+  .lc-circular-progress {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .lc-progress-text {
+    font-size: 14px;
+  }
+  
+  .lc-card-stats {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
 `;
 
 const CodingPracticeDashboard = ({ onProblemSelect }) => {
@@ -330,21 +624,26 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
   const fetchDashboardData = React.useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
+      console.log('🔍 CodingPractice: Fetching dashboard data...');
       const response = await axios.get('/api/coding-practice/student/dashboard', {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('📊 CodingPractice: Dashboard response:', response.data);
       setDashboardData(response.data.dashboard);
       
       // Set groups from dashboard data if available, otherwise fetch separately
       if (response.data.dashboard?.availableGroups) {
+        console.log('📚 CodingPractice: Found availableGroups:', response.data.dashboard.availableGroups.length);
         setGroups(response.data.dashboard.availableGroups);
       } else {
         // Call fetchGroups only if not available in dashboard
+        console.log('📚 CodingPractice: No availableGroups in dashboard, fetching separately...');
         const token = localStorage.getItem('token');
         try {
           const groupResponse = await axios.get('/api/coding-practice/student/groups', {
             headers: { Authorization: `Bearer ${token}` }
           });
+          console.log('📚 CodingPractice: Fallback groups response:', groupResponse.data);
           setGroups(groupResponse.data.groups);
         } catch (groupError) {
           console.error('Error fetching groups:', groupError);
@@ -354,11 +653,13 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
       console.error('Error fetching dashboard:', error);
       toast.error('Failed to load dashboard data');
       // Try to fetch groups separately if dashboard fails
+      console.log('❌ CodingPractice: Dashboard failed, trying fallback groups...');
       const token = localStorage.getItem('token');
       try {
         const groupResponse = await axios.get('/api/coding-practice/student/groups', {
           headers: { Authorization: `Bearer ${token}` }
         });
+        console.log('📚 CodingPractice: Emergency fallback groups:', groupResponse.data);
         setGroups(groupResponse.data.groups);
       } catch (groupError) {
         console.error('Error fetching groups:', groupError);
@@ -756,7 +1057,15 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
               <p>Structured learning paths to master coding concepts</p>
             </div>
             <div className="lc-explore-grid">
-              {(dashboardData?.availableGroups || groups)?.map(group => {
+              {(() => {
+                const groupsToShow = dashboardData?.availableGroups || groups;
+                console.log('🎯 CodingPractice: Explore tab rendering with groups:', {
+                  dashboardGroups: dashboardData?.availableGroups?.length || 0,
+                  fallbackGroups: groups?.length || 0,
+                  finalGroups: groupsToShow?.length || 0,
+                  activeTab
+                });
+                return groupsToShow?.map(group => {
                 const studentProgress = group.studentProgress;
                 const isStarted = !!studentProgress;
                 const isCompleted = studentProgress?.status === 'completed';
@@ -781,77 +1090,62 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
                 return (
                   <div key={group._id} className="lc-study-plan-card">
                     <div className="lc-card-header">
-                      <div className="lc-card-title-section">
-                        <h3 className="lc-card-title">
-                          {group.name}
-                          {isCompleted && <span className="lc-completed-badge">✅</span>}
-                        </h3>
-                        <span className={`lc-card-difficulty lc-difficulty-${group.difficulty?.toLowerCase() || 'medium'}`}>
-                          {group.difficulty || 'Medium'}
-                        </span>
-                      </div>
-                      <div className="lc-progress-circle">
-                        <svg width="50" height="50" viewBox="0 0 50 50">
+                      <h3 className="lc-plan-title">{group.name}</h3>
+                      <p className="lc-plan-description">
+                        {group.description || `Master ${totalProblems} coding problems with structured learning path`}
+                      </p>
+                    </div>
+                    
+                    <div className="lc-progress-section">
+                      <div className="lc-circular-progress">
+                        <svg>
                           <circle
-                            cx="25" cy="25" r="20"
-                            fill="none" stroke="#333" strokeWidth="4"
+                            className="lc-progress-bg"
+                            cx="50%"
+                            cy="50%"
+                            r="32"
                           />
                           <circle
-                            cx="25" cy="25" r="20"
-                            fill="none" 
-                            stroke={isCompleted ? "#52c41a" : "#00b4d8"} 
-                            strokeWidth="4"
-                            strokeDasharray={`${progress * 1.256} 125.6`}
-                            strokeDashoffset="31.4"
-                            transform="rotate(-90 25 25)"
-                            className="lc-progress-bar"
+                            className="lc-progress-fill"
+                            cx="50%"
+                            cy="50%"
+                            r="32"
+                            strokeDasharray={`${progress * 2.01} 201.06`}
                           />
                         </svg>
-                        <span className="lc-progress-text">{progress}%</span>
+                        <div className="lc-progress-text">{progress}%</div>
                       </div>
                     </div>
                     
-                    <p className="lc-card-description">{group.description || 'Master coding concepts with structured problems'}</p>
-                    
-                    <div className="lc-study-plan-stats">
+                    <div className="lc-card-stats">
                       <div className="lc-stat-row">
                         <span className="lc-stat-label">
-                          <span className="lc-stat-icon">📝</span>
-                          Progress
+                          <span className="lc-stat-icon">🎯</span>
+                          Problems
                         </span>
-                        <span className="lc-stat-value">
-                          {solvedCount}/{totalProblems} problems
-                        </span>
+                        <span className="lc-stat-value">{solvedCount}/{totalProblems}</span>
                       </div>
                       
-                      <div className="lc-stat-row">
-                        <span className="lc-stat-label">
-                          <span className="lc-stat-icon">🏆</span>
-                          Rank
-                        </span>
-                        <span className="lc-stat-value">{rank}</span>
-                      </div>
+                      {currentStreak > 0 && (
+                        <div className="lc-stat-row">
+                          <span className="lc-stat-label">
+                            <span className="lc-stat-icon">🔥</span>
+                            Streak
+                          </span>
+                          <span className="lc-stat-value">{currentStreak} days</span>
+                        </div>
+                      )}
                       
-                      {isStarted && (
-                        <>
-                          <div className="lc-stat-row">
-                            <span className="lc-stat-label">
-                              <span className="lc-stat-icon">🔥</span>
-                              Streak
-                            </span>
-                            <span className="lc-stat-value">{currentStreak} days</span>
-                          </div>
-                          
-                          <div className="lc-stat-row">
-                            <span className="lc-stat-label">
-                              <span className="lc-stat-icon">📅</span>
-                              {isCompleted ? 'Completed' : 'Started'}
-                            </span>
-                            <span className="lc-stat-value">
-                              {formatDate(isCompleted ? completedAt : startedAt)}
-                            </span>
-                          </div>
-                        </>
+                      {(isStarted || isCompleted) && (
+                        <div className="lc-stat-row">
+                          <span className="lc-stat-label">
+                            <span className="lc-stat-icon">📅</span>
+                            {isCompleted ? 'Completed' : 'Started'}
+                          </span>
+                          <span className="lc-stat-value">
+                            {formatDate(isCompleted ? completedAt : startedAt)}
+                          </span>
+                        </div>
                       )}
                       
                       <div className="lc-stat-row">
@@ -860,7 +1154,7 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
                           Level
                         </span>
                         <span className="lc-stat-value">
-                          {group.allowedStudentClasses?.join(', ') || 'All classes'}
+                          {group.difficulty || 'Intermediate'}
                         </span>
                       </div>
                     </div>
@@ -879,16 +1173,20 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
                     </div>
                   </div>
                 );
-              })}
+                });
+              })()}
             </div>
             
-            {(!dashboardData?.availableGroups || dashboardData.availableGroups.length === 0) && (
-              <div className="lc-empty-state">
-                <div className="lc-empty-icon">📚</div>
-                <h3>No Study Plans Available</h3>
-                <p>Study plans for your class will appear here when created by admins.</p>
-              </div>
-            )}
+            {(() => {
+              const groupsToShow = dashboardData?.availableGroups || groups;
+              return (!groupsToShow || groupsToShow.length === 0) && (
+                <div className="lc-empty-state">
+                  <div className="lc-empty-icon">📚</div>
+                  <h3>No Study Plans Available</h3>
+                  <p>Study plans for your class will appear here when created by admins.</p>
+                </div>
+              );
+            })()}
           </div>
         )}
 

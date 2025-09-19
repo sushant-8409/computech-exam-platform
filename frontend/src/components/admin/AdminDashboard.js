@@ -170,7 +170,7 @@ const AdminDashboard = () => {
 
   // Use backend URL from env or infer from current host (avoid SPA fallback)
   const DEFAULT_LOCAL_API = 'http://localhost:5000';
-  const DEFAULT_PROD_API = 'https://computech-exam-platform.onrender.com';
+  const DEFAULT_PROD_API = 'https://auctutor.app';
   const baseUrl = process.env.REACT_APP_API_URL || (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? DEFAULT_PROD_API : DEFAULT_LOCAL_API);
   const authUrl = `${baseUrl}/auth/google?token=${encodeURIComponent(token)}`;
   console.log('🔗 Opening OAuth popup:', authUrl);

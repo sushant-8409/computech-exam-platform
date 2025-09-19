@@ -4,13 +4,17 @@ const { uploadToGDrive } = require('../services/oauthDrive');
 const { authenticateStudent } = require('../middleware/auth');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+// Increase limits for mobile uploads (e.g., larger photos/PDFs)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB
+});
 
 router.post('/api/upload', upload.single('file'), async (req, res) => {
-  const tokens = req.session.tokens;
+  const tokens = (req.session && (req.session.googleTokens || req.session.tokens));
 
   if (!tokens) {
-    return res.status(401).json({ message: 'Not logged in with Google' });
+  return res.status(401).json({ message: 'Not logged in with Google' });
   }
 
   try {
@@ -41,9 +45,16 @@ router.post('/api/upload/monitoring-image', authenticateStudent, upload.single('
     const fileName = `${type}-${timestamp}.jpg`;
     
     // Upload to Google Drive
-    const tokens = req.session.tokens;
+    let tokens = (req.session && (req.session.googleTokens || req.session.tokens));
     if (!tokens) {
-      return res.status(401).json({ message: 'Not authenticated with Google Drive' });
+      // Fallback to admin tokens for monitoring uploads to avoid blocking mobile
+      const User = require('../models/User');
+      const adminUser = await User.findOne({ role: 'admin' });
+      if (adminUser && adminUser.googleTokens) {
+        tokens = adminUser.googleTokens;
+      } else {
+        return res.status(401).json({ message: 'Not authenticated with Google Drive' });
+      }
     }
 
     const result = await uploadToGDrive(

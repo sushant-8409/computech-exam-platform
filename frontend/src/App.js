@@ -408,9 +408,16 @@ function ProtectedRoute({ children, adminOnly = false }) {
 // ✅ Smart redirect based on user role
 function SmartRedirect() {
   const { user } = useAuth();
-  // If this is a direct request for sitemap or static file, let the server handle it
-  if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/sitemap.xml')) {
-    return null; // allow the static file to be served
+  
+  // Don't redirect for server-handled routes and OAuth callbacks
+  if (typeof window !== 'undefined' && window.location) {
+    const path = window.location.pathname;
+    // Allow server to handle these routes without client-side redirect
+    if (path.startsWith('/sitemap.xml') || 
+        path.startsWith('/auth/google') || 
+        path.startsWith('/api/')) {
+      return null;
+    }
   }
   
   if (user) {
@@ -430,10 +437,17 @@ function UniversalRedirect() {
   
   if (!user) {
     console.log('🔒 Unauthorized access to unknown route, redirecting to landing page');
-    // If requesting sitemap or static content, do not redirect
-    if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/sitemap.xml')) {
-      return null;
+    
+    // Don't redirect for server-handled routes and OAuth callbacks
+    if (typeof window !== 'undefined' && window.location) {
+      const path = window.location.pathname;
+      if (path.startsWith('/sitemap.xml') || 
+          path.startsWith('/auth/google') || 
+          path.startsWith('/api/')) {
+        return null;
+      }
     }
+    
     return <Navigate to="/" replace />;
   }
   

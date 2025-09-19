@@ -13,7 +13,7 @@ const getRedirectUri = () => {
   // Fallbacks by environment
   if (process.env.NODE_ENV === 'production') {
     // Default to backend domain if not provided via env
-    return 'https://computech-exam-platform.onrender.com/auth/google/callback';
+    return 'https://auctutor.app/auth/google/callback';
   }
   return 'http://localhost:5000/auth/google/callback';
 };
@@ -171,7 +171,7 @@ router.get('/auth/google/callback', async (req, res) => {
     } else {
       // For admin flow (existing logic)
       const frontendUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://computech-exam-platform.onrender.com' 
+        ? 'https://auctutor.app' 
         : 'http://localhost:3000';
       
       if (error === 'access_denied') {
@@ -202,7 +202,7 @@ router.get('/auth/google/callback', async (req, res) => {
       `);
     } else {
       const frontendUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://computech-exam-platform.onrender.com' 
+        ? 'https://auctutor.app' 
         : 'http://localhost:3000';
       return res.redirect(`${frontendUrl}/admin?tab=create-test&error=no_code`);
     }
@@ -274,14 +274,96 @@ router.get('/auth/google/callback', async (req, res) => {
         </script>
       `);
     } else {
-      // For admin flow (existing logic)
+      // For admin flow - show tokens for environment setup
       const frontendUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://computech-exam-platform.onrender.com' 
+        ? 'https://auctutor.app' 
         : 'http://localhost:3000';
       
-      const redirectUrl = `${frontendUrl}/admin?tab=create-test&oauth=success`;
-      console.log('🔄 Redirecting to admin:', redirectUrl);
-      res.redirect(redirectUrl);
+      // In production, show tokens for manual .env configuration
+      if (process.env.NODE_ENV === 'production') {
+        return res.send(`
+          <html>
+            <head>
+              <title>Google OAuth Success</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .success { color: #28a745; margin-bottom: 20px; }
+                .token-section { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }
+                .token-label { font-weight: bold; color: #495057; margin-bottom: 5px; }
+                .token-value { font-family: monospace; background: #e9ecef; padding: 10px; border-radius: 3px; word-break: break-all; font-size: 12px; }
+                .copy-btn { background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-top: 5px; }
+                .copy-btn:hover { background: #0056b3; }
+                .instructions { background: #d1ecf1; padding: 15px; border-radius: 5px; margin-top: 20px; border-left: 4px solid #bee5eb; }
+                .continue-btn { background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 20px; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h2 class="success">✅ Google OAuth Connected Successfully!</h2>
+                
+                <p><strong>For production deployment, add these tokens to your .env file:</strong></p>
+                
+                <div class="token-section">
+                  <div class="token-label">GOOGLE_ACCESS_TOKEN:</div>
+                  <div class="token-value" id="access-token">${tokens.access_token}</div>
+                  <button class="copy-btn" onclick="copyToClipboard('access-token')">Copy</button>
+                </div>
+                
+                <div class="token-section">
+                  <div class="token-label">GOOGLE_REFRESH_TOKEN:</div>
+                  <div class="token-value" id="refresh-token">${tokens.refresh_token || 'Not provided'}</div>
+                  <button class="copy-btn" onclick="copyToClipboard('refresh-token')">Copy</button>
+                </div>
+                
+                <div class="token-section">
+                  <div class="token-label">GOOGLE_TOKEN_EXPIRY:</div>
+                  <div class="token-value" id="expiry">${tokens.expiry_date || 'Not provided'}</div>
+                  <button class="copy-btn" onclick="copyToClipboard('expiry')">Copy</button>
+                </div>
+                
+                <div class="instructions">
+                  <h4>📋 Next Steps:</h4>
+                  <ol>
+                    <li>Copy the tokens above to your Vercel environment variables</li>
+                    <li>Or add them to your .env file if deploying elsewhere</li>
+                    <li>Redeploy your application</li>
+                    <li>Google Drive upload functionality will then work in production</li>
+                  </ol>
+                </div>
+                
+                <a href="${frontendUrl}/admin?tab=create-test&oauth=success" class="continue-btn">
+                  Continue to Admin Dashboard
+                </a>
+              </div>
+              
+              <script>
+                function copyToClipboard(elementId) {
+                  const element = document.getElementById(elementId);
+                  const text = element.textContent;
+                  navigator.clipboard.writeText(text).then(() => {
+                    const btn = element.nextElementSibling;
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    btn.style.background = '#28a745';
+                    setTimeout(() => {
+                      btn.textContent = originalText;
+                      btn.style.background = '#007bff';
+                    }, 2000);
+                  }).catch(() => {
+                    alert('Failed to copy. Please select and copy manually.');
+                  });
+                }
+              </script>
+            </body>
+          </html>
+        `);
+      } else {
+        // In development, redirect as usual
+        const redirectUrl = `${frontendUrl}/admin?tab=create-test&oauth=success`;
+        console.log('🔄 Redirecting to admin:', redirectUrl);
+        res.redirect(redirectUrl);
+      }
     }
     
   } catch (error) {
@@ -301,7 +383,7 @@ router.get('/auth/google/callback', async (req, res) => {
       `);
     } else {
       const frontendUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://computech-exam-platform.onrender.com' 
+        ? 'https://auctutor.app' 
         : 'http://localhost:3000';
       
       res.redirect(`${frontendUrl}/admin?tab=create-test&error=token_exchange`);
@@ -312,11 +394,18 @@ router.get('/auth/google/callback', async (req, res) => {
 // Route to check Google Drive connection status
 router.get('/auth/google/status', async (req, res) => {
   try {
-    const isConnected = !!(req.session.googleTokens && req.session.googleTokens.access_token);
+    // Check session tokens first
+    const sessionConnected = !!(req.session.googleTokens && req.session.googleTokens.access_token);
+    
+    // Check environment tokens (for production)
+    const envConnected = !!(process.env.GOOGLE_ACCESS_TOKEN);
+    
+    const isConnected = sessionConnected || envConnected;
     
     let driveAccess = false;
     let userInfo = null;
     let error = null;
+    let tokenSource = 'none';
 
     if (isConnected) {
       try {
@@ -325,14 +414,26 @@ router.get('/auth/google/status', async (req, res) => {
           process.env.GOOGLE_OAUTH_CLIENT_ID,
           process.env.GOOGLE_OAUTH_CLIENT_SECRET
         );
-        oauth2Client.setCredentials(req.session.googleTokens);
+        
+        // Use environment tokens if available, otherwise session tokens
+        if (envConnected) {
+          oauth2Client.setCredentials({
+            access_token: process.env.GOOGLE_ACCESS_TOKEN,
+            refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+            expiry_date: process.env.GOOGLE_TOKEN_EXPIRY
+          });
+          tokenSource = 'environment';
+        } else {
+          oauth2Client.setCredentials(req.session.googleTokens);
+          tokenSource = 'session';
+        }
 
         const drive = google.drive({ version: 'v3', auth: oauth2Client });
         const driveResponse = await drive.about.get({ fields: 'user' });
         driveAccess = true;
         userInfo = driveResponse.data.user;
         
-        console.log('✅ Drive status check successful for:', userInfo.emailAddress);
+        console.log('✅ Drive status check successful for:', userInfo.emailAddress, `(${tokenSource})`);
       } catch (driveError) {
         console.error('❌ Drive access test failed:', driveError.message);
         error = driveError.message;
@@ -344,7 +445,9 @@ router.get('/auth/google/status', async (req, res) => {
       driveAccess,
       userInfo,
       error,
-      tokens: req.session.googleTokens ? 'present' : 'missing',
+      tokenSource,
+      sessionTokens: sessionConnected ? 'present' : 'missing',
+      envTokens: envConnected ? 'present' : 'missing',
       scopes: req.session.googleTokens?.scope || 'unknown'
     });
   } catch (error) {
@@ -352,7 +455,7 @@ router.get('/auth/google/status', async (req, res) => {
     res.json({ 
       connected: false,
       error: error.message,
-      tokens: 'error'
+      tokenSource: 'error'
     });
   }
 });
