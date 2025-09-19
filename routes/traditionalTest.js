@@ -11,6 +11,7 @@ const MonitoringImage = require('../models/MonitoringImage');
 const { authenticateStudent } = require('../middleware/auth');
 const { uploadToGDrive: uploadViaOauth } = require('../services/oauthDrive');
 const { uploadToGoogleDrive } = require('../services/gdrive');
+const oauthDrive = require('../services/oauthDrive');
 
 // Configure multer for answer sheet uploads
 const storage = multer.diskStorage({
@@ -701,11 +702,11 @@ router.post('/exit-test/:testId', authenticateStudent, async (req, res) => {
             continue;
           }
 
-          // Upload to Google Drive
+          // Upload to Google Drive using token prioritization
           const timestamp = new Date(image.timestamp).toISOString().replace(/[:.]/g, '-');
           const filename = `monitoring-${studentId}-${testId}-${timestamp}.jpg`;
           
-          const fileId = await uploadToGoogleDrive(imageBuffer, filename, 'image/jpeg');
+          const fileId = await oauthDrive.uploadToGDrive(imageBuffer, filename, 'image/jpeg');
           console.log('� Uploaded monitoring image to Google Drive:', { filename, fileId });
 
           // Save to MongoDB

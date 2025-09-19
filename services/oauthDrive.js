@@ -52,20 +52,35 @@ async function uploadToGDrive(tokens, fileBuffer, fileName, mimeType) {
     fileName,
     mimeType,
     bufferSize: fileBuffer.length,
-    hasFolderId: !!process.env.GOOGLE_DRIVE_FOLDER_ID
+    hasFolderId: !!process.env.GOOGLE_DRIVE_FOLDER_ID,
+    hasEnvTokens: !!process.env.GOOGLE_ACCESS_TOKEN,
+    hasSessionTokens: !!(tokens && tokens.access_token)
   });
 
-  // Use environment tokens if available and no session tokens provided
-  const finalTokens = tokens || {
-    access_token: process.env.GOOGLE_ACCESS_TOKEN,
-    refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-    expiry_date: process.env.GOOGLE_TOKEN_EXPIRY
-  };
+  // Priority: Environment tokens (for production) > Session tokens (for development)
+  let finalTokens = null;
+  let tokenSource = 'none';
 
-  if (!finalTokens.access_token) {
-    throw new Error('No Google Drive tokens available. Please connect Google Drive first.');
+  if (process.env.GOOGLE_ACCESS_TOKEN) {
+    finalTokens = {
+      access_token: process.env.GOOGLE_ACCESS_TOKEN,
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+      token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+      expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : null
+    };
+    tokenSource = 'environment';
+    console.log('🔑 Using environment tokens for Google Drive upload');
+  } else if (tokens && tokens.access_token) {
+    finalTokens = tokens;
+    tokenSource = 'session';
+    console.log('🔑 Using session tokens for Google Drive upload');
   }
 
+  if (!finalTokens || !finalTokens.access_token) {
+    throw new Error('No Google Drive tokens available. Please run generate-google-tokens.js to create environment tokens or connect Google Drive in development.');
+  }
+
+  console.log(`🔐 Token source: ${tokenSource}`);
   oauth2Client.setCredentials(finalTokens);
   const drive = google.drive({ version: 'v3', auth: oauth2Client });
 

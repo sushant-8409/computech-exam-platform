@@ -394,8 +394,14 @@ router.get('/auth/google/callback', async (req, res) => {
 // Route to check Google Drive connection status
 router.get('/auth/google/status', async (req, res) => {
   try {
+    console.log('🔍 OAuth Status Check:', {
+      hasSessionTokens: !!(req.session?.googleTokens?.access_token),
+      hasEnvTokens: !!process.env.GOOGLE_ACCESS_TOKEN,
+      envTokenPreview: process.env.GOOGLE_ACCESS_TOKEN ? `${process.env.GOOGLE_ACCESS_TOKEN.substring(0, 20)}...` : 'none'
+    });
+
     // Check session tokens first
-    const sessionConnected = !!(req.session.googleTokens && req.session.googleTokens.access_token);
+    const sessionConnected = !!(req.session?.googleTokens?.access_token);
     
     // Check environment tokens (for production)
     const envConnected = !!(process.env.GOOGLE_ACCESS_TOKEN);
@@ -415,17 +421,22 @@ router.get('/auth/google/status', async (req, res) => {
           process.env.GOOGLE_OAUTH_CLIENT_SECRET
         );
         
-        // Use environment tokens if available, otherwise session tokens
+        // Prioritize environment tokens for production
         if (envConnected) {
-          oauth2Client.setCredentials({
+          const envTokens = {
             access_token: process.env.GOOGLE_ACCESS_TOKEN,
             refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-            expiry_date: process.env.GOOGLE_TOKEN_EXPIRY
-          });
+            token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+            expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+          };
+          
+          oauth2Client.setCredentials(envTokens);
           tokenSource = 'environment';
-        } else {
+          console.log('📋 Using environment tokens for status check');
+        } else if (sessionConnected) {
           oauth2Client.setCredentials(req.session.googleTokens);
           tokenSource = 'session';
+          console.log('📋 Using session tokens for status check');
         }
 
         const drive = google.drive({ version: 'v3', auth: oauth2Client });
@@ -437,10 +448,17 @@ router.get('/auth/google/status', async (req, res) => {
       } catch (driveError) {
         console.error('❌ Drive access test failed:', driveError.message);
         error = driveError.message;
+        
+        // Try to provide helpful error messages
+        if (driveError.message.includes('invalid_token')) {
+          error = 'Tokens have expired. Please regenerate tokens using generate-google-tokens.js';
+        } else if (driveError.message.includes('insufficient permissions')) {
+          error = 'Insufficient Google Drive permissions. Please check OAuth scopes.';
+        }
       }
     }
 
-    res.json({ 
+    const response = { 
       connected: isConnected,
       driveAccess,
       userInfo,
@@ -448,12 +466,27 @@ router.get('/auth/google/status', async (req, res) => {
       tokenSource,
       sessionTokens: sessionConnected ? 'present' : 'missing',
       envTokens: envConnected ? 'present' : 'missing',
-      scopes: req.session.googleTokens?.scope || 'unknown'
+      scopes: req.session?.googleTokens?.scope || (envConnected ? 'drive.file,userinfo.profile,userinfo.email' : 'unknown'),
+      debug: {
+        hasGoogleClientId: !!process.env.GOOGLE_OAUTH_CLIENT_ID,
+        hasGoogleClientSecret: !!process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+        nodeEnv: process.env.NODE_ENV
+      }
+    };
+
+    console.log('📊 OAuth Status Response:', {
+      connected: response.connected,
+      driveAccess: response.driveAccess,
+      tokenSource: response.tokenSource,
+      userEmail: response.userInfo?.emailAddress
     });
+
+    res.json(response);
   } catch (error) {
     console.error('❌ Status check error:', error);
     res.json({ 
       connected: false,
+      driveAccess: false,
       error: error.message,
       tokenSource: 'error'
     });
@@ -483,12 +516,55 @@ router.get('/auth/google/test-config', (req, res) => {
   });
 });
 
-// Route to check admin Google Drive connection status from database
+// Route to check admin Google Drive connection status from database or environment
 router.get('/auth/google/admin-status', async (req, res) => {
   try {
+    console.log('🔍 Admin OAuth Status Check:', {
+      hasEnvTokens: !!process.env.GOOGLE_ACCESS_TOKEN,
+      envTokenPreview: process.env.GOOGLE_ACCESS_TOKEN ? `${process.env.GOOGLE_ACCESS_TOKEN.substring(0, 20)}...` : 'none'
+    });
+
     const User = require('../models/User');
     
-    // Find admin user with Google tokens in database
+    // Check environment tokens first (priority for production)
+    const envConnected = !!(process.env.GOOGLE_ACCESS_TOKEN);
+    
+    if (envConnected) {
+      try {
+        const oauth2Client = new google.auth.OAuth2(
+          process.env.GOOGLE_OAUTH_CLIENT_ID,
+          process.env.GOOGLE_OAUTH_CLIENT_SECRET
+        );
+        
+        const envTokens = {
+          access_token: process.env.GOOGLE_ACCESS_TOKEN,
+          refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+          token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+          expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+        };
+        
+        oauth2Client.setCredentials(envTokens);
+
+        const drive = google.drive({ version: 'v3', auth: oauth2Client });
+        const driveResponse = await drive.about.get({ fields: 'user' });
+        
+        console.log('✅ Admin Google Drive connected via environment tokens:', driveResponse.data.user.emailAddress);
+        
+        return res.json({
+          connected: true,
+          driveAccess: true,
+          userInfo: driveResponse.data.user,
+          tokenSource: 'environment',
+          adminEmail: driveResponse.data.user.emailAddress,
+          tokenExpiry: envTokens.expiry_date ? new Date(envTokens.expiry_date) : null
+        });
+      } catch (driveError) {
+        console.error('❌ Environment Google Drive tokens invalid:', driveError.message);
+        // Continue to check database tokens as fallback
+      }
+    }
+    
+    // Fallback to database tokens
     const adminUser = await User.findOne({
       role: 'admin',
       $and: [
@@ -498,7 +574,6 @@ router.get('/auth/google/admin-status', async (req, res) => {
     });
 
     if (adminUser && adminUser.googleTokens) {
-      // Test if the tokens are still valid
       try {
         const oauth2Client = new google.auth.OAuth2(
           process.env.GOOGLE_OAUTH_CLIENT_ID,
@@ -509,30 +584,35 @@ router.get('/auth/google/admin-status', async (req, res) => {
         const drive = google.drive({ version: 'v3', auth: oauth2Client });
         const driveResponse = await drive.about.get({ fields: 'user' });
         
-        console.log('✅ Admin Google Drive connected:', driveResponse.data.user.emailAddress);
+        console.log('✅ Admin Google Drive connected via database tokens:', driveResponse.data.user.emailAddress);
         
         res.json({
           connected: true,
           driveAccess: true,
           userInfo: driveResponse.data.user,
+          tokenSource: 'database',
           adminEmail: adminUser.email,
           tokenExpiry: adminUser.googleTokens.expiry_date ? new Date(adminUser.googleTokens.expiry_date) : null
         });
       } catch (driveError) {
-        console.error('❌ Admin Google Drive tokens invalid:', driveError.message);
+        console.error('❌ Admin Google Drive database tokens invalid:', driveError.message);
         res.json({
           connected: false,
           driveAccess: false,
           error: 'Admin Google Drive tokens are invalid or expired',
+          tokenSource: 'database',
           adminEmail: adminUser.email
         });
       }
     } else {
-      console.log('❌ No admin Google Drive tokens found in database');
+      console.log('❌ No admin Google Drive tokens found');
       res.json({
         connected: false,
         driveAccess: false,
-        error: 'No admin Google Drive tokens found in database'
+        error: envConnected ? 
+          'Environment tokens invalid and no database tokens found' : 
+          'No Google Drive tokens found. Please connect Google Drive or run generate-google-tokens.js',
+        tokenSource: 'none'
       });
     }
   } catch (error) {
@@ -540,7 +620,8 @@ router.get('/auth/google/admin-status', async (req, res) => {
     res.status(500).json({
       connected: false,
       driveAccess: false,
-      error: 'Failed to check admin Google Drive status'
+      error: 'Failed to check admin Google Drive status',
+      details: error.message
     });
   }
 });

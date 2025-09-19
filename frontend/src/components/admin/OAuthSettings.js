@@ -37,7 +37,7 @@ const OAuthSettings = () => {
 
   const checkAdminOAuthStatus = async () => {
     try {
-      const response = await axios.get('/auth/google/admin-status');
+      const response = await axios.get('/api/auth/google/admin-status');
       setConnectionStatus(response.data);
       setIsConnected(response.data.connected);
     } catch (error) {

@@ -10,7 +10,8 @@
     "start": "node server.js",
     "build": "cd frontend && npm run build",
     "vercel-build": "cd frontend && npm install && cross-env CI=false npm run build",
-    "postinstall": "cd frontend && npm install"
+    "postinstall": "cd frontend && npm install",
+    "generate-tokens": "node generate-google-tokens.js"
   },
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
@@ -41,6 +42,7 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.3",
     "nodemon": "^3.0.1",
+    "open": "^10.2.0",
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
     "react-auth-kit": "^3.1.3",

@@ -493,21 +493,40 @@ router.post('/test/:testId/upload', authenticateStudent, upload.single('answerSh
         
         // Always use admin OAuth tokens for centralized file management
         let uploadResult;
-        const User = require('../models/User');
-        const adminUser = await User.findOne({ role: 'admin', googleConnected: true });
-        
-        if (adminUser && adminUser.googleTokens && adminUser.googleTokens.refresh_token) {
-            const oauthDrive = require('../services/oauthDrive');
-            console.log('📁 Uploading to admin\'s Google Drive:', adminUser.email);
-            uploadResult = await oauthDrive.uploadToGDrive(adminUser.googleTokens, req.file.buffer, fileName, req.file.mimetype);
+        let tokens = null;
+        let tokenSource = 'none';
+
+        // Priority 1: Use environment tokens
+        if (process.env.GOOGLE_ACCESS_TOKEN) {
+            tokens = {
+                access_token: process.env.GOOGLE_ACCESS_TOKEN,
+                refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+                token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+                expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+            };
+            tokenSource = 'environment';
+            console.log('📁 Using environment tokens for upload');
         } else {
-            // No admin OAuth tokens available - system not configured
-            return res.status(500).json({
-                success: false,
-                message: 'Google Drive not configured. Please contact administrator to set up Google OAuth.',
-                error: 'GOOGLE_OAUTH_NOT_CONFIGURED'
-            });
+            // Fallback: Use admin database tokens
+            const User = require('../models/User');
+            const adminUser = await User.findOne({ role: 'admin', googleConnected: true });
+            
+            if (adminUser && adminUser.googleTokens && adminUser.googleTokens.refresh_token) {
+                tokens = adminUser.googleTokens;
+                tokenSource = 'admin-database';
+                console.log('📁 Using admin database tokens for upload:', adminUser.email);
+            } else {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Google Drive not configured. Please run generate-google-tokens.js or contact administrator.',
+                    error: 'GOOGLE_OAUTH_NOT_CONFIGURED',
+                    suggestion: 'Run generate-google-tokens.js to create production tokens'
+                });
+            }
         }
+
+        const oauthDrive = require('../services/oauthDrive');
+        uploadResult = await oauthDrive.uploadToGDrive(tokens, req.file.buffer, fileName, req.file.mimetype);
         
         const { url, fileId } = uploadResult;
 
@@ -993,23 +1012,41 @@ router.post('/upload-answer-sheet', authenticateStudent, upload.single('answerSh
         
         let uploadResult;
         
-        // Get admin user for OAuth tokens
-        const User = require('../models/User');
-        const adminUser = await User.findOne({ role: 'admin' });
-        
-        // Always use admin OAuth tokens for centralized file management
-        if (adminUser && adminUser.googleTokens && adminUser.googleTokens.refresh_token) {
-            const oauthDrive = require('../services/oauthDrive');
-            console.log('📤 Using admin OAuth for answer sheet upload:', fileName);
-            uploadResult = await oauthDrive.uploadToGDrive(adminUser.googleTokens, req.file.buffer, fileName, req.file.mimetype);
+        // Get tokens for upload - priority: environment > admin database
+        let tokens = null;
+        let tokenSource = 'none';
+
+        // Priority 1: Use environment tokens
+        if (process.env.GOOGLE_ACCESS_TOKEN) {
+            tokens = {
+                access_token: process.env.GOOGLE_ACCESS_TOKEN,
+                refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+                token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+                expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+            };
+            tokenSource = 'environment';
+            console.log('📤 Using environment tokens for answer sheet upload:', fileName);
         } else {
-            // No admin OAuth tokens available - system not configured
-            return res.status(500).json({
-                success: false,
-                message: 'Google Drive not configured. Please contact administrator to set up Google OAuth.',
-                error: 'GOOGLE_OAUTH_NOT_CONFIGURED'
-            });
+            // Fallback: Use admin database tokens
+            const User = require('../models/User');
+            const adminUser = await User.findOne({ role: 'admin' });
+            
+            if (adminUser && adminUser.googleTokens && adminUser.googleTokens.refresh_token) {
+                tokens = adminUser.googleTokens;
+                tokenSource = 'admin-database';
+                console.log('📤 Using admin database tokens for answer sheet upload:', fileName);
+            } else {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Google Drive not configured. Please run generate-google-tokens.js or contact administrator.',
+                    error: 'GOOGLE_OAUTH_NOT_CONFIGURED',
+                    suggestion: 'Run generate-google-tokens.js to create production tokens'
+                });
+            }
         }
+
+        const oauthDrive = require('../services/oauthDrive');
+        uploadResult = await oauthDrive.uploadToGDrive(tokens, req.file.buffer, fileName, req.file.mimetype);
 
         // Update or create result with answer sheet URL
         let result = await Result.findOne({ studentId: req.student._id, testId });
@@ -1077,22 +1114,42 @@ router.post('/monitoring/upload', authenticateStudent, upload.single('monitoring
             try {
                 console.log('📤 Uploading monitoring image to Google Drive...');
                 
-                // Get admin's Google Drive tokens for upload
-                const User = require('../models/User');
-                const adminUser = await User.findOne({ role: 'admin' });
-                
-                if (!adminUser || !adminUser.googleTokens) {
-                    console.log('❌ No admin Google tokens found');
-                    return res.json({
-                        success: false,
-                        message: 'Google Drive authentication required for monitoring'
-                    });
+                // Get tokens for upload - priority: environment > admin database
+                let tokens = null;
+                let tokenSource = 'none';
+
+                // Priority 1: Use environment tokens
+                if (process.env.GOOGLE_ACCESS_TOKEN) {
+                    tokens = {
+                        access_token: process.env.GOOGLE_ACCESS_TOKEN,
+                        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+                        token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+                        expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+                    };
+                    tokenSource = 'environment';
+                    console.log('📸 Using environment tokens for monitoring upload');
+                } else {
+                    // Fallback: Get admin's Google Drive tokens from database
+                    const User = require('../models/User');
+                    const adminUser = await User.findOne({ role: 'admin' });
+                    
+                    if (!adminUser || !adminUser.googleTokens) {
+                        console.log('❌ No admin Google tokens found');
+                        return res.json({
+                            success: false,
+                            message: 'Google Drive authentication required for monitoring'
+                        });
+                    }
+
+                    tokens = adminUser.googleTokens;
+                    tokenSource = 'admin-database';
+                    console.log('📸 Using admin database tokens for monitoring upload');
                 }
 
-                const tokens = adminUser.googleTokens;
                 const fileName = `monitoring_${testId}_${req.student._id}_${timestamp}.jpg`;
                 
-                const uploadResult = await uploadViaOauth(
+                const oauthDrive = require('../services/oauthDrive');
+                const uploadResult = await oauthDrive.uploadToGDrive(
                     tokens,
                     req.file.buffer,
                     fileName,

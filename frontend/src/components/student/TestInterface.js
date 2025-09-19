@@ -152,6 +152,11 @@ const TestInterface = () => {
   const [mobileUploadUrl, setMobileUploadUrl] = useState(null);
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrCodeExpiry, setQrCodeExpiry] = useState(null);
+  
+  // Mobile upload detection state
+  const [mobileUploadDetected, setMobileUploadDetected] = useState(false);
+  const [mobileUploadCount, setMobileUploadCount] = useState(0);
+  const [lastUploadCheck, setLastUploadCheck] = useState(null);
 
   // Device detection
   const isMobileDevice = useCallback(() => {
@@ -212,6 +217,21 @@ const TestInterface = () => {
     
     return () => clearInterval(interval);
   }, [testStarted]);
+  
+  // Check for mobile uploads periodically during test
+  useEffect(() => {
+    if (!testStarted || isSubmitted) return;
+    
+    // Initial check
+    checkMobileUploadStatus();
+    
+    // Set up periodic checking every 30 seconds
+    const uploadCheckInterval = setInterval(() => {
+      checkMobileUploadStatus();
+    }, 30000);
+    
+    return () => clearInterval(uploadCheckInterval);
+  }, [testStarted, isSubmitted, checkMobileUploadStatus]);
   
   // Sync offline answers when coming back online
   const syncOfflineAnswers = useCallback(async () => {
@@ -324,6 +344,44 @@ const TestInterface = () => {
       toast.error('Failed to send mobile upload link. Please try again.');
     }
   }, [user.email, testId]);
+
+  // Check for mobile uploads periodically
+  const checkMobileUploadStatus = useCallback(async () => {
+    if (!testId || isSubmitted) return;
+    
+    try {
+      const response = await axios.get(`/api/mobile-upload/status/${testId}`);
+      if (response.data.success && response.data.hasUploads) {
+        const { uploadCount, latestUpload } = response.data;
+        
+        // Only show notification if this is a new upload we haven't seen
+        if (uploadCount > mobileUploadCount) {
+          setMobileUploadDetected(true);
+          setMobileUploadCount(uploadCount);
+          setLastUploadCheck(new Date());
+          
+          // Show notification about mobile upload
+          toast.success(
+            `📱 Mobile Upload Detected! ${uploadCount} file(s) uploaded. ` +
+            `You can now submit your test when ready.`,
+            {
+              duration: 8000,
+              position: 'top-center',
+              style: {
+                background: '#10B981',
+                color: 'white',
+                padding: '16px',
+                borderRadius: '8px',
+                fontSize: '14px'
+              }
+            }
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error checking mobile upload status:', error);
+    }
+  }, [testId, isSubmitted, mobileUploadCount]);
 
   // Show Google Drive warning before starting test
   const showGoogleDriveWarning = async () => {
@@ -4636,6 +4694,7 @@ const TestInterface = () => {
                       multiple
                       onChange={handleImageFileUpload}
                       className="file-input"
+                      disabled={mobileUploadDetected}
                     />
                     <label htmlFor="file-upload" className="file-upload-label">
                       <div className="upload-icon">�</div>
@@ -4664,9 +4723,9 @@ const TestInterface = () => {
                           <button
                             className="btn btn-success"
                             onClick={convertPagesToPdf}
-                            disabled={isUploading || uploadedPages.length === 0}
+                            disabled={isUploading || uploadedPages.length === 0 || mobileUploadDetected}
                           >
-                            📑 Convert to PDF & Upload
+                            {mobileUploadDetected ? '📱 Mobile Upload Complete' : '📑 Convert to PDF & Upload'}
                           </button>
                         </div>
                       </div>
@@ -4763,15 +4822,17 @@ const TestInterface = () => {
                 <button
                   className={`btn btn-success btn-large btn-primary-action ${autoSubmit ? 'auto-submit-btn' : ''}`}
                   onClick={submitPaperUpload}
-                  disabled={paperUploadPages.length === 0 || isUploading || paperUploadComplete}
+                  disabled={paperUploadPages.length === 0 || isUploading || paperUploadComplete || mobileUploadDetected}
                 >
-                  {isUploading 
-                    ? (autoSubmit ? '⏳ Uploading & Auto-Submitting...' : '⏳ Uploading...') 
-                    : paperUploadComplete 
-                      ? '✅ Uploaded' 
-                      : autoSubmit 
-                        ? `� Upload ${paperUploadPages.length} Pages & Auto-Submit`
-                        : `�📤 Upload ${paperUploadPages.length} Pages`
+                  {mobileUploadDetected 
+                    ? '📱 Mobile Upload Completed'
+                    : isUploading 
+                      ? (autoSubmit ? '⏳ Uploading & Auto-Submitting...' : '⏳ Uploading...') 
+                      : paperUploadComplete 
+                        ? '✅ Uploaded' 
+                        : autoSubmit 
+                          ? `� Upload ${paperUploadPages.length} Pages & Auto-Submit`
+                          : `�📤 Upload ${paperUploadPages.length} Pages`
                   }
                 </button>
                 
@@ -4873,8 +4934,9 @@ const TestInterface = () => {
                         onChange={handleImageFileUpload}
                         className={styles.fileInputHidden}
                         id="add-page-input"
+                        disabled={mobileUploadDetected}
                       />
-                      <label htmlFor="add-page-input" className={styles.addPageLabel}>
+                      <label htmlFor="add-page-input" className={`${styles.addPageLabel} ${mobileUploadDetected ? styles.disabled : ''}`}>
                         <div className={styles.addPageIcon}>📎</div>
                         <div className={styles.addPageText}>
                           <h5>Add Pages</h5>
@@ -4902,17 +4964,18 @@ const TestInterface = () => {
                     <button
                       className="btn-convert"
                       onClick={handleAnswerSheetSubmit}
-                      disabled={isUploading || answerSheetUrl}
+                      disabled={isUploading || answerSheetUrl || mobileUploadDetected}
                     >
-                      {isUploading ? '⏳ Converting & Uploading...' : '📤 Convert to PDF & Upload'}
+                      {mobileUploadDetected ? '📱 Mobile Upload Completed' : 
+                       isUploading ? '⏳ Converting & Uploading...' : '📤 Convert to PDF & Upload'}
                     </button>
                     <button
                       className="btn-mobile-upload"
                       onClick={requestMobileUploadLink}
-                      disabled={isUploading || answerSheetUrl}
-                      title="Send upload link to your email for mobile upload"
+                      disabled={isUploading || answerSheetUrl || mobileUploadDetected}
+                      title={mobileUploadDetected ? "Mobile upload already completed" : "Send upload link to your email for mobile upload"}
                     >
-                      📱 Mobile Upload
+                      {mobileUploadDetected ? '✅ Upload Complete' : '📱 Mobile Upload'}
                     </button>
                   </div>
                 </div>
@@ -4951,9 +5014,9 @@ const TestInterface = () => {
                     <button
                       className="btn-mobile-upload"
                       onClick={requestMobileUploadLink}
-                      disabled={isUploading || answerSheetUrl}
+                      disabled={isUploading || answerSheetUrl || mobileUploadDetected}
                     >
-                      📱 Send Mobile Upload Link
+                      {mobileUploadDetected ? '✅ Mobile Upload Complete' : '📱 Send Mobile Upload Link'}
                     </button>
                     <small style={{ display: 'block', marginTop: '0.5rem', color: '#6c757d' }}>
                       Link will be sent to {user.email} and expires in 10 minutes
@@ -5035,6 +5098,29 @@ const TestInterface = () => {
             )}
             <p>Double-check your answers before submitting. You cannot make changes after submission.</p>
           </div>
+          
+          {/* Mobile Upload Detection Indicator */}
+          {mobileUploadDetected && (
+            <div className="alert alert-success" style={{ 
+              margin: '1rem 0', 
+              padding: '0.75rem', 
+              backgroundColor: '#d4edda', 
+              border: '1px solid #c3e6cb', 
+              borderRadius: '0.375rem',
+              color: '#155724'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.2rem' }}>📱</span>
+                <div>
+                  <strong>Mobile Upload Detected!</strong>
+                  <br />
+                  <small>
+                    {mobileUploadCount} file(s) uploaded via mobile. Ready to submit!
+                  </small>
+                </div>
+              </div>
+            </div>
+          )}
           
           <button
             className={`btn btn-large ${

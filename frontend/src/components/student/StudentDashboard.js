@@ -110,7 +110,7 @@ const StudentDashboard = () => {
     setCheckingGoogleStatus(true);
     try {
       // Check for admin Google Drive tokens in database
-      const response = await axios.get('/auth/google/admin-status');
+      const response = await axios.get('/api/auth/google/admin-status');
       
       const isConnected = response.data.connected && response.data.driveAccess;
       setGoogleConnected(isConnected);

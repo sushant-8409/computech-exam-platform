@@ -1037,19 +1037,37 @@ router.post(
         userId: req.user?.id || 'none'
       });
 
-      // 🛡️ Get OAuth2 tokens from database (saved during Google OAuth)
-      const adminUser = await User.findOne({ role: 'admin' });
-      if (!adminUser || !adminUser.googleTokens) {
-        console.log('❌ No Google tokens found in database');
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Google Drive authentication required. Please connect to Google Drive first.',
-          needsAuth: true
-        });
-      }
+      // Get tokens for upload - priority: environment > admin database
+      let tokens = null;
+      let tokenSource = 'none';
 
-      console.log('✅ Google tokens found in database, proceeding with upload');
-      const tokens = adminUser.googleTokens;
+      // Priority 1: Use environment tokens
+      if (process.env.GOOGLE_ACCESS_TOKEN) {
+        tokens = {
+          access_token: process.env.GOOGLE_ACCESS_TOKEN,
+          refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+          token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+          expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+        };
+        tokenSource = 'environment';
+        console.log('✅ Using environment tokens for admin upload');
+      } else {
+        // Fallback: Get OAuth2 tokens from database
+        const adminUser = await User.findOne({ role: 'admin' });
+        if (!adminUser || !adminUser.googleTokens) {
+          console.log('❌ No Google tokens found in database or environment');
+          return res.status(401).json({ 
+            success: false, 
+            message: 'Google Drive authentication required. Please run generate-google-tokens.js or connect to Google Drive first.',
+            needsAuth: true,
+            suggestion: 'Run generate-google-tokens.js to create production tokens'
+          });
+        }
+
+        tokens = adminUser.googleTokens;
+        tokenSource = 'admin-database';
+        console.log('✅ Using admin database tokens for upload');
+      }
       const fileData = {};
       const nowIST = moment().tz('Asia/Kolkata');
 
@@ -1099,17 +1117,36 @@ router.post('/upload/question-paper/:testId', upload.single('question-paper'), a
   try {
     console.log('📄 Question paper upload for test:', req.params.testId);
     
-    // Get admin user OAuth tokens from database (consistent approach)
-    const adminUser = await User.findOne({ role: 'admin' });
-    if (!adminUser || !adminUser.googleTokens) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Google Drive authentication required. Please connect to Google Drive first.',
-        needsAuth: true
-      });
+    // Get tokens for upload - priority: environment > admin database
+    let tokens = null;
+    let tokenSource = 'none';
+
+    // Priority 1: Use environment tokens
+    if (process.env.GOOGLE_ACCESS_TOKEN) {
+      tokens = {
+        access_token: process.env.GOOGLE_ACCESS_TOKEN,
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+        token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+        expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+      };
+      tokenSource = 'environment';
+      console.log('✅ Using environment tokens for question paper upload');
+    } else {
+      // Fallback: Get admin user OAuth tokens from database
+      const adminUser = await User.findOne({ role: 'admin' });
+      if (!adminUser || !adminUser.googleTokens) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Google Drive authentication required. Please run generate-google-tokens.js or connect to Google Drive first.',
+          needsAuth: true,
+          suggestion: 'Run generate-google-tokens.js to create production tokens'
+        });
+      }
+      
+      tokens = adminUser.googleTokens;
+      tokenSource = 'admin-database';
+      console.log('✅ Using admin database tokens for question paper upload');
     }
-    
-    const tokens = adminUser.googleTokens;
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
@@ -1158,17 +1195,36 @@ router.post('/upload/answer-sheet/:testId', upload.single('answer-sheet'), async
   try {
     console.log('📋 Answer sheet upload for test:', req.params.testId);
     
-    // Get admin user OAuth tokens from database (consistent approach)
-    const adminUser = await User.findOne({ role: 'admin' });
-    if (!adminUser || !adminUser.googleTokens) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Google Drive authentication required. Please connect to Google Drive first.',
-        needsAuth: true
-      });
+    // Get tokens for upload - priority: environment > admin database
+    let tokens = null;
+    let tokenSource = 'none';
+
+    // Priority 1: Use environment tokens
+    if (process.env.GOOGLE_ACCESS_TOKEN) {
+      tokens = {
+        access_token: process.env.GOOGLE_ACCESS_TOKEN,
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+        token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+        expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+      };
+      tokenSource = 'environment';
+      console.log('✅ Using environment tokens for answer sheet upload');
+    } else {
+      // Fallback: Get admin user OAuth tokens from database
+      const adminUser = await User.findOne({ role: 'admin' });
+      if (!adminUser || !adminUser.googleTokens) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Google Drive authentication required. Please run generate-google-tokens.js or connect to Google Drive first.',
+          needsAuth: true,
+          suggestion: 'Run generate-google-tokens.js to create production tokens'
+        });
+      }
+      
+      tokens = adminUser.googleTokens;
+      tokenSource = 'admin-database';
+      console.log('✅ Using admin database tokens for answer sheet upload');
     }
-    
-    const tokens = adminUser.googleTokens;
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
@@ -1217,12 +1273,42 @@ router.post('/upload/answer-key/:testId', upload.single('answer-key'), async (re
   try {
     console.log('🔑 Answer key upload for test:', req.params.testId);
     
-    const tokens = req.session.googleTokens || req.session.tokens;
+    // Get tokens for upload - priority: environment > session > admin database
+    let tokens = null;
+    let tokenSource = 'none';
+
+    // Priority 1: Use environment tokens
+    if (process.env.GOOGLE_ACCESS_TOKEN) {
+      tokens = {
+        access_token: process.env.GOOGLE_ACCESS_TOKEN,
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+        token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+        expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+      };
+      tokenSource = 'environment';
+      console.log('✅ Using environment tokens for answer key upload');
+    } else if (req.session && (req.session.googleTokens || req.session.tokens)) {
+      // Priority 2: Use session tokens (development)
+      tokens = req.session.googleTokens || req.session.tokens;
+      tokenSource = 'session';
+      console.log('✅ Using session tokens for answer key upload');
+    } else {
+      // Fallback: Get admin database tokens
+      const User = require('../models/User');
+      const adminUser = await User.findOne({ role: 'admin' });
+      if (adminUser && adminUser.googleTokens) {
+        tokens = adminUser.googleTokens;
+        tokenSource = 'admin-database';
+        console.log('✅ Using admin database tokens for answer key upload');
+      }
+    }
+
     if (!tokens) {
       return res.status(401).json({ 
         success: false, 
-        message: 'Google Drive authentication required. Please connect to Google Drive first.',
-        needsAuth: true
+        message: 'Google Drive authentication required. Please run generate-google-tokens.js or connect to Google Drive first.',
+        needsAuth: true,
+        suggestion: 'Run generate-google-tokens.js to create production tokens'
       });
     }
 

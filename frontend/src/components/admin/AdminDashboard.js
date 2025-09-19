@@ -132,7 +132,7 @@ const AdminDashboard = () => {
       console.log('🔍 Checking Admin Google Drive status...');
       
       // Check for admin Google Drive tokens in database
-      const res = await axios.get('/auth/google/admin-status');
+      const res = await axios.get('/api/auth/google/admin-status');
       
       console.log('📊 Admin Google Drive status response:', {
         connected: res.data.connected,

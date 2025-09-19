@@ -103,13 +103,19 @@ router.post('/request', authenticateStudent, async (req, res) => {
     } = req.body;
 
     // Use authenticated student's email if not provided in body
-    const email = emailFromBody || req.user?.email;
+    const email = emailFromBody || req.student?.email || req.user?.email;
 
     // Validate required fields
     if (!email) {
       return res.status(400).json({
         success: false,
-        error: 'Email is required'
+        error: 'Email is required',
+        debug: {
+          hasStudent: !!req.student,
+          hasUser: !!req.user,
+          studentEmail: req.student?.email,
+          userEmail: req.user?.email
+        }
       });
     }
 
@@ -476,6 +482,46 @@ router.use((error, req, res, next) => {
     success: false,
     error: 'Internal server error'
   });
+});
+
+// GET /api/mobile-upload/status/:testId - Check mobile upload status for current student
+router.get('/status/:testId', authenticateStudent, async (req, res) => {
+  try {
+    const { testId } = req.params;
+    const studentId = req.student._id;
+    
+    // Find recent mobile upload requests for this student and test
+    const recentRequests = await MobileUploadRequest.find({
+      userId: studentId,
+      uploadContext: { testId },
+      status: 'completed',
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
+    }).sort({ updatedAt: -1 }).limit(5);
+    
+    const hasRecentUploads = recentRequests.length > 0;
+    const latestUpload = recentRequests[0];
+    
+    res.json({
+      success: true,
+      hasUploads: hasRecentUploads,
+      uploadCount: recentRequests.length,
+      latestUpload: latestUpload ? {
+        uploadedAt: latestUpload.updatedAt,
+        fileCount: latestUpload.uploadedFiles.length,
+        files: latestUpload.uploadedFiles.map(f => ({
+          filename: f.filename,
+          uploadedAt: f.uploadedAt
+        }))
+      } : null
+    });
+    
+  } catch (error) {
+    console.error('Error checking mobile upload status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check mobile upload status'
+    });
+  }
 });
 
 module.exports = router;

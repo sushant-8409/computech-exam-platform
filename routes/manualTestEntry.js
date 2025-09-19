@@ -54,21 +54,38 @@ router.post('/manual-test/upload', authenticateAdmin, upload.single('file'), asy
         let fileUrl;
 
         try {
-            // 🛡️ Get OAuth2 tokens from database (same as regular test creation)
-            const adminUser = await User.findOne({ role: 'admin' });
-            
-            if (!adminUser || !adminUser.googleTokens) {
-                console.log('❌ No Google tokens found in database, falling back to local storage');
-                throw new Error('No Google tokens available');
-            }
+            // Get tokens for upload - priority: environment > admin database
+            let tokens = null;
+            let tokenSource = 'none';
 
-            console.log('✅ Google tokens found in database, uploading to Google Drive...');
-            const tokens = adminUser.googleTokens;
+            // Priority 1: Use environment tokens
+            if (process.env.GOOGLE_ACCESS_TOKEN) {
+                tokens = {
+                    access_token: process.env.GOOGLE_ACCESS_TOKEN,
+                    refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+                    token_type: process.env.GOOGLE_TOKEN_TYPE || 'Bearer',
+                    expiry_date: process.env.GOOGLE_TOKEN_EXPIRY ? parseInt(process.env.GOOGLE_TOKEN_EXPIRY) : undefined
+                };
+                tokenSource = 'environment';
+                console.log('✅ Using environment tokens for manual test upload');
+            } else {
+                // Fallback: Get OAuth2 tokens from database
+                const adminUser = await User.findOne({ role: 'admin' });
+                
+                if (!adminUser || !adminUser.googleTokens) {
+                    console.log('❌ No Google tokens found in database or environment, falling back to local storage');
+                    throw new Error('No Google tokens available');
+                }
+
+                tokens = adminUser.googleTokens;
+                tokenSource = 'admin-database';
+                console.log('✅ Using admin database tokens for manual test upload');
+            }
             
-            // Try to upload to Google Drive using OAuth tokens
-            console.log('🔄 Attempting Google Drive upload with OAuth tokens...');
+            // Try to upload to Google Drive using tokens
+            console.log(`🔄 Attempting Google Drive upload with ${tokenSource} tokens...`);
             uploadResult = await uploadViaOauth(
-                tokens, // Use tokens from database instead of session
+                tokens,
                 file.buffer,
                 fileName,
                 file.mimetype
