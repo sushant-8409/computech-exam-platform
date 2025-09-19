@@ -96,7 +96,7 @@ const PWAInstallPrompt = () => {
       setShowInstallPrompt(false);
     } else if (isIOS) {
       // Show iOS install instructions
-      const message = `To install CompuTech Exam Platform on your iPhone/iPad:
+      const message = `To install AucTutor on your iPhone/iPad:
 
 1. Tap the Share button (⬆️) at the bottom of Safari
 2. Scroll down and tap "Add to Home Screen"
@@ -114,7 +114,7 @@ Benefits:
       localStorage.setItem('install-prompt-dismissed', Date.now() + (3 * 24 * 60 * 60 * 1000)); // 3 days
     } else if (isAndroid) {
       // Show Android manual install instructions
-      const message = `To install CompuTech Exam Platform:
+      const message = `To install AucTutor:
 
 1. Open Chrome browser menu (⋮)
 2. Tap "Add to Home screen"
@@ -157,7 +157,7 @@ Benefits:
         <button className="pwa-close-btn" onClick={handleDismiss}>×</button>
         
         <div className="pwa-header">
-          <img src="/icon-192x192.png" alt="CompuTech" className="pwa-app-icon" />
+          <img src="/icon-192x192.png" alt="AucTutor" className="pwa-app-icon" />
           <div>
             <h3>Install CompuTech Exam Platform</h3>
             <p>Get the full app experience on your {isIOS ? 'iPhone/iPad' : isAndroid ? 'Android device' : 'device'}</p>

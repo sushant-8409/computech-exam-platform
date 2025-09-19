@@ -13,6 +13,15 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { email, password } = req.body;
     
+    // Basic validation
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid input',
+        errors: [{ msg: 'Email and password are required' }]
+      });
+    }
+    
     // Simple admin check
     if (email === 'mdalamrahman@gmail.com' && password === '4321') {
       const token = jwt.sign(

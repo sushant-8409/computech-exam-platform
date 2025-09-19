@@ -1,7 +1,7 @@
 {
-  "name": "CompuTech Exam Platform",
-  "short_name": "CompuTech",
-  "description": "Secure online examination platform for students and educators",
+  "name": "AucTutor - Online Education Platform",
+  "short_name": "AucTutor",
+  "description": "Advanced online education platform for students and educators with coding practice",
   "start_url": "/?utm_source=pwa",
   "scope": "/",
   "display": "standalone",

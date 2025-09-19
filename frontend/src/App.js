@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import { ToastContainer, toast } from 'react-toastify';
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import axios from 'axios';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
@@ -11,6 +14,9 @@ import QuestionWiseResults from './components/student/QuestionWiseResults';
 import StudentCodeReview from './components/student/StudentCodeReview';
 import Header from './components/Header';
 import Login from './components/Login';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
+import LandingPage from './components/LandingPage';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AnswerSheetReview from './components/admin/AnswerSheetReview';
 import EditTestPage from './components/admin/EditTestPage';
@@ -35,10 +41,13 @@ import MockTestCreator from './components/student/MockTestCreator';
 import MobileUploadInterface from './components/mobile/MobileUploadInterface';
 import { useDevToolsProtection } from './hooks/useDevToolsProtection'; // Security protection
 
-// Set axios base URL for Vercel deployment
-// In production: same-origin (no base prefix), in development: localhost:5000 or REACT_APP_API_URL
+// Set axios base URL
+// In production, use same-origin so /api hits Vercel serverless functions under the same domain
+// In development, point to local backend or REACT_APP_API_URL if provided
 const DEFAULT_LOCAL_API = 'http://localhost:5000';
-const apiBase = process.env.NODE_ENV === 'production' ? '' : (process.env.REACT_APP_API_URL || DEFAULT_LOCAL_API);
+const apiBase = process.env.NODE_ENV === 'production'
+  ? ''
+  : (process.env.REACT_APP_API_URL || DEFAULT_LOCAL_API);
 axios.defaults.baseURL = apiBase;
 axios.defaults.withCredentials = true;
 // Change to your server URL
@@ -110,6 +119,25 @@ function AuthProvider({ children }) {
 
     initializeAuth();
 
+    // Set up periodic token refresh every 6 days (before 7-day expiration)
+    const refreshInterval = setInterval(async () => {
+      const token = localStorage.getItem('token');
+      if (token && user) {
+        try {
+          const response = await axios.post('/api/auth/refresh', {}, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          if (response.data.success) {
+            localStorage.setItem('token', response.data.token);
+            console.log('✅ Token auto-refreshed');
+          }
+        } catch (error) {
+          console.log('❌ Auto token refresh failed:', error);
+        }
+      }
+    }, 6 * 24 * 60 * 60 * 1000); // 6 days in milliseconds
+
     // ✅ Add offline request handling
   const reqI = axios.interceptors.request.use(
     (config) => {
@@ -159,11 +187,37 @@ function AuthProvider({ children }) {
         console.log('🔴 Network request failed - app is offline');
         toast.error('Unable to connect. Please check your internet connection.');
       } else if (error.response?.status === 401) {
-        console.log('🔒 Unauthorized request detected, logging out');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setUser(null);
-        toast.error('Session expired. Please login again.');
+        console.log('🔒 Unauthorized request detected, attempting token refresh');
+        
+        // Try to refresh token before logging out
+        const refreshToken = async () => {
+          try {
+            const currentToken = localStorage.getItem('token');
+            if (currentToken) {
+              const response = await axios.post('/api/auth/refresh', {}, {
+                headers: { Authorization: `Bearer ${currentToken}` }
+              });
+              
+              if (response.data.success) {
+                localStorage.setItem('token', response.data.token);
+                console.log('✅ Token refreshed successfully');
+                // Retry the original request
+                return axios.request(error.config);
+              }
+            }
+          } catch (refreshError) {
+            console.log('❌ Token refresh failed:', refreshError);
+          }
+          
+          // If refresh fails, logout
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          toast.error('Session expired. Please login again.');
+          return Promise.reject(error);
+        };
+        
+        return refreshToken();
       }
       return Promise.reject(error);
     }
@@ -172,6 +226,7 @@ function AuthProvider({ children }) {
   return () => {
     axios.interceptors.request.eject(reqI);
     axios.interceptors.response.eject(resI);
+    clearInterval(refreshInterval);
   };
 
   }, [verifyToken]);
@@ -312,7 +367,7 @@ function LoginRoute() {
         color: 'white'
       }}>
         <LoadingSpinner 
-          text="Loading CompuTech Exam Platform..." 
+          text="Loading AucTutor Exam Platform..." 
           size="large"
           color="primary"
         />
@@ -326,6 +381,8 @@ function LoginRoute() {
   
   return <Login />;
 }
+
+
 
 // ✅ Enhanced ProtectedRoute
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -351,15 +408,19 @@ function ProtectedRoute({ children, adminOnly = false }) {
 // ✅ Smart redirect based on user role
 function SmartRedirect() {
   const { user } = useAuth();
+  // If this is a direct request for sitemap or static file, let the server handle it
+  if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/sitemap.xml')) {
+    return null; // allow the static file to be served
+  }
   
   if (user) {
     return <Navigate to={user.role === 'admin' ? '/admin' : '/student'} replace />;
   }
   
-  return <Navigate to="/login" replace />;
+  return <LandingPage />;
 }
 
-// ✅ Universal redirect for any unmatched URL - ensures login redirect
+// ✅ Universal redirect for any unmatched URL - ensures landing page for unauthenticated
 function UniversalRedirect() {
   const { user, loading, authChecked } = useAuth();
   
@@ -368,8 +429,12 @@ function UniversalRedirect() {
   }
   
   if (!user) {
-    console.log('🔒 Unauthorized access to unknown route, redirecting to login');
-    return <Navigate to="/login" replace />;
+    console.log('🔒 Unauthorized access to unknown route, redirecting to landing page');
+    // If requesting sitemap or static content, do not redirect
+    if (typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/sitemap.xml')) {
+      return null;
+    }
+    return <Navigate to="/" replace />;
   }
   
   // If user is authenticated but hits unknown route, redirect to their dashboard
@@ -419,14 +484,19 @@ export default function App() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
+    <>
+    <HelmetProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
           <PWAInstallPrompt />
           <Routes>
 
-            {/* ✅ ONLY Public route - login */}
+            {/* ✅ Public routes - homepage, login */}
+            <Route path="/" element={<SmartRedirect />} />
             <Route path="/login" element={<LoginRoute />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* ✅ PROTECTED ROUTES: Traditional TestInterface WITHOUT Header */}
             <Route path="/student/test/:testId" element={
@@ -464,48 +534,60 @@ export default function App() {
               <Route index element={<CodingInterface />} />
             </Route>
 
-            {/* ✅ PROTECTED ROUTES: All other routes WITH Header */}
-            <Route path="/" element={
+            {/* ✅ PROTECTED ROUTES: All dashboard routes WITH Header */}
+            <Route path="/dashboard" element={
               <ProtectedRoute>
                 <AppLayoutWithHeader />
               </ProtectedRoute>
             }>
-              {/* Smart default redirect based on user role */}
+              {/* Smart default redirect based on user role for protected dashboard */}
               <Route index element={<SmartRedirect />} />
               
-              {/* Admin section */}
-              <Route path="admin" element={<ProtectedRoute adminOnly><Outlet /></ProtectedRoute>}>
-                <Route index element={<AdminDashboard />} />
-                <Route path="tests" element={<AdminDashboard />} />
-                <Route path="tests/edit/:id" element={<EditTestPage />} />
-                <Route path="answer-review" element={<AnswerSheetReview />} />
-                <Route path="manual-entry" element={<ManualTestEntry />} />
-                <Route path="students/:id" element={<StudentDetail />} />
-                <Route path="students/edit/:id" element={<EditStudentPage />} />
-                <Route path="analytics" element={<Analytics />} />
-                <Route path="coding-review/:resultId" element={<CodingTestReview />} />
-                <Route path="result-details/:resultId" element={<ResultDetail />} />
-                <Route path="coding-practice" element={<CodingPracticeAdmin />} />
-              </Route>
 
-              {/* Student section */}
-              <Route path="student" element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
-                <Route index element={<StudentDashboard />} />
-                <Route path="mock-test" element={<MockTestCreator />} />
-                <Route path="coding-practice" element={<CodingPracticeContainer />} />
-                <Route path="result/:resultId" element={<ResultDetail />} />
-                <Route path="result/:resultId/code-review" element={<StudentCodeReview />} />
-                <Route path="request-review/:resultId" element={<ReviewRequestPage />} />
-                <Route path="result/:resultId/breakdown" element={<QuestionWiseResults />} />
-              </Route>
 
-              {/* Global result route for backward compatibility */}
-              <Route path="result/:resultId" element={
-                <ProtectedRoute>
-                  <ResultDetail />
-                </ProtectedRoute>
-              } />
+            </Route>
 
+            {/* ✅ ADMIN ROUTES WITH Header */}
+            <Route path="/admin" element={
+              <ProtectedRoute adminOnly>
+                <AppLayoutWithHeader />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="tests" element={<AdminDashboard />} />
+              <Route path="tests/edit/:id" element={<EditTestPage />} />
+              <Route path="answer-review" element={<AnswerSheetReview />} />
+              <Route path="manual-entry" element={<ManualTestEntry />} />
+              <Route path="students/:id" element={<StudentDetail />} />
+              <Route path="students/edit/:id" element={<EditStudentPage />} />
+              <Route path="analytics" element={<Analytics />} />
+              <Route path="coding-review/:resultId" element={<CodingTestReview />} />
+              <Route path="result-details/:resultId" element={<ResultDetail />} />
+              <Route path="coding-practice" element={<CodingPracticeAdmin />} />
+            </Route>
+
+            {/* ✅ STUDENT ROUTES WITH Header */}
+            <Route path="/student" element={
+              <ProtectedRoute>
+                <AppLayoutWithHeader />
+              </ProtectedRoute>
+            }>
+              <Route index element={<StudentDashboard />} />
+              <Route path="mock-test" element={<MockTestCreator />} />
+              <Route path="coding-practice" element={<CodingPracticeContainer />} />
+              <Route path="result/:resultId" element={<ResultDetail />} />
+              <Route path="result/:resultId/code-review" element={<StudentCodeReview />} />
+              <Route path="request-review/:resultId" element={<ReviewRequestPage />} />
+              <Route path="result/:resultId/breakdown" element={<QuestionWiseResults />} />
+            </Route>
+
+            {/* Global result route for backward compatibility */}
+            <Route path="/result/:resultId" element={
+              <ProtectedRoute>
+                <AppLayoutWithHeader />
+              </ProtectedRoute>
+            }>
+              <Route index element={<ResultDetail />} />
             </Route>
 
             {/* Mobile Upload Interface - Public route with token validation */}
@@ -518,5 +600,9 @@ export default function App() {
         </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
+    </HelmetProvider>
+      <VercelAnalytics />
+      <SpeedInsights />
+    </>
   );
 }

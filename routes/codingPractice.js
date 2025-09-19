@@ -3,6 +3,7 @@ const router = express.Router();
 const CodingProblem = require('../models/CodingProblem');
 const ProblemGroup = require('../models/ProblemGroup');
 const StudentSubmission = require('../models/StudentSubmission');
+const StudyPlanProgress = require('../models/StudyPlanProgress');
 const pistonService = require('../services/pistonService');
 const { authenticateStudent, authenticateAdmin } = require('../middleware/auth');
 
@@ -361,13 +362,41 @@ router.get('/student/dashboard', authenticateStudent, async (req, res) => {
       ]
     }).populate('problems', 'problemNumber title difficulty').lean();
 
+    // Get study plan progress for each group
+    const studyPlanProgresses = await StudyPlanProgress.find({ 
+      studentId,
+      groupId: { $in: availableGroups.map(g => g._id) }
+    }).lean();
+
+    // Enhance groups with progress data
+    const groupsWithProgress = availableGroups.map(group => {
+      const progress = studyPlanProgresses.find(p => p.groupId.toString() === group._id.toString());
+      
+      return {
+        ...group,
+        studentProgress: progress ? {
+          status: progress.status,
+          startedAt: progress.startedAt,
+          completedAt: progress.completedAt,
+          solvedProblems: progress.solvedProblems.length,
+          totalProblems: group.problems.length,
+          progressPercentage: group.problems.length > 0 ? 
+            Math.round((progress.solvedProblems.length / group.problems.length) * 100) : 0,
+          rank: progress.rank,
+          currentStreak: progress.currentStreak,
+          maxStreak: progress.maxStreak,
+          lastAccessedAt: progress.lastAccessedAt
+        } : null
+      };
+    });
+
     res.json({
       success: true,
       dashboard: {
         stats: enhancedStats,
         languageStats,
         recentSubmissions,
-        availableGroups
+        availableGroups: groupsWithProgress
       }
     });
   } catch (error) {
@@ -375,6 +404,161 @@ router.get('/student/dashboard', authenticateStudent, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Failed to fetch dashboard data' 
+    });
+  }
+});
+
+// =============================================================================
+// STUDY PLAN ROUTES
+// =============================================================================
+
+// Start a study plan
+router.post('/student/study-plans/:groupId/start', authenticateStudent, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const studentId = req.user.id;
+
+    // Check if group exists and is accessible
+    const studentClass = req.student?.class || req.user.class;
+    const group = await ProblemGroup.findOne({
+      _id: groupId,
+      isActive: true,
+      $or: [
+        { allowedStudentClasses: { $in: [studentClass] } },
+        { allowedStudentClasses: { $size: 0 } } // Open to all
+      ]
+    }).populate('problems');
+
+    if (!group) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Study plan not found or not accessible' 
+      });
+    }
+
+    // Check if already started
+    let progress = await StudyPlanProgress.findOne({ studentId, groupId });
+    
+    if (progress) {
+      // Resume existing study plan
+      progress.status = 'active';
+      progress.lastAccessedAt = new Date();
+      await progress.save();
+      
+      return res.json({
+        success: true,
+        message: 'Study plan resumed successfully',
+        progress: {
+          ...progress.toObject(),
+          progressPercentage: progress.progressPercentage,
+          isCompleted: progress.isCompleted
+        }
+      });
+    }
+
+    // Create new study plan progress
+    progress = new StudyPlanProgress({
+      studentId,
+      groupId,
+      totalProblems: group.problems.length,
+      status: 'active'
+    });
+
+    await progress.save();
+
+    res.json({
+      success: true,
+      message: 'Study plan started successfully',
+      progress: {
+        ...progress.toObject(),
+        progressPercentage: progress.progressPercentage,
+        isCompleted: progress.isCompleted
+      }
+    });
+  } catch (error) {
+    console.error('Error starting study plan:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to start study plan' 
+    });
+  }
+});
+
+// Get study plan progress
+router.get('/student/study-plans/:groupId/progress', authenticateStudent, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const studentId = req.user.id;
+
+    const progress = await StudyPlanProgress.findOne({ studentId, groupId })
+      .populate('solvedProblems', 'problemNumber title difficulty')
+      .lean();
+
+    if (!progress) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Study plan not started yet' 
+      });
+    }
+
+    // Get group details
+    const group = await ProblemGroup.findById(groupId)
+      .populate('problems', 'problemNumber title difficulty')
+      .lean();
+
+    res.json({
+      success: true,
+      progress: {
+        ...progress,
+        progressPercentage: group.problems.length > 0 ? 
+          Math.round((progress.solvedProblems.length / group.problems.length) * 100) : 0,
+        isCompleted: progress.status === 'completed' || 
+          (group.problems.length > 0 && progress.solvedProblems.length >= group.problems.length),
+        group: {
+          name: group.name,
+          description: group.description,
+          totalProblems: group.problems.length,
+          difficulty: group.difficulty
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching study plan progress:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch study plan progress' 
+    });
+  }
+});
+
+// Get study plan rankings
+router.get('/student/study-plans/:groupId/rankings', authenticateStudent, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    
+    const rankings = await StudyPlanProgress.find({ groupId })
+      .populate('studentId', 'name email class')
+      .sort({ 'solvedProblems.length': -1, startedAt: 1 })
+      .limit(50)
+      .lean();
+
+    // Add rank numbers
+    const rankedList = rankings.map((progress, index) => ({
+      ...progress,
+      rank: index + 1,
+      progressPercentage: progress.totalProblems > 0 ? 
+        Math.round((progress.solvedProblems.length / progress.totalProblems) * 100) : 0
+    }));
+
+    res.json({
+      success: true,
+      rankings: rankedList
+    });
+  } catch (error) {
+    console.error('Error fetching study plan rankings:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch rankings' 
     });
   }
 });
@@ -697,6 +881,30 @@ router.post('/student/problems/:id/submit', authenticateStudent, async (req, res
     });
 
     await submission.save();
+
+    // Update study plan progress if problem is solved
+    if (submission.status === 'Accepted') {
+      try {
+        // Find all study plans that include this problem
+        const groups = await ProblemGroup.find({ problems: problemId }).lean();
+        
+        for (const group of groups) {
+          const progress = await StudyPlanProgress.findOne({ 
+            studentId, 
+            groupId: group._id 
+          });
+          
+          if (progress) {
+            await progress.addSolvedProblem(problemId);
+            // Update rank after solving a problem
+            await progress.updateRank();
+          }
+        }
+      } catch (studyPlanError) {
+        console.error('Error updating study plan progress:', studyPlanError);
+        // Don't fail the submission if study plan update fails
+      }
+    }
 
     res.json({
       success: true,

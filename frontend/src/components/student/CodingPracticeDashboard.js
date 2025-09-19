@@ -326,23 +326,8 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
   const [studentRank, setStudentRank] = useState(null);
   const [activeTab, setActiveTab] = useState('problems');
 
-  useEffect(() => {
-    fetchDashboardData(); // This will handle groups fetching
-    fetchProblems();
-    fetchStudentRank();
-    fetchTopics();
-  }, []);
-
-  useEffect(() => {
-    fetchProblems();
-    fetchTopics();
-  }, [selectedGroup]);
-
-  useEffect(() => {
-    fetchProblems();
-  }, [selectedDifficulty, searchTerm, showSolved, selectedTopic]);
-
-  const fetchDashboardData = async () => {
+  // Hoist function definitions to prevent TDZ issues
+  const fetchDashboardData = React.useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get('/api/coding-practice/student/dashboard', {
@@ -354,15 +339,91 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
       if (response.data.dashboard?.availableGroups) {
         setGroups(response.data.dashboard.availableGroups);
       } else {
-        fetchGroups();
+        // Call fetchGroups only if not available in dashboard
+        const token = localStorage.getItem('token');
+        try {
+          const groupResponse = await axios.get('/api/coding-practice/student/groups', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setGroups(groupResponse.data.groups);
+        } catch (groupError) {
+          console.error('Error fetching groups:', groupError);
+        }
       }
     } catch (error) {
       console.error('Error fetching dashboard:', error);
       toast.error('Failed to load dashboard data');
       // Try to fetch groups separately if dashboard fails
-      fetchGroups();
+      const token = localStorage.getItem('token');
+      try {
+        const groupResponse = await axios.get('/api/coding-practice/student/groups', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setGroups(groupResponse.data.groups);
+      } catch (groupError) {
+        console.error('Error fetching groups:', groupError);
+      }
     }
-  };
+  }, []);
+
+  // Handle study plan start/resume
+  const handleStudyPlanAction = React.useCallback(async (groupId, isStarted) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!isStarted) {
+        // Start new study plan
+        const response = await axios.post(`/api/coding-practice/student/study-plans/${groupId}/start`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (response.data.success) {
+          toast.success(response.data.message);
+          // Refresh dashboard data to show updated progress
+          fetchDashboardData();
+        }
+      }
+      
+      // Switch to problems tab and filter by the selected group
+      setSelectedGroup(groupId);
+      setActiveTab('problems');
+      
+    } catch (error) {
+      console.error('Error with study plan action:', error);
+      toast.error(error.response?.data?.message || 'Failed to start study plan');
+    }
+  }, [fetchDashboardData]);
+
+  const fetchTopics = React.useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams();
+      if (selectedGroup !== 'all') params.append('groupId', selectedGroup);
+      const response = await axios.get(`/api/coding-practice/student/topics?${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTopics(response.data.topics || []);
+    } catch (error) {
+      console.error('Error fetching topics:', error);
+      setTopics([]);
+    }
+  }, [selectedGroup]);
+
+  const fetchStudentRank = React.useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/coding-practice/student/rank', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        setStudentRank(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching student rank:', error);
+      setStudentRank(null);
+    }
+  }, []);
 
   const fetchProblems = useCallback(async () => {
     try {
@@ -397,50 +458,25 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
     }
   }, [selectedGroup, selectedDifficulty, searchTerm, showSolved, selectedTopic]);
 
-  const fetchTopics = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const params = new URLSearchParams();
-      if (selectedGroup !== 'all') params.append('groupId', selectedGroup);
-      const response = await axios.get(`/api/coding-practice/student/topics?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setTopics(response.data.topics || []);
-    } catch (error) {
-      console.error('Error fetching topics:', error);
-      setTopics([]);
-    }
-  };
+  // useEffect hooks that depend on fetchProblems
+  useEffect(() => {
+    fetchDashboardData(); // This will handle groups fetching
+    fetchProblems();
+    fetchStudentRank();
+    fetchTopics();
+  }, [fetchDashboardData, fetchProblems, fetchStudentRank, fetchTopics]);
 
-  const fetchGroups = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/coding-practice/student/groups', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setGroups(response.data.groups);
-    } catch (error) {
-      console.error('Error fetching groups:', error);
-    }
-  };
+  useEffect(() => {
+    fetchProblems();
+    fetchTopics();
+  }, [selectedGroup, fetchProblems, fetchTopics]);
 
-  const fetchStudentRank = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/coding-practice/student/rank', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (response.data.success) {
-        setStudentRank(response.data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching student rank:', error);
-      setStudentRank(null);
-    }
-  };
+  useEffect(() => {
+    fetchProblems();
+  }, [selectedDifficulty, searchTerm, showSolved, selectedTopic, fetchProblems]);
 
-  const getStatusIcon = (status) => {
+  // Hoist utility functions to prevent TDZ issues
+  const getStatusIcon = React.useCallback((status) => {
     switch (status) {
       case 'Accepted': return '✅';
       case 'Wrong Answer': return '❌';
@@ -449,9 +485,9 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
       case 'Compilation Error': return '🔨';
       default: return '⭕';
     }
-  };
+  }, []);
 
-  const getStatusColor = (status) => {
+  const getStatusColor = React.useCallback((status) => {
     switch (status) {
       case 'Accepted': return 'success';
       case 'Wrong Answer': return 'error';
@@ -460,16 +496,16 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
       case 'Compilation Error': return 'error';
       default: return 'default';
     }
-  };
+  }, []);
 
-  const getDifficultyColor = (difficulty) => {
+  const getDifficultyColor = React.useCallback((difficulty) => {
     switch (difficulty) {
       case 'Easy': return 'easy';
       case 'Medium': return 'medium';
       case 'Hard': return 'hard';
       default: return 'default';
     }
-  };
+  }, []);
 
   if (!dashboardData) {
     return (
@@ -489,7 +525,7 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
         <div className="lc-container">
           <div className="lc-header-content">
             <div className="lc-logo-section">
-              <h1 className="lc-title">💻 CompuTech Practice</h1>
+              <h1 className="lc-title">💻 AucTutor Practice</h1>
               <p className="lc-subtitle">Welcome back, {user?.name || 'Student'}!</p>
               <p className="lc-subtext">Level up your coding skills</p>
             </div>
@@ -715,38 +751,144 @@ const CodingPracticeDashboard = ({ onProblemSelect }) => {
         {/* Explore Tab Content */}
         {activeTab === 'explore' && (
           <div className="lc-explore-section">
-            <div className="lc-explore-grid">
-              {dashboardData?.availableGroups?.map(group => (
-                <div key={group._id} className="lc-explore-card">
-                  <div className="lc-card-header">
-                    <h3 className="lc-card-title">{group.name}</h3>
-                    <span className={`lc-card-difficulty lc-difficulty-${group.difficulty.toLowerCase()}`}>
-                      {group.difficulty}
-                    </span>
-                  </div>
-                  <p className="lc-card-description">{group.description}</p>
-                  <div className="lc-card-stats">
-                    <span className="lc-card-stat">
-                      <span className="lc-stat-icon">📝</span>
-                      {group.totalProblems} problems
-                    </span>
-                    <span className="lc-card-stat">
-                      <span className="lc-stat-icon">🎓</span>
-                      {group.allowedStudentClasses?.join(', ') || 'All classes'}
-                    </span>
-                  </div>
-                  <button 
-                    className="lc-explore-btn"
-                    onClick={() => {
-                      setSelectedGroup(group._id);
-                      setActiveTab('problems');
-                    }}
-                  >
-                    Start Practice
-                  </button>
-                </div>
-              ))}
+            <div className="lc-section-header">
+              <h2>📚 Study Plans</h2>
+              <p>Structured learning paths to master coding concepts</p>
             </div>
+            <div className="lc-explore-grid">
+              {(dashboardData?.availableGroups || groups)?.map(group => {
+                const studentProgress = group.studentProgress;
+                const isStarted = !!studentProgress;
+                const isCompleted = studentProgress?.status === 'completed';
+                const solvedCount = studentProgress?.solvedProblems || 0;
+                const totalProblems = group.problems?.length || group.totalProblems || 0;
+                const progress = studentProgress?.progressPercentage || 0;
+                const rank = studentProgress?.rank || 'Not ranked';
+                const startedAt = studentProgress?.startedAt;
+                const completedAt = studentProgress?.completedAt;
+                const currentStreak = studentProgress?.currentStreak || 0;
+                const maxStreak = studentProgress?.maxStreak || 0;
+                
+                const formatDate = (date) => {
+                  if (!date) return '';
+                  return new Date(date).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: 'numeric'
+                  });
+                };
+                
+                return (
+                  <div key={group._id} className="lc-study-plan-card">
+                    <div className="lc-card-header">
+                      <div className="lc-card-title-section">
+                        <h3 className="lc-card-title">
+                          {group.name}
+                          {isCompleted && <span className="lc-completed-badge">✅</span>}
+                        </h3>
+                        <span className={`lc-card-difficulty lc-difficulty-${group.difficulty?.toLowerCase() || 'medium'}`}>
+                          {group.difficulty || 'Medium'}
+                        </span>
+                      </div>
+                      <div className="lc-progress-circle">
+                        <svg width="50" height="50" viewBox="0 0 50 50">
+                          <circle
+                            cx="25" cy="25" r="20"
+                            fill="none" stroke="#333" strokeWidth="4"
+                          />
+                          <circle
+                            cx="25" cy="25" r="20"
+                            fill="none" 
+                            stroke={isCompleted ? "#52c41a" : "#00b4d8"} 
+                            strokeWidth="4"
+                            strokeDasharray={`${progress * 1.256} 125.6`}
+                            strokeDashoffset="31.4"
+                            transform="rotate(-90 25 25)"
+                            className="lc-progress-bar"
+                          />
+                        </svg>
+                        <span className="lc-progress-text">{progress}%</span>
+                      </div>
+                    </div>
+                    
+                    <p className="lc-card-description">{group.description || 'Master coding concepts with structured problems'}</p>
+                    
+                    <div className="lc-study-plan-stats">
+                      <div className="lc-stat-row">
+                        <span className="lc-stat-label">
+                          <span className="lc-stat-icon">📝</span>
+                          Progress
+                        </span>
+                        <span className="lc-stat-value">
+                          {solvedCount}/{totalProblems} problems
+                        </span>
+                      </div>
+                      
+                      <div className="lc-stat-row">
+                        <span className="lc-stat-label">
+                          <span className="lc-stat-icon">🏆</span>
+                          Rank
+                        </span>
+                        <span className="lc-stat-value">{rank}</span>
+                      </div>
+                      
+                      {isStarted && (
+                        <>
+                          <div className="lc-stat-row">
+                            <span className="lc-stat-label">
+                              <span className="lc-stat-icon">🔥</span>
+                              Streak
+                            </span>
+                            <span className="lc-stat-value">{currentStreak} days</span>
+                          </div>
+                          
+                          <div className="lc-stat-row">
+                            <span className="lc-stat-label">
+                              <span className="lc-stat-icon">📅</span>
+                              {isCompleted ? 'Completed' : 'Started'}
+                            </span>
+                            <span className="lc-stat-value">
+                              {formatDate(isCompleted ? completedAt : startedAt)}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                      
+                      <div className="lc-stat-row">
+                        <span className="lc-stat-label">
+                          <span className="lc-stat-icon">🎓</span>
+                          Level
+                        </span>
+                        <span className="lc-stat-value">
+                          {group.allowedStudentClasses?.join(', ') || 'All classes'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="lc-card-actions">
+                      <button 
+                        className={`lc-study-plan-btn ${
+                          isCompleted ? 'lc-completed' : 
+                          isStarted ? 'lc-continue' : 'lc-start'
+                        }`}
+                        onClick={() => handleStudyPlanAction(group._id, isStarted)}
+                      >
+                        {isCompleted ? '✅ Completed' :
+                         isStarted ? '📖 Resume Study Plan' : '🚀 Start Study Plan'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {(!dashboardData?.availableGroups || dashboardData.availableGroups.length === 0) && (
+              <div className="lc-empty-state">
+                <div className="lc-empty-icon">📚</div>
+                <h3>No Study Plans Available</h3>
+                <p>Study plans for your class will appear here when created by admins.</p>
+              </div>
+            )}
           </div>
         )}
 

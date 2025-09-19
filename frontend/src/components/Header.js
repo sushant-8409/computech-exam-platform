@@ -29,7 +29,10 @@ const Header = () => {
     <header className={`${styles.appHeader} ${darkMode ? styles.dark : ''}`}>
       <div className={styles.headerContent}>
         <div className={styles.headerLeft}>
-          <h1>🎓 CompuTech Exam Platform</h1>
+          <div className={styles.logo}>
+            <img src="/icon-192x192.png" alt="AucTutor" className={styles.logoImage} />
+            <h1>AucTutor</h1>
+          </div>
         </div>
 
         {/* ✅ Desktop Navigation */}
@@ -53,7 +56,7 @@ const Header = () => {
                 to="/student/coding-practice" 
                 className={`${styles.navLink} ${location.pathname.includes('/coding-practice') ? styles.active : ''}`}
               >
-                � Coding Practice
+                💻 Coding Practice
               </Link>
             </>
           )}
@@ -127,7 +130,7 @@ const Header = () => {
                 className={`${styles.mobileNavLink} ${location.pathname.includes('/coding-practice') ? styles.active : ''}`}
                 onClick={() => setShowMobileNav(false)}
               >
-                � Coding Practice
+                💻 Coding Practice
               </Link>
             </>
           )}

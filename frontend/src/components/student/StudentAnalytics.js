@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useTheme } from '../../App';
 import { toast } from 'react-toastify';
+import axios from 'axios';
 import { Line, Bar, Doughnut, Radar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -38,7 +39,50 @@ const StudentAnalytics = ({ results = [], tests = [], isVisible, onClose }) => {
   const { darkMode } = useTheme();
   const navigate = useNavigate();
   const [downloadingPDF, setDownloadingPDF] = useState(false);
-  const [analyticsView, setAnalyticsView] = useState('overview'); // overview, performance, trends, subjects
+  const [analyticsView, setAnalyticsView] = useState('overview'); // overview, performance, trends, subjects, rankings
+  const [rankings, setRankings] = useState([]);
+  const [loadingRankings, setLoadingRankings] = useState(false);
+  const [studentRank, setStudentRank] = useState(null);
+
+  // Fetch rankings data
+  const fetchRankings = async () => {
+    if (!isVisible) return;
+    
+    setLoadingRankings(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const [rankingsResponse, studentRankResponse] = await Promise.all([
+        axios.get('/api/coding-practice/rankings', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get('/api/coding-practice/student-rank', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      if (rankingsResponse.data.success) {
+        setRankings(rankingsResponse.data.data || []);
+      }
+
+      if (studentRankResponse.data.success && studentRankResponse.data.rank) {
+        setStudentRank(studentRankResponse.data.rank);
+      }
+    } catch (error) {
+      console.error('Error fetching rankings:', error);
+      // Don't show error toast for rankings as it's supplementary data
+    } finally {
+      setLoadingRankings(false);
+    }
+  };
+
+  // Fetch rankings when analytics is opened
+  useEffect(() => {
+    if (isVisible) {
+      fetchRankings();
+    }
+  }, [isVisible]);
 
   // Calculate comprehensive analytics
   const analytics = useMemo(() => {
@@ -179,9 +223,6 @@ const StudentAnalytics = ({ results = [], tests = [], isVisible, onClose }) => {
 
   // Handle subject performance click - navigate to results filtered by subject
   const handleSubjectClick = (subject) => {
-    console.log('Subject clicked:', subject);
-    console.log('Available results:', results);
-    console.log('Available tests:', tests);
     
     // Find all results for this subject with more flexible matching
     const subjectResults = results.filter(result => {
@@ -193,7 +234,7 @@ const StudentAnalytics = ({ results = [], tests = [], isVisible, onClose }) => {
         t.id === result.test
       );
       
-      console.log('Checking result:', result._id, 'for test:', test?.title, 'subject:', test?.subject);
+
       
       // More flexible subject matching
       const subjectMatch = test && (
@@ -207,7 +248,7 @@ const StudentAnalytics = ({ results = [], tests = [], isVisible, onClose }) => {
       return subjectMatch && statusMatch;
     });
 
-    console.log('Found subject results:', subjectResults);
+
 
     if (subjectResults.length > 0) {
       // Navigate to the most recent result for this subject
@@ -217,7 +258,7 @@ const StudentAnalytics = ({ results = [], tests = [], isVisible, onClose }) => {
         return dateB - dateA;
       })[0];
       
-      console.log('Navigating to result:', mostRecentResult._id);
+
       
       // Navigate to result detail with subject context
       navigate(`/student/result/${mostRecentResult._id}?subject=${encodeURIComponent(subject)}`);
@@ -950,6 +991,12 @@ const StudentAnalytics = ({ results = [], tests = [], isVisible, onClose }) => {
           >
             📚 Subjects
           </button>
+          <button
+            className={`${styles.navTab} ${analyticsView === 'rankings' ? styles.active : ''}`}
+            onClick={() => setAnalyticsView('rankings')}
+          >
+            🏆 Rankings
+          </button>
         </div>
 
         {/* Content */}
@@ -1156,7 +1203,111 @@ const StudentAnalytics = ({ results = [], tests = [], isVisible, onClose }) => {
             </div>
           )}
 
-          {analytics.totalTests === 0 && (
+          {analyticsView === 'rankings' && (
+            <div className={styles.rankingsSection}>
+              <div className={styles.rankingCards}>
+                {/* Student's Current Rank */}
+                {studentRank && (
+                  <div className={styles.currentRankCard}>
+                    <div className={styles.rankBadge}>
+                      <span className={styles.rankNumber}>#{studentRank.rank}</span>
+                      <span className={styles.rankTitle}>Your Rank</span>
+                    </div>
+                    <div className={styles.rankStats}>
+                      <div className={styles.rankStat}>
+                        <span className={styles.statLabel}>Score</span>
+                        <span className={styles.statValue}>{studentRank.totalScore || 0}</span>
+                      </div>
+                      <div className={styles.rankStat}>
+                        <span className={styles.statLabel}>Problems Solved</span>
+                        <span className={styles.statValue}>{studentRank.problemsSolved || 0}</span>
+                      </div>
+                      <div className={styles.rankStat}>
+                        <span className={styles.statLabel}>Accuracy</span>
+                        <span className={styles.statValue}>
+                          {studentRank.accuracy ? `${studentRank.accuracy.toFixed(1)}%` : '0%'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Performance Summary */}
+                <div className={styles.performanceSummaryCard}>
+                  <h3>📈 Performance Summary</h3>
+                  <div className={styles.summaryStats}>
+                    <div className={styles.summaryItem}>
+                      <span className={styles.summaryLabel}>Traditional Tests</span>
+                      <span className={styles.summaryValue}>
+                        {results.filter(r => !r.isCodingTest).length}
+                      </span>
+                    </div>
+                    <div className={styles.summaryItem}>
+                      <span className={styles.summaryLabel}>Coding Tests</span>
+                      <span className={styles.summaryValue}>
+                        {results.filter(r => r.isCodingTest).length}
+                      </span>
+                    </div>
+                    <div className={styles.summaryItem}>
+                      <span className={styles.summaryLabel}>Average Score</span>
+                      <span className={styles.summaryValue}>
+                        {analytics.averageScore.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Leaderboard */}
+              <div className={styles.leaderboardSection}>
+                <h3>🏆 Leaderboard</h3>
+                {loadingRankings ? (
+                  <div className={styles.loadingState}>
+                    <div className={styles.spinner}></div>
+                    <p>Loading rankings...</p>
+                  </div>
+                ) : rankings.length > 0 ? (
+                  <div className={styles.leaderboard}>
+                    <div className={styles.leaderboardHeader}>
+                      <span>Rank</span>
+                      <span>Student</span>
+                      <span>Score</span>
+                      <span>Problems</span>
+                      <span>Accuracy</span>
+                    </div>
+                    {rankings.slice(0, 20).map((student, index) => {
+                      const isCurrentStudent = student.studentId === user?.id;
+                      return (
+                        <div 
+                          key={student.studentId || index}
+                          className={`${styles.leaderboardRow} ${isCurrentStudent ? styles.currentStudent : ''}`}
+                        >
+                          <span className={styles.rankPosition}>{index + 1}</span>
+                          <span className={styles.studentName}>
+                            {isCurrentStudent ? 'You' : student.name || `Student ${index + 1}`}
+                            {isCurrentStudent && <span className={styles.youLabel}>👈</span>}
+                          </span>
+                          <span className={styles.studentScore}>{student.totalScore || 0}</span>
+                          <span className={styles.problemsSolved}>{student.problemsSolved || 0}</span>
+                          <span className={styles.accuracy}>
+                            {student.accuracy ? `${student.accuracy.toFixed(1)}%` : '0%'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className={styles.noRankingsState}>
+                    <div className={styles.noDataIcon}>🏆</div>
+                    <h4>No Rankings Available</h4>
+                    <p>Complete some coding problems to see rankings!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {analyticsView === 'overview' && analytics.totalTests === 0 && (
             <div className={styles.noDataState}>
               <div className={styles.noDataIcon}>📊</div>
               <h3>No Analytics Available</h3>

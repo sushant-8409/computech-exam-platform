@@ -38,7 +38,8 @@ const StudentDashboard = () => {
     checkGoogleDriveStatus();
   }, []);
 
-  const fetchStudentData = async () => {
+  // ✅ Optimized data loading based on user role and lazy loading
+  const fetchStudentData = async (priority = 'high') => {
     setLoading(true);
     setError(null);
     
@@ -46,14 +47,36 @@ const StudentDashboard = () => {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
 
-      const testsResponse = await axios.get('/api/student/tests', { headers });
-      const resultsResponse = await axios.get('/api/student/results', { headers });
+      if (priority === 'high') {
+        // Load essential data first (recent tests and critical results)
+        const [testsResponse, recentResultsResponse] = await Promise.all([
+          axios.get('/api/student/tests?limit=10&sort=recent', { headers }),
+          axios.get('/api/student/results?limit=5&sort=recent', { headers })
+        ]);
 
-      const testsData = testsResponse?.data?.tests || [];
-      const resultsData = resultsResponse?.data?.results || [];
-      
-      setTests(Array.isArray(testsData) ? testsData : []);
-      setResults(Array.isArray(resultsData) ? resultsData : []);
+        const testsData = testsResponse?.data?.tests || [];
+        const recentResultsData = recentResultsResponse?.data?.results || [];
+        
+        setTests(Array.isArray(testsData) ? testsData : []);
+        setResults(Array.isArray(recentResultsData) ? recentResultsData : []);
+
+        // Load remaining data in background after initial render
+        setTimeout(() => {
+          fetchAdditionalData(headers);
+        }, 1000);
+      } else {
+        // Load all data for comprehensive view
+        const [testsResponse, resultsResponse] = await Promise.all([
+          axios.get('/api/student/tests', { headers }),
+          axios.get('/api/student/results', { headers })
+        ]);
+
+        const testsData = testsResponse?.data?.tests || [];
+        const resultsData = resultsResponse?.data?.results || [];
+        
+        setTests(Array.isArray(testsData) ? testsData : []);
+        setResults(Array.isArray(resultsData) ? resultsData : []);
+      }
       
     } catch (error) {
       console.error('Error fetching student data:', error);
@@ -63,6 +86,22 @@ const StudentDashboard = () => {
       setResults([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ Load additional data in background
+  const fetchAdditionalData = async (headers) => {
+    try {
+      // Load complete results history if not already loaded
+      if (results.length <= 5) {
+        const allResultsResponse = await axios.get('/api/student/results', { headers });
+        const allResultsData = allResultsResponse?.data?.results || [];
+        if (allResultsData.length > results.length) {
+          setResults(Array.isArray(allResultsData) ? allResultsData : []);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching additional data:', error);
     }
   };
 
@@ -310,11 +349,31 @@ const StudentDashboard = () => {
       
       <div className={styles.studentDashboard}>
         <div className={styles.dashboardHeader}>
-          <h1>Welcome back, {user?.name || 'Student'}! 👋</h1>
-          <div className={styles.studentInfo}>
-            <p><strong>Class:</strong> {user?.class || 'N/A'} | <strong>Board:</strong> {user?.board || 'N/A'}</p>
-            <p><strong>Roll No:</strong> {user?.rollNo || 'Not assigned'}</p>
-            <p><strong>School:</strong> {user?.school || 'N/A'}</p>
+          <div className={styles.headerContent}>
+            <div className={styles.welcomeSection}>
+              <h1>Welcome back, {user?.name || 'Student'}! 👋</h1>
+              <div className={styles.studentInfo}>
+                <p><strong>Class:</strong> {user?.class || 'N/A'} | <strong>Board:</strong> {user?.board || 'N/A'}</p>
+                <p><strong>Roll No:</strong> {user?.rollNo || 'Not assigned'}</p>
+                <p><strong>School:</strong> {user?.school || 'N/A'}</p>
+              </div>
+            </div>
+            <div className={styles.headerActions}>
+              <button 
+                className={styles.analyticsHeaderBtn}
+                onClick={() => setShowAnalytics(true)}
+                title="View Performance Analytics"
+              >
+                📊 Analytics
+              </button>
+              <button 
+                className={styles.codingPracticeBtn}
+                onClick={() => navigate('/student/coding-practice')}
+                title="Practice coding problems"
+              >
+                💻 Coding Practice
+              </button>
+            </div>
           </div>
         </div>
 
@@ -395,10 +454,10 @@ const StudentDashboard = () => {
             </div>
             <button 
               className={styles.analyticsBtn}
-              onClick={() => navigate('/student/coding-practice')}
-              title="Practice coding problems and improve your programming skills"
+              onClick={() => setShowAnalytics(true)}
+              title="View detailed performance analytics and insights"
             >
-              � Coding Practice
+              � View Analytics
             </button>
           </div>
         </div>
@@ -410,7 +469,7 @@ const StudentDashboard = () => {
             <div className={styles.portalCard}>
               <div className={styles.portalIcon}>🤖</div>
               <div className={styles.portalContent}>
-                <h4>Computech Chatbot</h4>
+                <h4>AucTutor Chatbot</h4>
                 <p>Get instant help and answers to your questions</p>
                 <button 
                   className={styles.portalButton}

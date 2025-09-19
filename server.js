@@ -21,11 +21,14 @@ const { cleanupTmpDirectory } = require('./services/tmpCleanup');
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? [
-        'https://computech-exam-platform.onrender.com',
+        'https://computech-exam-platform.vercel.app',
+        'https://computechexamplatform.vercel.app',
+        'https://www.auctutor.app',
+        'https://auctutor.app',
         'https://computechexamplatform.netlify.app',
-        'https://68c7f60439c4a6e13be296cf--computechexamplatform.netlify.app' // Deploy URL
+        'https://68c7f60439c4a6e13be296cf--computechexamplatform.netlify.app'
       ]
-    : ['http://localhost:3000', 'http://localhost:5000'], // Add port 5000
+    : ['http://localhost:3000', 'http://localhost:5000'],
   methods: 'GET,POST,PUT,DELETE,PATCH',
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -74,6 +77,8 @@ if (process.env.NODE_ENV === 'development') {
 // OAuth routes moved to auth.js
 app.use('/api/auth', require('./routes/auth'));
 app.use(require('./routes/googleAuth')); // Google OAuth routes - must come before React fallback
+// Also expose under /api for frontends that expect API-prefixed routes
+app.use('/api', require('./routes/googleAuth'));
 app.use('/api/student', require('./routes/student'));
 app.use('/api/tests', require('./routes/tests'));
 app.use('/api/coding-test', require('./routes/codingTest')); // Coding test routes
@@ -98,6 +103,7 @@ app.use('/api/mobile-upload', require('./routes/mobileUpload')); // Mobile uploa
 app.use('/api/admin', require('./routes/adminReviewResults')); // Restored this route
 app.use('/api/admin', require('./routes/reviewRoutes'));    // Restored this route
 app.use('/api/admin', require('./routes/adminReview')); 
+app.use('/api/promotions', require('./routes/promotions')); // Promotions management
 // Add this line with your other app.use() statements
 // Admin cleanup route (manual trigger for tmp cleanup)
 app.use('/', require('./routes/adminCleanup'));

@@ -26,6 +26,7 @@ import OAuthSettings from './OAuthSettings';
 import MobileUploadManager from './MobileUploadManager';
 import CodingTestCreator from './CodingTestCreatorMulti';
 import ExampleBox from './ExampleBox';
+import PromotionsManager from './PromotionsManager';
 import { CLASS_OPTIONS, BOARD_OPTIONS } from '../../constants/classBoardOptions';
 // Register Chart.js components
 ChartJS.register(
@@ -167,11 +168,11 @@ const AdminDashboard = () => {
     return;
   }
 
-  // Prefer environment variable, fall back to sensible defaults
-  const DEFAULT_PROD_API = 'https://computech-exam-platform.onrender.com';
+  // Use backend URL from env or infer from current host (avoid SPA fallback)
   const DEFAULT_LOCAL_API = 'http://localhost:5000';
-  const serverUrl = process.env.REACT_APP_API_URL || (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? DEFAULT_PROD_API : DEFAULT_LOCAL_API);
-  const authUrl = `${serverUrl}/auth/google?token=${encodeURIComponent(token)}`;
+  const DEFAULT_PROD_API = 'https://computech-exam-platform.onrender.com';
+  const baseUrl = process.env.REACT_APP_API_URL || (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' ? DEFAULT_PROD_API : DEFAULT_LOCAL_API);
+  const authUrl = `${baseUrl}/auth/google?token=${encodeURIComponent(token)}`;
   console.log('🔗 Opening OAuth popup:', authUrl);
   
   // Open popup window for OAuth
@@ -189,7 +190,7 @@ const AdminDashboard = () => {
   // Listen for messages from the popup
   const handleMessage = (event) => {
     // Security check: allow either configured API origin or the window.location origin (for proxy setups)
-    const allowedOrigin = new URL(serverUrl).origin;
+    const allowedOrigin = new URL(baseUrl).origin;
     if (event.origin !== allowedOrigin && event.origin !== window.location.origin) {
       console.warn('Received message from unexpected origin:', event.origin);
       return;
@@ -614,7 +615,8 @@ const AdminDashboard = () => {
     }
   };
 
-  const fetchDashboardData = useCallback(async () => {
+  // ✅ Optimized role-based data loading for admin dashboard
+  const fetchDashboardData = useCallback(async (priority = 'high') => {
     setDashboardLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -626,28 +628,41 @@ const AdminDashboard = () => {
 
       const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
-      // Fetch dashboard statistics
-      const dashboardResponse = await axios.get('/api/admin/dashboard/stats', authHeaders);
-      setDashboardStats(dashboardResponse.data);
+      if (priority === 'high') {
+        // Load critical admin data first (stats and recent activity)
+        const [dashboardResponse, recentTestsResponse] = await Promise.all([
+          axios.get('/api/admin/dashboard/stats', authHeaders),
+          axios.get('/api/admin/tests?limit=10&sort=recent', authHeaders)
+        ]);
 
-      // Fetch tests
-      const testsResponse = await axios.get('/api/admin/tests', authHeaders);
-      setTests(testsResponse.data.tests || []);
+        setDashboardStats(dashboardResponse.data);
+        setTests(recentTestsResponse.data.tests || []);
 
-      // Fetch students  
-      const studentsResponse = await axios.get('/api/admin/students', authHeaders);
-      setStudents(studentsResponse.data.students || []);
+        // Load remaining data based on active tab
+        setTimeout(() => {
+          loadDataBasedOnTab(activeTab, authHeaders);
+        }, 800);
+      } else {
+        // Load all data for comprehensive view
+        const [dashboardResponse, testsResponse, studentsResponse, resultsResponse] = await Promise.all([
+          axios.get('/api/admin/dashboard/stats', authHeaders),
+          axios.get('/api/admin/tests', authHeaders),
+          axios.get('/api/admin/students', authHeaders),
+          axios.get('/api/admin/results', authHeaders)
+        ]);
 
-      // Fetch results
-      const resultsResponse = await axios.get('/api/admin/results', authHeaders);
-      setResults(resultsResponse.data.results || []);
+        setDashboardStats(dashboardResponse.data);
+        setTests(testsResponse.data.tests || []);
+        setStudents(studentsResponse.data.students || []);
+        setResults(resultsResponse.data.results || []);
 
-      // Fetch additional dashboard data
-      await Promise.all([
-        fetchGradeDistribution(),
-        fetchSubjectPerformance(),
-        fetchRecentActivity()
-      ]);
+        // Load additional analytics data
+        await Promise.all([
+          fetchGradeDistribution(),
+          fetchSubjectPerformance(),
+          fetchRecentActivity()
+        ]);
+      }
 
     } catch (error) {
       console.error('❌ Failed to fetch dashboard data:', error);
@@ -660,7 +675,49 @@ const AdminDashboard = () => {
     } finally {
       setDashboardLoading(false);
     }
-  }, []);
+  }, [activeTab]);
+
+  // ✅ Load data based on currently active tab to optimize performance
+  const loadDataBasedOnTab = async (tab, authHeaders) => {
+    try {
+      switch (tab) {
+        case 'dashboard':
+          await Promise.all([
+            fetchRecentActivity(),
+            fetchChartData()
+          ]);
+          break;
+        case 'students':
+          if (students.length === 0) {
+            const studentsResponse = await axios.get('/api/admin/students', authHeaders);
+            setStudents(studentsResponse.data.students || []);
+          }
+          break;
+        case 'results':
+          if (results.length === 0) {
+            const resultsResponse = await axios.get('/api/admin/results', authHeaders);
+            setResults(resultsResponse.data.results || []);
+          }
+          break;
+        case 'analytics':
+          await Promise.all([
+            fetchGradeDistribution(),
+            fetchSubjectPerformance()
+          ]);
+          break;
+        case 'tests':
+          if (tests.length <= 10) {
+            const allTestsResponse = await axios.get('/api/admin/tests', authHeaders);
+            setTests(allTestsResponse.data.tests || []);
+          }
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      console.error(`Error loading data for ${tab} tab:`, error);
+    }
+  };
 
   // Fetch recent activity data
   const fetchRecentActivity = async () => {
@@ -829,7 +886,7 @@ const AdminDashboard = () => {
       return;
     }
 
-    fetchDashboardData();
+    fetchDashboardData('high'); // Use high priority loading for initial load
     fetchChartData();
     fetchAnalyticsData();
     fetchCodingTests(); // Fetch coding test data for enhanced results management
@@ -840,6 +897,23 @@ const AdminDashboard = () => {
       document.body.classList.add('dark-theme');
     }
   }, [user]); // Add user dependency to re-run when user changes
+
+  // ✅ Optimized tab-based data loading
+  useEffect(() => {
+    if (!user) return;
+    
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+    
+    // Load data based on active tab to optimize performance
+    const timeoutId = setTimeout(() => {
+      loadDataBasedOnTab(activeTab, authHeaders);
+    }, 300); // Debounce tab switching
+
+    return () => clearTimeout(timeoutId);
+  }, [activeTab, user, loadDataBasedOnTab]);
 
   // Theme toggle effect
   useEffect(() => {
@@ -4543,7 +4617,7 @@ const AdminDashboard = () => {
         <div className="sidebar-header">
           <div className="logo">
             <span className="logo-icon">🎓</span>
-            <span className="logo-text">CompuTech</span>
+            <span className="logo-text">AucTutor</span>
           </div>
           <button
             className="sidebar-toggle"
@@ -4634,8 +4708,18 @@ const AdminDashboard = () => {
                 setMobileMenuOpen(false);
               }}
             >
-              <span className="nav-icon">�</span>
+              <span className="nav-icon">📈</span>
               <span className="nav-text">Analytics</span>
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'promotions' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('promotions');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <span className="nav-icon">📢</span>
+              <span className="nav-text">Promotions</span>
             </button>
             <button
               className={`nav-item ${activeTab === 'manual-entry' ? 'active' : ''}`}
@@ -4755,6 +4839,7 @@ const AdminDashboard = () => {
               {activeTab === 'students' && '👥 Student Management'}
               {activeTab === 'results' && '📊 Results Management'}
               {activeTab === 'analytics' && '📈 Analytics'}
+              {activeTab === 'promotions' && '📢 Promotions Management'}
               {activeTab === 'notifications' && '📢 Notification Center'}
               {activeTab === 'settings' && '⚙️ System Settings'}
               {activeTab === 'oauth-settings' && '🔐 OAuth Configuration'}
@@ -4813,6 +4898,7 @@ const AdminDashboard = () => {
           {activeTab === 'students' && renderStudents()}
           {activeTab === 'results' && renderResultsTable()}
           {activeTab === 'analytics' && renderAnalytics()}
+          {activeTab === 'promotions' && <PromotionsManager />}
           {activeTab === 'notifications' && <NotificationCenter />}
           {activeTab === 'settings' && <NotificationSettings />}
           {activeTab === 'oauth-settings' && <OAuthSettings />}

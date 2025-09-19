@@ -1,32 +1,46 @@
 class DevToolsProtection {
   constructor(options = {}) {
-    this.maxViolations = options.maxViolations || 5; // Increased from 3 to 5
-    this.violationCount = 0;
+    // Simplified protection - minimal interference
     this.isDestroyed = false;
-    this.recursionFlag = false;
-    this.onViolationCallback = options.onViolation || null;
-    this.strictMode = options.strictMode || false;
     
     // Bind methods to preserve context
-    this.recordViolation = this.recordViolation.bind(this);
     this.destroy = this.destroy.bind(this);
     
-    // Initialize protection immediately
+    // Initialize minimal protection
     this.init();
   }
 
   init() {
     if (this.isDestroyed) return;
     
-    this.setupContextMenuProtection();
-    this.setupKeyboardProtection();
-    // Removed setupDevToolsDetection() - keyboard shortcuts are sufficient
-    this.setupElementProtection();
-    this.setupNetworkProtection();
-    
-    if (this.strictMode) {
-      this.setupStrictModeProtections();
-    }
+    // Only basic context menu protection, no console interference
+    this.setupBasicProtection();
+  }
+
+  setupBasicProtection() {
+    // Minimal context menu protection
+    document.addEventListener('contextmenu', (e) => {
+      // Allow context menu in development
+      if (process.env.NODE_ENV === 'development') {
+        return;
+      }
+      
+      // Only prevent on non-input elements
+      if (!['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+        e.preventDefault();
+      }
+    });
+
+    // Basic keyboard protection - only for F12
+    document.addEventListener('keydown', (e) => {
+      if (process.env.NODE_ENV === 'development') {
+        return;
+      }
+      
+      if (e.key === 'F12') {
+        e.preventDefault();
+      }
+    });
   }
 
   recordViolation(type) {
@@ -289,4 +303,11 @@ class DevToolsProtection {
   }
 }
 
+// Export for use in other components
 export default DevToolsProtection;
+
+// Auto-initialize in production with minimal protection
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+  // Only enable minimal protection in production
+  new DevToolsProtection();
+}

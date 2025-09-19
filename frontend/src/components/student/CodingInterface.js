@@ -1,10 +1,31 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Editor from '@monaco-editor/react';
 import { toast } from 'react-toastify';
 import CodeSnippetToolbar from './CodeSnippetToolbar';
 import './CodingInterface.css';
+
+// Mobile detection hook
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const width = window.innerWidth;
+      const userAgent = navigator.userAgent;
+      const mobileKeywords = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+      
+      setIsMobile(width <= 768 || mobileKeywords.test(userAgent));
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+};
 
 // AI Doubt Solver Component
 // const DoubtSolver = ({ problem, code, language, onClose }) => {
@@ -142,10 +163,37 @@ const formatAIResponse = (response) => {
     if (trimmedLine.startsWith('```') || trimmedLine.includes('```')) {
       if (inCodeBlock) {
         // End code block
+        const codeContent = currentCodeBlock.join('\n');
         formattedContent.push(
-          <pre key={`code-${index}`} className="ai-code-block">
-            <code>{currentCodeBlock.join('\n')}</code>
-          </pre>
+          <div key={`code-${index}`} className="ai-code-container">
+            <div className="code-block-header">
+              <span>Code Solution</span>
+              <div className="code-actions">
+                <button 
+                  className="copy-code-btn"
+                  onClick={() => navigator.clipboard.writeText(codeContent)}
+                  title="Copy code"
+                >
+                  📋 Copy
+                </button>
+                <button 
+                  className="insert-code-btn"
+                  onClick={() => {
+                    if (window.monacoEditor) {
+                      window.monacoEditor.setValue(codeContent);
+                      window.monacoEditor.getAction('editor.action.formatDocument').run();
+                    }
+                  }}
+                  title="Insert code into editor"
+                >
+                  📝 Insert
+                </button>
+              </div>
+            </div>
+            <pre className="ai-code-block">
+              <code>{codeContent}</code>
+            </pre>
+          </div>
         );
         currentCodeBlock = [];
         inCodeBlock = false;
@@ -175,12 +223,12 @@ const formatAIResponse = (response) => {
     }
 
     // Handle lists
-    if (trimmedLine.match(/^[\-\*\+]\s+/) || trimmedLine.match(/^\d+\.\s+/)) {
+    if (trimmedLine.match(/^[-*+]\s+/) || trimmedLine.match(/^\d+\.\s+/)) {
       if (!inList) {
         inList = true;
         listItems = [];
       }
-      const listContent = trimmedLine.replace(/^[\-\*\+\d\.]\s*/, '');
+      const listContent = trimmedLine.replace(/^[-*+\d.]\s*/, '');
       listItems.push(<li key={`list-${index}`} className="ai-list-item">{listContent}</li>);
       return;
     } else if (inList && trimmedLine === '') {
@@ -250,11 +298,7 @@ const DoubtSolver = ({ problem, code, language, onClose }) => {
   const [doubts, setDoubts] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
 
-  useEffect(() => {
-    fetchDoubtHistory();
-  }, []);
-
-  const fetchDoubtHistory = async () => {
+  const fetchDoubtHistory = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`/api/coding-practice/problems/${problem._id}/doubts`, {
@@ -264,7 +308,11 @@ const DoubtSolver = ({ problem, code, language, onClose }) => {
     } catch (error) {
       console.error('Error fetching doubt history:', error);
     }
-  };
+  }, [problem._id]);
+
+  useEffect(() => {
+    fetchDoubtHistory();
+  }, [fetchDoubtHistory]);
 
   const askAI = async () => {
     if (!query.trim()) return;
@@ -394,11 +442,7 @@ const DiscussionTab = ({ problemId }) => {
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyContent, setReplyContent] = useState('');
 
-  useEffect(() => {
-    fetchComments();
-  }, [problemId]);
-
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`/api/coding-practice/problems/${problemId}/comments`, {
@@ -411,7 +455,11 @@ const DiscussionTab = ({ problemId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [problemId]);
+
+  useEffect(() => {
+    fetchComments();
+  }, [problemId, fetchComments]);
 
   const submitComment = async () => {
     if (!newComment.trim()) return;
@@ -742,6 +790,7 @@ const DiscussionTab = ({ problemId }) => {
 const CodingInterface = () => {
   const { problemId } = useParams();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   
   const onBack = () => {
     navigate('/student/coding-practice');
@@ -761,8 +810,15 @@ const CodingInterface = () => {
   const [fontSize, setFontSize] = useState(14);
   const [showDoubtSolver, setShowDoubtSolver] = useState(false);
   
+  // Mobile-specific states
+  const [showMobileBottomSheet, setShowMobileBottomSheet] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
   // AI Button dragging state
-  const [aiButtonPosition, setAiButtonPosition] = useState({ x: 20, y: 20 });
+  const [aiButtonPosition, setAiButtonPosition] = useState({ 
+    x: window.innerWidth - 80, 
+    y: window.innerHeight - 80 
+  });
   const [isDraggingAI, setIsDraggingAI] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const aiButtonRef = useRef(null);
@@ -978,102 +1034,6 @@ int main() {
     }
   };
 
-  useEffect(() => {
-    fetchProblem();
-    startTimer();
-    
-    // Add keyboard shortcuts
-    const handleKeyDown = (event) => {
-      if (event.ctrlKey && event.key === "'") {
-        event.preventDefault();
-        runCode();
-      } else if (event.ctrlKey && event.key === 'Enter') {
-        event.preventDefault();
-        submitCode();
-      } else if (event.key === 'F11') {
-        event.preventDefault();
-        setHeaderVisible(!headerVisible);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [problemId]);
-
-  useEffect(() => {
-    if (problem && problem.starterCode && problem.starterCode[language]) {
-      setCode(problem.starterCode[language]);
-    } else {
-      setCode(languageConfig[language].defaultCode);
-    }
-  }, [language, problem]);
-
-  // Keyboard shortcuts: Ctrl+' for run, Ctrl+Enter for submit
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      // Ctrl+' for run (also handle key code for single quote)
-      if (event.ctrlKey && (event.key === "'" || event.code === "Quote")) {
-        event.preventDefault();
-        if (!loading && code.trim()) {
-          runCode();
-        }
-      }
-      // Ctrl+Enter for submit
-      else if (event.ctrlKey && event.key === 'Enter') {
-        event.preventDefault();
-        if (!loading && code.trim()) {
-          submitCode();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [code, loading]);
-
-  // Handle panel resizing
-  const handleMouseDown = (e) => {
-    setIsResizing(true);
-    e.preventDefault();
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isResizing || !containerRef.current) return;
-    
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-    
-    // Constrain between 20% and 80%
-    const constrainedWidth = Math.min(Math.max(newWidth, 20), 80);
-    setLeftPanelWidth(constrainedWidth);
-  };
-
-  const handleMouseUp = () => {
-    setIsResizing(false);
-  };
-
-  // Add global mouse events for resizing
-  React.useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isResizing, handleMouseMove, handleMouseUp]);
-
   const fetchProblem = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -1127,7 +1087,27 @@ int main() {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const runCode = async () => {
+  useEffect(() => {
+    fetchProblem();
+    startTimer();
+    
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [problemId]);
+
+  useEffect(() => {
+    if (problem && problem.starterCode && problem.starterCode[language]) {
+      setCode(problem.starterCode[language]);
+    } else {
+      setCode(languageConfig[language].defaultCode);
+    }
+  }, [language, problem]);
+
+  // Hoisted to avoid TDZ: define runCode and submitCode before effects that reference them
+  const runCode = React.useCallback(async () => {
     if (!code.trim()) {
       setRunOutput('Please write some code first.');
       setActiveTab('output');
@@ -1143,27 +1123,31 @@ int main() {
       const token = localStorage.getItem('token');
       const response = await axios.post(`/api/coding-practice/student/problems/${problemId}/run`, {
         code,
-        language
+        language,
+        examplesOnly: true // Only run example test cases
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Handle run output in LeetCode style
+      // Handle run output with improved formatting for examples
       if (response.data.result && response.data.result.testResults) {
+        const testResults = response.data.result.testResults;
         setTestResults(response.data.result);
         setIsRunResults(true);
-        setActiveTab('submit'); // Switch to submit tab to show test results
         
-        // Create LeetCode-style run output
-        const testResults = response.data.result.testResults;
-        const firstFailed = testResults.find(test => !test.passed);
+        // Create formatted output for example test cases
+        let output = 'Example Test Cases:\n\n';
+        testResults.forEach((test, index) => {
+          const exampleNum = index + 1;
+          output += `Example ${exampleNum}:\n`;
+          output += `Input: ${test.input}\n`;
+          output += `Expected: ${test.expectedOutput}\n`;
+          output += `Output: ${test.actualOutput}\n`;
+          output += `Status: ${test.passed ? '✅ PASSED' : '❌ FAILED'}\n`;
+          output += `Time: ${test.executionTime || 'N/A'}ms\n\n`;
+        });
         
-        if (firstFailed) {
-          const output = `Wrong Answer\n\nInput:\n${firstFailed.input}\n\nOutput:\n${firstFailed.actualOutput}\n\nExpected:\n${firstFailed.expectedOutput}`;
-          setRunOutput(output);
-        } else {
-          setRunOutput(`Accepted\n\nAll sample test cases passed!`);
-        }
+        setRunOutput(output);
       } else {
         setRunOutput(response.data.output || 'Code executed successfully (no output)');
       }
@@ -1173,9 +1157,9 @@ int main() {
     } finally {
       setIsRunning(false);
     }
-  };
+  }, [code, language, problemId]);
 
-  const submitCode = async () => {
+  const submitCode = React.useCallback(async () => {
     if (!code.trim()) {
       setSubmitOutput('Please write some code first.');
       setActiveTab('submit');
@@ -1217,7 +1201,70 @@ int main() {
     } finally {
       setIsSubmitting(false);
     }
+  }, [code, language, problemId, timeElapsed]);
+
+  // Keyboard shortcuts: Ctrl+' for run, Ctrl+Enter for submit
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Ctrl+' for run (also handle key code for single quote)
+      if (event.ctrlKey && (event.key === "'" || event.code === "Quote")) {
+        event.preventDefault();
+        if (!loading && code.trim()) {
+          runCode();
+        }
+      }
+      // Ctrl+Enter for submit
+      else if (event.ctrlKey && event.key === 'Enter') {
+        event.preventDefault();
+        if (!loading && code.trim()) {
+          submitCode();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [code, loading, runCode, submitCode]);
+
+  // Handle panel resizing
+  const handleMouseDown = (e) => {
+    setIsResizing(true);
+    e.preventDefault();
   };
+
+  const handleMouseMove = (e) => {
+    if (!isResizing || !containerRef.current) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+    
+    // Constrain between 20% and 80%
+    const constrainedWidth = Math.min(Math.max(newWidth, 20), 80);
+    setLeftPanelWidth(constrainedWidth);
+  };
+
+  const handleMouseUp = () => {
+    setIsResizing(false);
+  };
+
+  // Add global mouse events for resizing
+  React.useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
+  // Hoisted to avoid TDZ: define runCode before effects that reference it
+
 
   // AI Button drag handlers
   const handleAIMouseDown = (e) => {
@@ -1265,6 +1312,33 @@ int main() {
     }
   }, [isDraggingAI, dragOffset]);
 
+  // Fullscreen functionality
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch(err => {
+        console.error('Error attempting to enable fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      }).catch(err => {
+        console.error('Error attempting to exit fullscreen:', err);
+      });
+    }
+  }, []);
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   const resetCode = () => {
     const defaultCode = problem?.starterCode?.[language] || languageConfig[language].defaultCode;
     setCode(defaultCode);
@@ -1310,55 +1384,209 @@ int main() {
   };
 
   return (
-    <div className="coding-interface coding-interface-headerless">
+    <div className={`coding-interface coding-interface-headerless ${isMobile ? 'mobile-interface' : ''}`}>
       {/* No header - maximized coding space */}
       
-      {/* Floating Back Button */}
-      <button onClick={onBack} className="floating-back-btn" title="Back to Problems">
-        ← Back
-      </button>
-      
-      {/* Floating Timer */}
-      <div className="floating-timer" title="Time Elapsed">
-        <span className="timer-icon">⏱️</span>
-        <span className="timer-text">{formatTime(timeElapsed)}</span>
-      </div>
-
-      <div className="coding-body" ref={containerRef}>
-        {/* Left Panel - Problem Description */}
-        <div className="left-panel" style={{ width: `${leftPanelWidth}%` }}>
-          <div className="panel-tabs">
+      {/* Mobile Navigation Bar */}
+      {isMobile && (
+        <div className="mobile-nav-bar">
+          <button onClick={onBack} className="mobile-nav-btn back-btn">
+            ← Back
+          </button>
+          
+          <div className="mobile-timer">
+            <span className="timer-icon">⏱️</span>
+            <span className="timer-text">{formatTime(timeElapsed)}</span>
+          </div>
+          
+          <div className="mobile-nav-right">
             <button 
-              className={`tab ${activeTab === 'description' ? 'active' : ''}`}
-              onClick={() => setActiveTab('description')}
+              className="mobile-nav-btn fullscreen-btn"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
             >
-              Description
+              {isFullscreen ? '⤓' : '⤢'}
             </button>
+            
             <button 
-              className={`tab ${activeTab === 'output' ? 'active' : ''}`}
-              onClick={() => setActiveTab('output')}
+              className="mobile-nav-btn menu-btn"
+              onClick={() => setShowMobileBottomSheet(!showMobileBottomSheet)}
             >
-              Run Output
-            </button>
-            <button 
-              className={`tab ${activeTab === 'submit' ? 'active' : ''}`}
-              onClick={() => setActiveTab('submit')}
-            >
-              Submit Results
-            </button>
-            <button 
-              className={`tab ${activeTab === 'solution' ? 'active' : ''}`}
-              onClick={() => setActiveTab('solution')}
-            >
-              Solution
-            </button>
-            <button 
-              className={`tab ${activeTab === 'discussion' ? 'active' : ''}`}
-              onClick={() => setActiveTab('discussion')}
-            >
-              Discussion
+              <div className="menu-dots">
+                <div className="dot"></div>
+                <div className="dot"></div>
+                <div className="dot"></div>
+              </div>
             </button>
           </div>
+        </div>
+      )}
+      
+      {/* Desktop Floating Buttons */}
+      {!isMobile && (
+        <>
+          <button onClick={onBack} className="floating-back-btn" title="Back to Problems">
+            ← Back
+          </button>
+          
+          <div className="floating-timer" title="Time Elapsed">
+            <span className="timer-icon">⏱️</span>
+            <span className="timer-text">{formatTime(timeElapsed)}</span>
+          </div>
+        </>
+      )}
+
+      {/* Mobile Bottom Sheet */}
+      {isMobile && showMobileBottomSheet && (
+        <div className="mobile-bottom-sheet-overlay" onClick={() => setShowMobileBottomSheet(false)}>
+          <div className="mobile-bottom-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-sheet-header">
+              <h3>Problem Options</h3>
+              <button 
+                className="close-sheet-btn"
+                onClick={() => setShowMobileBottomSheet(false)}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="mobile-sheet-content">
+              <div className="mobile-tabs">
+                <button 
+                  className={`mobile-tab ${activeTab === 'description' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('description');
+                    setShowMobileBottomSheet(false);
+                  }}
+                >
+                  📖 Description
+                </button>
+                <button 
+                  className={`mobile-tab ${activeTab === 'output' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('output');
+                    setShowMobileBottomSheet(false);
+                  }}
+                >
+                  🏃 Run Output
+                </button>
+                <button 
+                  className={`mobile-tab ${activeTab === 'submit' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('submit');
+                    setShowMobileBottomSheet(false);
+                  }}
+                >
+                  ✅ Submit Results
+                </button>
+                <button 
+                  className={`mobile-tab ${activeTab === 'solution' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('solution');
+                    setShowMobileBottomSheet(false);
+                  }}
+                >
+                  💡 Solution
+                </button>
+                <button 
+                  className={`mobile-tab ${activeTab === 'discussion' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('discussion');
+                    setShowMobileBottomSheet(false);
+                  }}
+                >
+                  💬 Discussion
+                </button>
+              </div>
+              
+              {/* AI Assistant Button */}
+              <button 
+                className="mobile-ai-btn"
+                onClick={() => {
+                  setShowDoubtSolver(true);
+                  setShowMobileBottomSheet(false);
+                }}
+              >
+                🤖 AI Assistant
+              </button>
+              
+              {/* Language & Font Size Controls */}
+              <div className="mobile-controls">
+                <div className="mobile-control-group">
+                  <label>Language:</label>
+                  <select 
+                    value={language} 
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="mobile-select"
+                  >
+                    <option value="python">Python</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="cpp">C++</option>
+                    <option value="java">Java</option>
+                    <option value="c">C</option>
+                  </select>
+                </div>
+                
+                <div className="mobile-control-group">
+                  <label>Font Size:</label>
+                  <div className="font-size-controls">
+                    <button 
+                      onClick={() => setFontSize(Math.max(10, fontSize - 2))}
+                      className="font-size-btn"
+                    >
+                      A-
+                    </button>
+                    <span className="font-size-display">{fontSize}</span>
+                    <button 
+                      onClick={() => setFontSize(Math.min(24, fontSize + 2))}
+                      className="font-size-btn"
+                    >
+                      A+
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={`coding-body ${isMobile ? 'mobile-body' : ''}`} ref={containerRef}>
+        {/* Left Panel - Problem Description (Hidden on Mobile) */}
+        {!isMobile && (
+          <div className="left-panel" style={{ width: `${leftPanelWidth}%` }}>
+            <div className="panel-tabs">
+              <button 
+                className={`tab ${activeTab === 'description' ? 'active' : ''}`}
+                onClick={() => setActiveTab('description')}
+              >
+                Description
+              </button>
+              <button 
+                className={`tab ${activeTab === 'output' ? 'active' : ''}`}
+                onClick={() => setActiveTab('output')}
+              >
+                Run Output
+              </button>
+              <button 
+                className={`tab ${activeTab === 'submit' ? 'active' : ''}`}
+                onClick={() => setActiveTab('submit')}
+              >
+                Submit Results
+              </button>
+              <button 
+                className={`tab ${activeTab === 'solution' ? 'active' : ''}`}
+                onClick={() => setActiveTab('solution')}
+              >
+                Solution
+              </button>
+              <button 
+                className={`tab ${activeTab === 'discussion' ? 'active' : ''}`}
+                onClick={() => setActiveTab('discussion')}
+              >
+                Discussion
+              </button>
+            </div>
 
           <div className="panel-content">
             {activeTab === 'description' && (
@@ -1477,7 +1705,7 @@ int main() {
                     <div className="test-stats">
                       <div className="stat-item">
                         <span className="stat-label">Score</span>
-                        <span className="stat-value">{testResults.score}/{testResults.maxScore} ({testResults.percentage.toFixed(1)}%)</span>
+                        <span className="stat-value">{testResults.score || 0}/{testResults.maxScore || 0} ({testResults.percentage?.toFixed(1) || 0}%)</span>
                       </div>
                       <div className="stat-item">
                         <span className="stat-label">Execution Time</span>
@@ -1621,47 +1849,185 @@ int main() {
             )}
           </div>
         </div>
+        )}
 
-        {/* Resizer Handle */}
-        <div 
-          className={`panel-resizer ${isResizing ? 'resizing' : ''}`}
-          onMouseDown={handleMouseDown}
-        >
-          <div className="resizer-line"></div>
-        </div>
+        {/* Mobile Content Panel */}
+        {isMobile && activeTab !== 'output' && activeTab !== 'submit' && (
+          <div className="mobile-content-panel">
+            {activeTab === 'description' && (
+              <div className="mobile-problem-description">
+                <div className="mobile-problem-header">
+                  <div className="mobile-problem-title">
+                    <h2>{problem.problemNumber}. {problem.title}</h2>
+                    <div className="mobile-problem-metadata">
+                      <span className={`mobile-difficulty-badge ${problem.difficulty?.toLowerCase()}`}>
+                        {problem.difficulty}
+                      </span>
+                      {hasSolved && (
+                        <span className="mobile-solved-badge">
+                          ✅ Solved
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mobile-description-content">
+                  {problem.description ? (
+                    <div dangerouslySetInnerHTML={{__html: problem.description.replace(/\n/g, '<br>')}} />
+                  ) : (
+                    <p style={{color: '#ff5252'}}>
+                      <strong>Problem description not available.</strong>
+                    </p>
+                  )}
 
-        {/* Right Panel - Code Editor */}
-        <div className="right-panel" style={{ width: `${100 - leftPanelWidth}%` }}>
-          <div className="editor-header">
-            <button 
-              onClick={handleRestoreLastCode} 
-              className="restore-btn" 
-              style={{marginRight: 12, padding: '8px', minWidth: '40px'}}
-              title="Restore Last Submitted Code"
-            >
-              ♻️
-            </button>
-            <div className="language-selector">
-              <label>Language:</label>
-              <select value={language} onChange={(e) => handleLanguageChange(e.target.value)}>
-                <option value="python">Python</option>
-                <option value="java">Java</option>
-                <option value="cpp">C++</option>
-                <option value="c">C</option>
-              </select>
-            </div>
-            {hasSolved && (
-              <div title="You have solved this problem before" style={{
-                color: '#22c55e',
-                fontWeight: 700
-              }}>
-                ✅ Solved
+                  {problem.examples && problem.examples.length > 0 && (
+                    <div className="mobile-examples">
+                      <h4>Examples:</h4>
+                      {problem.examples.map((example, index) => (
+                        <div key={index} className="mobile-example">
+                          <strong>Example {index + 1}:</strong>
+                          <pre className="mobile-example-code">
+                            <div><strong>Input:</strong> {example.input}</div>
+                            <div><strong>Output:</strong> {example.output}</div>
+                            {example.explanation && (
+                              <div><strong>Explanation:</strong> {example.explanation}</div>
+                            )}
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {problem.constraints && (
+                    <div className="mobile-constraints">
+                      <h4>Constraints:</h4>
+                      {Array.isArray(problem.constraints) ? (
+                        <ul>
+                          {problem.constraints.map((constraint, index) => (
+                            <li key={index}>{constraint}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>{problem.constraints}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-            <button onClick={resetCode} className="reset-btn">
-              🔄 Reset
-            </button>
+
+            {activeTab === 'solution' && (
+              <div className="mobile-solution-panel">
+                {problem.solution ? (
+                  <div>
+                    <h4>Official Solution</h4>
+                    <div className="mobile-solution-approach">
+                      <h5>Approach:</h5>
+                      <p>{problem.solution.approach}</p>
+                    </div>
+                    
+                    {problem.solution.code && problem.solution.code[language] && (
+                      <div className="mobile-solution-code">
+                        <h5>Code ({language}):</h5>
+                        <pre className="solution-code">
+                          <code>{problem.solution.code[language]}</code>
+                        </pre>
+                      </div>
+                    )}
+                    
+                    <div className="mobile-complexity-analysis">
+                      <h5>Complexity Analysis:</h5>
+                      <p><strong>Time:</strong> {problem.solution.timeComplexity || 'Not specified'}</p>
+                      <p><strong>Space:</strong> {problem.solution.spaceComplexity || 'Not specified'}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p>Official solution is not available for this problem yet.</p>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'discussion' && (
+              <div className="mobile-discussion-panel">
+                <h4>Discussion</h4>
+                <DiscussionTab problemId={problemId} />
+              </div>
+            )}
           </div>
+        )}
+
+        {/* Desktop Resizer Handle */}
+        {!isMobile && (
+          <div 
+            className={`panel-resizer ${isResizing ? 'resizing' : ''}`}
+            onMouseDown={handleMouseDown}
+          >
+            <div className="resizer-line"></div>
+          </div>
+        )}
+
+        {/* Code Editor Panel */}
+        <div className={`right-panel ${isMobile ? 'mobile-editor-panel' : ''}`} 
+             style={!isMobile ? { width: `${100 - leftPanelWidth}%` } : {}}>
+          {/* Desktop Editor Header */}
+          {!isMobile && (
+            <div className="editor-header">
+              <button 
+                onClick={handleRestoreLastCode} 
+                className="restore-btn" 
+                style={{marginRight: 12, padding: '8px', minWidth: '40px'}}
+                title="Restore Last Submitted Code"
+              >
+                ♻️
+              </button>
+              <div className="language-selector">
+                <label>Language:</label>
+                <select value={language} onChange={(e) => handleLanguageChange(e.target.value)}>
+                  <option value="python">Python</option>
+                  <option value="java">Java</option>
+                  <option value="cpp">C++</option>
+                  <option value="c">C</option>
+                </select>
+              </div>
+              {hasSolved && (
+                <div title="You have solved this problem before" style={{
+                  color: '#22c55e',
+                  fontWeight: 700
+                }}>
+                  ✅ Solved
+                </div>
+              )}
+              <button onClick={resetCode} className="reset-btn">
+                🔄 Reset
+              </button>
+            </div>
+          )}
+
+          {/* Mobile Editor Header */}
+          {isMobile && (
+            <div className="mobile-editor-header">
+              <div className="mobile-editor-title">
+                Code Editor ({language})
+              </div>
+              <div className="mobile-editor-actions">
+                <button 
+                  onClick={handleRestoreLastCode} 
+                  className="mobile-action-btn"
+                  title="Restore Last Submitted Code"
+                >
+                  ♻️
+                </button>
+                <button 
+                  onClick={resetCode} 
+                  className="mobile-action-btn"
+                  title="Reset Code"
+                >
+                  🔄
+                </button>
+              </div>
+            </div>
+          )}
 
           <CodeSnippetToolbar 
             language={language} 
@@ -1679,6 +2045,7 @@ int main() {
               onChange={setCode}
               onMount={(editor) => {
                 editorRef.current = editor;
+                window.monacoEditor = editor;
               }}
               theme="vs-dark"
               options={{
@@ -1693,69 +2060,117 @@ int main() {
             />
           </div>
 
-          <div className="editor-actions">
-            <button 
-              onClick={runCode} 
-              disabled={isRunning}
-              className="run-btn"
-              title="Run Code (Ctrl+')"
-            >
-              {isRunning ? 'Running...' : '▶️ Run (Ctrl+\')'}
-            </button>
-            <button 
-              onClick={submitCode} 
-              disabled={isSubmitting}
-              className="submit-btn"
-              title="Submit Code (Ctrl+Enter)"
-            >
-              {isSubmitting ? 'Submitting...' : '🚀 Submit (Ctrl+Enter)'}
-            </button>
-          </div>
-
-          {/* Professional Status Console */}
-          <div className="status-console">
-            <div className="console-header">
-              <span className="console-title">Console</span>
-              <div className="console-info">
-                <span>Lang: {language.toUpperCase()}</span>
-                <span>•</span>
-                <span>Lines: {code.split('\n').length}</span>
-                <span>•</span>
-                <span>Chars: {code.length}</span>
-              </div>
+          {/* Desktop Editor Actions */}
+          {!isMobile && (
+            <div className="editor-actions">
+              <button 
+                onClick={runCode} 
+                disabled={isRunning}
+                className="run-btn"
+                title="Run Code (Ctrl+')"
+              >
+                {isRunning ? 'Running...' : '▶️ Run (Ctrl+\')'}
+              </button>
+              <button 
+                onClick={submitCode} 
+                disabled={isSubmitting}
+                className="submit-btn"
+                title="Submit Code (Ctrl+Enter)"
+              >
+                {isSubmitting ? 'Submitting...' : '🚀 Submit (Ctrl+Enter)'}
+              </button>
             </div>
-            <div className="console-content">
-              {isRunning && <div className="console-message running">🔄 Running code...</div>}
-              {isSubmitting && <div className="console-message submitting">📤 Submitting solution...</div>}
-              {!isRunning && !isSubmitting && (
-                <div className="console-message ready">✅ Ready to run • Press Ctrl+' to run, Ctrl+Enter to submit</div>
+          )}
+
+          {/* Mobile Action Bar */}
+          {isMobile && (
+            <div className="mobile-action-bar">
+              <button 
+                onClick={runCode} 
+                disabled={isRunning}
+                className="mobile-run-btn"
+              >
+                {isRunning ? 'Running...' : '▶️ Run'}
+              </button>
+              <button 
+                onClick={submitCode} 
+                disabled={isSubmitting}
+                className="mobile-submit-btn"
+              >
+                {isSubmitting ? 'Submitting...' : '🚀 Submit'}
+              </button>
+            </div>
+          )}
+
+          {/* Mobile Results Panel */}
+          {isMobile && (activeTab === 'output' || activeTab === 'submit') && (
+            <div className="mobile-results-panel">
+              {activeTab === 'output' && runOutput && (
+                <div className="mobile-run-results">
+                  <h4>Run Output</h4>
+                  <pre className="mobile-output">{runOutput}</pre>
+                </div>
+              )}
+              
+              {activeTab === 'submit' && testResults && (
+                <div className="mobile-submit-results">
+                  <h4>Submit Results</h4>
+                  <div className="mobile-test-summary">
+                    <div className={`mobile-status ${testResults.status?.toLowerCase() || 'error'}`}>
+                      {testResults.status || 'Error'}
+                    </div>
+                    <div className="mobile-score">
+                      Score: {testResults.percentage || 0}%
+                    </div>
+                  </div>
+                  
+                  {testResults.testCases && testResults.testCases.length > 0 && (
+                    <div className="mobile-test-cases">
+                      {testResults.testCases.map((testCase, index) => (
+                        <div key={index} className={`mobile-test-case ${testCase.passed ? 'passed' : 'failed'}`}>
+                          <div className="mobile-test-case-header">
+                            Test Case {index + 1} {testCase.passed ? '✅' : '❌'}
+                          </div>
+                          <div className="mobile-test-case-details">
+                            <div><strong>Input:</strong> {testCase.input}</div>
+                            <div><strong>Expected:</strong> {testCase.expected}</div>
+                            <div><strong>Your Output:</strong> {testCase.output}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          </div>
+          )}
+
         </div>
       </div>
 
-      {/* Floating AI Doubt Solver Button */}
-      <button 
-        ref={aiButtonRef}
-        className={`floating-ai-btn ${isDraggingAI ? 'dragging' : ''}`}
-        style={{
-          position: 'fixed',
-          left: `${aiButtonPosition.x}px`,
-          top: `${aiButtonPosition.y}px`,
-          zIndex: 1001
-        }}
-        onClick={(e) => {
-          if (!isDraggingAI) {
-            setShowDoubtSolver(true);
-          }
-        }}
-        onMouseDown={handleAIMouseDown}
-        title="Ask AI for help (Drag to move)"
-      >
-        <span className="ai-icon">🤖</span>
-        <span className="ai-text">Ask AI</span>
-      </button>
+      {/* Desktop Floating AI Doubt Solver Button */}
+      {!isMobile && (
+        <button 
+          ref={aiButtonRef}
+          className={`floating-ai-btn ${isDraggingAI ? 'dragging' : ''}`}
+          style={{
+            position: 'fixed',
+            left: `${aiButtonPosition.x}px`,
+            top: `${aiButtonPosition.y}px`,
+            zIndex: 1001
+          }}
+          onClick={(e) => {
+            if (!isDraggingAI) {
+              setShowDoubtSolver(true);
+            }
+          }}
+          onMouseDown={handleAIMouseDown}
+          title="Ask AI for help (Drag to move)"
+        >
+          <span className="ai-icon">🤖</span>
+          <span className="ai-text">Ask AI</span>
+        </button>
+      )}
 
       {/* AI Doubt Solver Modal */}
       {showDoubtSolver && (

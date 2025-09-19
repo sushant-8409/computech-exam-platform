@@ -1,11 +1,19 @@
 const express = require('express');
 const { google } = require('googleapis');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 const router = express.Router();
 
 // Google OAuth2 configuration
 const getRedirectUri = () => {
+  // Prefer explicit configuration
+  if (process.env.GOOGLE_OAUTH_REDIRECT_URI) {
+    return process.env.GOOGLE_OAUTH_REDIRECT_URI;
+  }
+  // Fallbacks by environment
   if (process.env.NODE_ENV === 'production') {
-    return 'https://computech-07f0.onrender.com/auth/google/callback';
+    // Default to backend domain if not provided via env
+    return 'https://computech-exam-platform.onrender.com/auth/google/callback';
   }
   return 'http://localhost:5000/auth/google/callback';
 };
@@ -210,6 +218,36 @@ router.get('/auth/google/callback', async (req, res) => {
 
     // Store tokens in session
     req.session.googleTokens = tokens;
+    
+    // Persist tokens to MongoDB for the authenticated user (admin/student) if token was provided during start
+    try {
+      const sessionToken = req.session.userToken;
+      if (sessionToken) {
+        const decoded = jwt.verify(sessionToken, process.env.JWT_SECRET || 'fallback-secret');
+        if (decoded && decoded.id) {
+          const userId = decoded.id;
+          const updated = await User.findByIdAndUpdate(
+            userId,
+            {
+              $set: {
+                googleTokens: tokens,
+                googleConnected: true
+              }
+            },
+            { new: true }
+          );
+          if (updated) {
+            console.log('🗄️ Saved Google tokens for user:', updated.email || updated._id.toString());
+          } else {
+            console.warn('⚠️ Could not find user to save Google tokens');
+          }
+        }
+      } else {
+        console.log('ℹ️ No session user token found; skipping DB token persist');
+      }
+    } catch (persistErr) {
+      console.warn('⚠️ Failed to persist Google tokens to DB:', persistErr.message);
+    }
     
     // Test Drive API access
     try {

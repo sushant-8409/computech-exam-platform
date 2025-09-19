@@ -11,18 +11,40 @@ console.log('- Has GOOGLE_OAUTH_CLIENT_ID:', !!process.env.GOOGLE_OAUTH_CLIENT_I
 
 const app = express();
 
+// Allowed origins (canonical) and dynamic matchers
+const allowedOrigins = [
+  'https://computech-exam-platform.vercel.app',
+  'https://computechexamplatform.vercel.app',
+  'https://www.auctutor.app',
+  'https://auctutor.app',
+  'https://computechexamplatform.netlify.app'
+];
+const vercelProjectRegex = /^https:\/\/computechexamplatform-[a-z0-9-]+\.vercel\.app$/;
+
 // ================== Middleware ==================
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? [
-        'https://computech-exam-platform.vercel.app',
-        'https://computechexamplatform.netlify.app' // Keep as fallback
-      ]
-    : ['http://localhost:3000', 'http://localhost:5000'],
-  methods: 'GET,POST,PUT,DELETE,PATCH',
+  origin: (origin, callback) => {
+    // Allow non-browser requests or same-origin
+    if (!origin) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production') {
+      return ['http://localhost:3000', 'http://localhost:5000'].includes(origin)
+        ? callback(null, true)
+        : callback(new Error('Not allowed by CORS'));
+    }
+    if (allowedOrigins.includes(origin) || vercelProjectRegex.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: 'GET,POST,PUT,DELETE,PATCH,OPTIONS',
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 204,
+  preflightContinue: false
 }));
+
+// Explicitly handle preflight
+app.options('*', cors());
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -116,6 +138,7 @@ app.use('/admin', require('../routes/adminReviewResults'));
 app.use('/admin', require('../routes/reviewRoutes'));
 app.use('/admin', require('../routes/adminReview'));
 app.use('/', require('../routes/adminCleanup'));
+app.use('/promotions', require('../routes/promotions'));
 
 // Coding Practice routes
 app.use('/coding-practice', require('../routes/codingPractice'));

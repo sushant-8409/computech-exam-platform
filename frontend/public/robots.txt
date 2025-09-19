@@ -1,3 +1,79 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+
+# Allow all student-facing pages for better indexing
+Allow: /student
+Allow: /student/*
+Allow: /login
+Allow: /forgot-password
+Allow: /mobile-upload
+Allow: /landing
+
+# Block admin and sensitive areas from indexing
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /api
+Disallow: /api/*
+Disallow: /reset-password
+Disallow: /dashboard
+
+# Block dynamic test interfaces to prevent indexing of actual test content
+Disallow: /student/test/*
+Disallow: /student/coding-test/*
+Disallow: /student/coding-interface/*
+
+# Allow but reduce crawl frequency for result pages (to protect student privacy)
+Crawl-delay: 2
+
+# Sitemap location
+Sitemap: https://auctutor.app/sitemap.xml
+
+# Additional SEO directives
+# Allow social media and search engines to access Open Graph images
+Allow: /static/
+Allow: /images/
+Allow: /icons/
+Allow: /*.css
+Allow: /*.js
+Allow: /*.png
+Allow: /*.jpg
+Allow: /*.jpeg
+Allow: /*.gif
+Allow: /*.svg
+Allow: /*.ico
+Allow: /*.webp
+
+# Block common bot traps and unwanted crawlers
+Disallow: /*?
+Disallow: /*#
+Disallow: /tmp/
+Disallow: /cache/
+Disallow: /.git/
+Disallow: /node_modules/
+
+# Specific instructions for different bots
+User-agent: Googlebot
+Allow: /student
+Allow: /student/coding-practice
+Allow: /student/mock-test
+Crawl-delay: 1
+
+User-agent: Bingbot
+Allow: /student
+Allow: /student/coding-practice
+Allow: /student/mock-test
+Crawl-delay: 2
+
+User-agent: Slurp
+Allow: /student
+Crawl-delay: 3
+
+# Block aggressive crawlers that might affect performance
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Crawl-delay: 10
+
+User-agent: MJ12bot
+Crawl-delay: 5

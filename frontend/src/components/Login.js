@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useAuth }      from '../App';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useAuth } from '../App';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { ToastContainer, toast } from 'react-toastify';     // ← Keep toast for success
-import 'react-toastify/dist/ReactToastify.css';             // ← NEW
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import './Login.css';
 
 const Login = () => {
@@ -11,14 +11,13 @@ const Login = () => {
   const navigate = useNavigate();
 
   const [credentials, setCredentials] = useState({ email: '', password: '' });
-  const [loading,     setLoading]     = useState(false);
+  const [loading, setLoading] = useState(false);
 
   /* already logged-in? bounce */
   if (user) {
     return <Navigate to={user.role === 'admin' ? '/admin' : '/student'} replace />;
   }
 
-  /* ---------------------------------------------------------------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -49,6 +48,8 @@ const Login = () => {
           color: 'var(--text-primary)',
           confirmButtonColor: 'var(--primary)'
         });
+        
+
       }
     } catch (err) {
       // Show server error with SweetAlert
@@ -79,7 +80,7 @@ const Login = () => {
       <div className="login-card card">
         <div className="login-header">
           <h2>Welcome Back!</h2>
-          <p>Sign in to CompuTech Exam Platform</p>
+          <p>Sign in to AucTutor Exam Platform</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -107,6 +108,8 @@ const Login = () => {
             />
           </div>
 
+
+
           <button
             type="submit"
             className="btn btn-primary w-100"
@@ -120,19 +123,19 @@ const Login = () => {
         <div className="login-links">
           <p>
             Don&apos;t have an account?{' '}
-            <a
-              href={`${process.env.REACT_APP_BASE_URL || 'https://computechexamplatform.netlify.app'}/signup.html`}
-            >
-              Sign up here
-            </a>
+            {process.env.REACT_APP_SIGNUP_URL ? (
+              <a href={process.env.REACT_APP_SIGNUP_URL} target="_blank" rel="noreferrer" className="link">Sign up here</a>
+            ) : (
+              <Link to="/signup" className="link">Sign up here</Link>
+            )}
           </p>
           <p>
             Forgot password?{' '}
-            <a
-              href={`${process.env.REACT_APP_BASE_URL || 'https://computechexamplatform.netlify.app'}/forget-password.html`}
-            >
-              Reset here
-            </a>
+            {process.env.REACT_APP_FORGOT_PASSWORD_URL ? (
+              <a href={process.env.REACT_APP_FORGOT_PASSWORD_URL} target="_blank" rel="noreferrer" className="link">Reset here</a>
+            ) : (
+              <Link to="/forgot-password" className="link">Reset here</Link>
+            )}
           </p>
         </div>
       </div>

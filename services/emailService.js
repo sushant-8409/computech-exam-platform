@@ -206,7 +206,7 @@ CompuTech Exam Platform`
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0; font-size: 28px;">🎓 CompuTech Exam Platform</h1>
+          <h1 style="margin: 0; font-size: 28px;">🎓 AucTutor</h1>
           <p style="margin: 10px 0 0 0; font-size: 16px;">New Test Assignment</p>
         </div>
         
@@ -242,8 +242,12 @@ CompuTech Exam Platform`
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.FRONTEND_URL || 'https://computech-exam-platform.onrender.com'}/student" 
-               style="background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            <a href="https://auctutor.app/login" 
+               style="background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; margin-right: 10px;">
+              🚀 Login to AucTutor
+            </a>
+            <a href="${'https://auctutor.app'}/student" 
+               style="background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
               📖 Take Test Now
             </a>
           </div>
