@@ -6,6 +6,13 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import styles from './TraditionalTestInterface.module.css';
 import QRCode from 'react-qr-code';
+import { createRoot } from 'react-dom/client';
+
+// Make React components available globally for QR code rendering in modals
+if (typeof window !== 'undefined') {
+  window.React = React;
+  window.ReactDOM = { createRoot };
+}
 
 // Optimized components
 const TimerDisplay = React.memo(({ timeLeft, isWarning }) => {
@@ -64,6 +71,11 @@ const AnswerSheetUploader = React.memo(({
   const [mobileUploadExpiry, setMobileUploadExpiry] = useState(null);
   const [mobileUploadUrl, setMobileUploadUrl] = useState(null);
   const [showQRCode, setShowQRCode] = useState(false);
+  
+  // Mobile upload detection states
+  const [mobileUploadDetected, setMobileUploadDetected] = useState(false);
+  const [mobileUploadCount, setMobileUploadCount] = useState(0);
+  const [lastUploadCheck, setLastUploadCheck] = useState(null);
   
   const handleFileSelect = useCallback((event) => {
     // File picker is closing
@@ -275,10 +287,39 @@ const AnswerSheetUploader = React.memo(({
         setMobileUploadExpiry(new Date(Date.now() + 10 * 60 * 1000)); // 10 minutes from now
         setMobileUploadUrl(mobileUrl);
         setShowQRCode(true);
-        
-        toast.success('📱 Mobile upload link sent to your registered email!', {
-          position: 'top-center',
-          autoClose: 5000
+
+        await Swal.fire({
+          title: '📱 Mobile Upload Ready!',
+          html: `
+            <div style="text-align: left; margin: 1rem 0;">
+              <p><strong>✅ Upload link has been sent to:</strong></p>
+              <p style="background: #f0f9ff; padding: 8px; border-radius: 4px; font-family: monospace;">${user?.email || 'your registered email'}</p>
+              <br>
+              <p><strong>📱 Or scan the QR code below:</strong></p>
+              <div style="text-align: center; margin: 1rem 0;">
+                <div id="qr-code-container" style="display: inline-block; padding: 16px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
+              </div>
+              <br>
+              <p><strong>⏱️ Link expires in 10 minutes</strong></p>
+              <p style="font-size: 14px; color: #666;">Use your mobile device's camera to scan the QR code or check your email for the upload link.</p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonText: 'Got it!',
+          confirmButtonColor: '#10b981',
+          width: 500,
+          didOpen: () => {
+            // Render QR code in the modal
+            const qrContainer = document.getElementById('qr-code-container');
+            if (qrContainer) {
+              const root = createRoot(qrContainer);
+              root.render(React.createElement(QRCode, {
+                value: mobileUrl,
+                size: 200,
+                level: 'M'
+              }));
+            }
+          }
         });
         
         console.log('Mobile upload link sent:', response.data.token);
@@ -291,10 +332,78 @@ const AnswerSheetUploader = React.memo(({
     }
   }, [testId]);
 
+  // Check mobile upload status periodically
+  const checkMobileUploadStatus = useCallback(async () => {
+    if (!testId || isSubmitted) return;
+    
+    try {
+      const response = await axios.get(`/api/mobile-upload/status/${testId}`);
+      if (response.data.success && response.data.hasUploads) {
+        const { uploadCount, latestUpload } = response.data;
+        
+        // Only show notification if this is a new upload we haven't seen
+        if (uploadCount > mobileUploadCount) {
+          setMobileUploadDetected(true);
+          setMobileUploadCount(uploadCount);
+          setLastUploadCheck(new Date());
+          
+          // Show notification about mobile upload
+          toast.success(
+            `📱 Mobile Upload Detected! ${uploadCount} file(s) uploaded. ` +
+            `You can now submit your test when ready.`,
+            {
+              duration: 8000,
+              position: 'top-center',
+              style: {
+                background: '#10b981',
+                color: 'white',
+                fontSize: '16px',
+                fontWeight: '600',
+                borderRadius: '12px',
+                padding: '16px 24px',
+                boxShadow: '0 10px 25px rgba(16, 185, 129, 0.3)'
+              }
+            }
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error checking mobile upload status:', error);
+    }
+  }, [testId, isSubmitted, mobileUploadCount]);
+
+  // Set up periodic mobile upload checking
+  useEffect(() => {
+    if (!testStarted || isSubmitted) return;
+    
+    // Check immediately
+    checkMobileUploadStatus();
+    
+    // Check every 30 seconds during test
+    const interval = setInterval(() => {
+      checkMobileUploadStatus();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [testStarted, isSubmitted, checkMobileUploadStatus]);
+
   return (
     <div className={styles.answerUploader}>
       <div className={styles.uploaderContent}>
         <h3>📄 Answer Sheet Upload {isRequired && <span className={styles.required}>*</span>}</h3>
+        
+        {/* Mobile Upload Detection Indicator */}
+        {mobileUploadDetected && (
+          <div className={styles.mobileUploadAlert}>
+            <div className={styles.alertIcon}>📱</div>
+            <div className={styles.alertContent}>
+              <strong>Mobile Upload Detected!</strong>
+              <p>
+                {mobileUploadCount} file(s) uploaded via mobile. Ready to submit!
+              </p>
+            </div>
+          </div>
+        )}
         
         <div className={styles.uploadArea}>
         {answerSheetUrl && isSubmitted ? (
@@ -304,9 +413,9 @@ const AnswerSheetUploader = React.memo(({
             <button 
               onClick={handleReset}
               className={styles.replaceBtn}
-              disabled={isUploading}
+              disabled={isUploading || mobileUploadDetected}
             >
-              Upload New Set
+              {mobileUploadDetected ? 'Mobile Upload Complete' : 'Upload New Set'}
             </button>
           </div>
         ) : (
@@ -338,7 +447,7 @@ const AnswerSheetUploader = React.memo(({
                     <button 
                       onClick={handleAddPage}
                       className={styles.addPageBtn}
-                      disabled={isUploading}
+                      disabled={isUploading || mobileUploadDetected}
                     >
                       {selectedPages.length === 0 ? (
                         <>
@@ -357,10 +466,10 @@ const AnswerSheetUploader = React.memo(({
                       <button 
                         onClick={handleCameraClick}
                         className={styles.cameraBtn}
-                        disabled={isUploading}
+                        disabled={isUploading || mobileUploadDetected}
                       >
                         <span className={styles.uploadIcon}>📷</span>
-                        {isAndroid ? 'Use Back Camera' : 'Take Photo'}
+                        {mobileUploadDetected ? 'Upload Complete' : isAndroid ? 'Use Back Camera' : 'Take Photo'}
                       </button>
                     )}
                     
@@ -368,12 +477,13 @@ const AnswerSheetUploader = React.memo(({
                       <button 
                         onClick={handleMobileUploadRequest}
                         className={`${styles.mobileUploadBtn} ${mobileUploadRequested ? styles.linkSent : ''}`}
-                        disabled={isUploading || mobileUploadRequested}
+                        disabled={isUploading || mobileUploadRequested || mobileUploadDetected}
+                        title={mobileUploadDetected ? "Mobile upload already completed" : "Get mobile upload link via email or QR code"}
                       >
                         <span className={styles.uploadIcon}>
-                          {mobileUploadRequested ? '✅' : '📱'}
+                          {mobileUploadDetected ? '✅' : mobileUploadRequested ? '✅' : '📱'}
                         </span>
-                        {mobileUploadRequested ? 'Link Sent!' : 'Send Mobile Link'}
+                        {mobileUploadDetected ? 'Upload Complete!' : mobileUploadRequested ? 'Link Sent!' : 'Mobile Upload (Email + QR)'}
                       </button>
                     )}
                   </>
@@ -383,9 +493,14 @@ const AnswerSheetUploader = React.memo(({
                   <button 
                     onClick={handleSubmitPages}
                     className={styles.submitPagesBtn}
-                    disabled={isUploading}
+                    disabled={isUploading || mobileUploadDetected}
                   >
-                    {isUploading ? (
+                    {mobileUploadDetected ? (
+                      <>
+                        <span className={styles.uploadIcon}>📱</span>
+                        Mobile Upload Complete
+                      </>
+                    ) : isUploading ? (
                       <>
                         <span className={styles.spinner}></span>
                         Converting to PDF...
