@@ -53,7 +53,15 @@ const AnswerSheetUploader = React.memo(({
   onFilePickerOpen,
   onFilePickerClose,
   onCameraOpen,
-  onCameraClose
+  onCameraClose,
+  // Mobile upload props
+  handleMobileUploadRequest,
+  mobileUploadRequested,
+  mobileUploadDetected,
+  mobileUploadCount,
+  mobileUploadExpiry,
+  mobileUploadUrl,
+  showQRCode
 }) => {
   const fileInputRef = useRef(null);
   const [selectedPages, setSelectedPages] = useState([]);
@@ -65,17 +73,6 @@ const AnswerSheetUploader = React.memo(({
   const cameraRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  
-  // Mobile upload states
-  const [mobileUploadRequested, setMobileUploadRequested] = useState(false);
-  const [mobileUploadExpiry, setMobileUploadExpiry] = useState(null);
-  const [mobileUploadUrl, setMobileUploadUrl] = useState(null);
-  const [showQRCode, setShowQRCode] = useState(false);
-  
-  // Mobile upload detection states
-  const [mobileUploadDetected, setMobileUploadDetected] = useState(false);
-  const [mobileUploadCount, setMobileUploadCount] = useState(0);
-  const [lastUploadCheck, setLastUploadCheck] = useState(null);
   
   const handleFileSelect = useCallback((event) => {
     // File picker is closing
@@ -536,6 +533,17 @@ const TraditionalTestInterface = () => {
   const [answerSheetUrl, setAnswerSheetUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
+  
+  // Mobile upload states
+  const [mobileUploadRequested, setMobileUploadRequested] = useState(false);
+  const [mobileUploadExpiry, setMobileUploadExpiry] = useState(null);
+  const [mobileUploadUrl, setMobileUploadUrl] = useState(null);
+  const [showQRCode, setShowQRCode] = useState(false);
+  
+  // Mobile upload detection states
+  const [mobileUploadDetected, setMobileUploadDetected] = useState(false);
+  const [mobileUploadCount, setMobileUploadCount] = useState(0);
+  const [lastUploadCheck, setLastUploadCheck] = useState(null);
   
   // Monitoring state
   const [violations, setViolations] = useState([]);
@@ -2027,6 +2035,13 @@ const TraditionalTestInterface = () => {
                 onFilePickerClose={() => setIsFilePickerOpen(false)}
                 onCameraOpen={handleCameraClick}
                 onCameraClose={handleCameraClose}
+                handleMobileUploadRequest={handleMobileUploadRequest}
+                mobileUploadRequested={mobileUploadRequested}
+                mobileUploadDetected={mobileUploadDetected}
+                mobileUploadCount={mobileUploadCount}
+                mobileUploadExpiry={mobileUploadExpiry}
+                mobileUploadUrl={mobileUploadUrl}
+                showQRCode={showQRCode}
               />
               
               {/* Test Actions */}
