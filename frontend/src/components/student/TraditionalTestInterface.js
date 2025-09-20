@@ -6,13 +6,7 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import styles from './TraditionalTestInterface.module.css';
 import QRCode from 'react-qr-code';
-import { createRoot } from 'react-dom/client';
-
-// Make React components available globally for QR code rendering in modals
-if (typeof window !== 'undefined') {
-  window.React = React;
-  window.ReactDOM = { createRoot };
-}
+import QRCodeLib from 'qrcode';
 
 // Optimized components
 const TimerDisplay = React.memo(({ timeLeft, isWarning }) => {
@@ -1333,16 +1327,24 @@ const TraditionalTestInterface = () => {
           confirmButtonText: 'Got it!',
           confirmButtonColor: '#10b981',
           width: 500,
-          didOpen: () => {
-            // Render QR code in the modal
+          didOpen: async () => {
+            // Generate QR code as data URL
             const qrContainer = document.getElementById('qr-code-container');
             if (qrContainer) {
-              const root = createRoot(qrContainer);
-              root.render(React.createElement(QRCode, {
-                value: mobileUrl,
-                size: 200,
-                level: 'M'
-              }));
+              try {
+                const qrDataURL = await QRCodeLib.toDataURL(mobileUrl, {
+                  width: 200,
+                  margin: 2,
+                  color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                  }
+                });
+                qrContainer.innerHTML = `<img src="${qrDataURL}" alt="QR Code" style="max-width: 100%; height: auto;" />`;
+              } catch (error) {
+                console.error('Failed to generate QR code:', error);
+                qrContainer.innerHTML = '<p>Failed to generate QR code</p>';
+              }
             }
           }
         });

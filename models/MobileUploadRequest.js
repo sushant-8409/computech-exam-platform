@@ -255,7 +255,7 @@ mobileUploadRequestSchema.virtual('timeRemaining').get(function() {
 
 // Virtual for upload URL
 mobileUploadRequestSchema.virtual('uploadUrl').get(function() {
-  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.FRONTEND_URL || 'https://computechexamplatform.vercel.app';
   return `${baseUrl}/mobile-upload/${this.token}`;
 });
 

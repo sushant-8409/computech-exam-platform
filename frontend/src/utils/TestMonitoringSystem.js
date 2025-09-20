@@ -37,10 +37,15 @@ class TestMonitoringSystem {
 
     try {
       // Start monitoring session on server
+      const token = localStorage.getItem('token');
       const response = await axios.post('/api/student/monitoring/start', {
         testId,
         sessionId: this.sessionId,
         settings: this.settings
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
 
       console.log('📊 Monitoring start response:', response.data);
@@ -433,11 +438,16 @@ class TestMonitoringSystem {
   // Send screenshot to server
   async sendScreenshot(imageData, flagged = false) {
     try {
+      const token = localStorage.getItem('token');
       await axios.post('/api/student/monitoring/screenshot', {
         sessionId: this.sessionId,
         imageData,
         type: 'monitoring',
         flagged
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
     } catch (error) {
       console.error('❌ Failed to send screenshot:', error);
@@ -462,11 +472,16 @@ class TestMonitoringSystem {
     this.violations.push(violation); // Store locally
 
     try {
+      const token = localStorage.getItem('token');
       await axios.post('/api/student/monitoring/violation', {
         sessionId: this.sessionId,
         type,
         details,
         severity
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
 
       // Show warning to student
@@ -495,11 +510,16 @@ class TestMonitoringSystem {
     this.suspiciousActivities.push(activity); // Store locally
 
     try {
+      const token = localStorage.getItem('token');
       await axios.post('/api/student/monitoring/suspicious', {
         sessionId: this.sessionId,
         type,
         confidence,
         description
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
     } catch (error) {
       console.error('❌ Failed to record suspicious activity:', error);
@@ -636,7 +656,12 @@ class TestMonitoringSystem {
     if (!this.sessionId) return null;
 
     try {
-      const response = await axios.get(`/api/monitoring/stats/${this.sessionId}`);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/api/monitoring/stats/${this.sessionId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       return response.data.stats;
     } catch (error) {
       console.error('❌ Failed to get monitoring stats:', error);
@@ -679,11 +704,16 @@ class TestMonitoringSystem {
       document.body.style.cursor = 'auto';
 
       // End monitoring session on server with proper timestamps
+      const token = localStorage.getItem('token');
       const response = await axios.post('/api/student/monitoring/end', {
         sessionId: this.sessionId,
         resultId,
         startTime: this.startTime,
         endTime: this.endTime
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
 
       console.log('✅ Monitoring session ended successfully');
@@ -718,7 +748,12 @@ class TestMonitoringSystem {
       let serverStats = {};
       if (this.sessionId && this.isMonitoring) {
         try {
-          const response = await axios.get(`/api/student/monitoring/stats?sessionId=${this.sessionId}`);
+          const token = localStorage.getItem('token');
+          const response = await axios.get(`/api/student/monitoring/stats?sessionId=${this.sessionId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
           if (response.data.success) {
             serverStats = response.data.stats;
           }

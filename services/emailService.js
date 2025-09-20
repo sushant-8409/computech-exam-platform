@@ -424,7 +424,7 @@ CompuTech Exam Platform`
 
   getMobileUploadLinkTemplate(uploadRequest, requesterName) {
     const timeRemaining = uploadRequest.timeRemaining;
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.FRONTEND_URL || 'https://computechexamplatform.vercel.app';
     
     return `
       <!DOCTYPE html>
