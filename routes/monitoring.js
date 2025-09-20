@@ -528,7 +528,8 @@ router.post('/violation', authenticateStudent, async (req, res) => {
       });
     }
 
-    const violation = monitoringService.recordViolation(
+    // If session doesn't exist, try to create it from the sessionId pattern
+    let violation = monitoringService.recordViolation(
       sessionId,
       type,
       details || '',
@@ -536,9 +537,29 @@ router.post('/violation', authenticateStudent, async (req, res) => {
     );
 
     if (!violation) {
+      // Try to recover session by creating it if it follows our pattern
+      const sessionParts = sessionId.split('_');
+      if (sessionParts.length >= 2) {
+        const studentId = req.student._id;
+        const testId = sessionParts[0]; // Assuming testId is first part
+        
+        console.log(`🔄 Recovering monitoring session: ${sessionId}`);
+        monitoringService.startMonitoring(sessionId, studentId, testId, {});
+        
+        // Try recording violation again
+        violation = monitoringService.recordViolation(
+          sessionId,
+          type,
+          details || '',
+          severity || 'medium'
+        );
+      }
+    }
+
+    if (!violation) {
       return res.status(404).json({
         success: false,
-        message: 'Session not found'
+        message: 'Session not found and could not be recovered'
       });
     }
 
@@ -570,12 +591,33 @@ router.post('/screenshot', authenticateStudent, async (req, res) => {
       });
     }
 
-    const image = await monitoringService.storeMonitoringImage(
+    // Try to store image, with session recovery if needed
+    let image = await monitoringService.storeMonitoringImage(
       sessionId,
       imageData,
       type || 'monitoring',
       flagged || false
     );
+
+    if (!image) {
+      // Try to recover session by creating it if it follows our pattern
+      const sessionParts = sessionId.split('_');
+      if (sessionParts.length >= 2) {
+        const studentId = req.student._id;
+        const testId = sessionParts[0]; // Assuming testId is first part
+        
+        console.log(`🔄 Recovering monitoring session for screenshot: ${sessionId}`);
+        monitoringService.startMonitoring(sessionId, studentId, testId, {});
+        
+        // Try storing image again
+        image = await monitoringService.storeMonitoringImage(
+          sessionId,
+          imageData,
+          type || 'monitoring',
+          flagged || false
+        );
+      }
+    }
 
     if (!image) {
       return res.status(404).json({

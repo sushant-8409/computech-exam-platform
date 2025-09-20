@@ -56,6 +56,13 @@ const CodingPracticeAdmin = () => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [availableProblems, setAvailableProblems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [editGroupData, setEditGroupData] = useState({
+    name: '',
+    description: '',
+    difficulty: 'Beginner',
+    allowedStudentClasses: []
+  });
 
   // Student stats state
   const [studentStats, setStudentStats] = useState([]);
@@ -284,6 +291,65 @@ const CodingPracticeAdmin = () => {
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
     toast.info('Problem loaded for editing');
+  };
+
+  // Edit group
+  const handleEditGroup = (group) => {
+    setEditingGroup(group);
+    setEditGroupData({
+      name: group.name,
+      description: group.description,
+      difficulty: group.difficulty,
+      allowedStudentClasses: group.allowedStudentClasses || []
+    });
+  };
+
+  // Update group
+  const handleUpdateGroup = async (e) => {
+    e.preventDefault();
+    if (!editingGroup) return;
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      await axios.put(`/api/coding-practice/admin/groups/${editingGroup._id}`, editGroupData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success('Group updated successfully!');
+      setEditingGroup(null);
+      setEditGroupData({ name: '', description: '', difficulty: 'Beginner', allowedStudentClasses: [] });
+      fetchGroups();
+    } catch (error) {
+      console.error('Error updating group:', error);
+      toast.error('Failed to update group');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete group
+  const handleDeleteGroup = async (groupId) => {
+    const group = groups.find(g => g._id === groupId);
+    const confirmMessage = `Are you sure you want to delete the group "${group?.name}"?\n\n⚠️ This will remove the group and all its problem associations.\nThis action cannot be undone.`;
+    
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/coding-practice/admin/groups/${groupId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success('Group deleted successfully!');
+      fetchGroups();
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      toast.error('Failed to delete group');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Delete problem
@@ -988,12 +1054,28 @@ Please create a coding problem following this exact format with all required fie
                     <span>📚 {group.totalProblems} problems</span>
                     <span>🎓 Classes: {group.allowedStudentClasses.join(', ') || 'All'}</span>
                   </div>
-                  <button 
-                    className="manage-btn"
-                    onClick={() => setSelectedGroup(group)}
-                  >
-                    Manage Problems
-                  </button>
+                  <div className="group-actions">
+                    <button 
+                      className="manage-btn"
+                      onClick={() => setSelectedGroup(group)}
+                    >
+                      📝 Manage Problems
+                    </button>
+                    <button 
+                      className="edit-btn"
+                      onClick={() => handleEditGroup(group)}
+                      title="Edit group details"
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button 
+                      className="delete-btn"
+                      onClick={() => handleDeleteGroup(group._id)}
+                      title="Delete group"
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1051,18 +1133,114 @@ Please create a coding problem following this exact format with all required fie
                                 }
                               }}
                             />
-                            <label htmlFor={`problem-${problem._id}`}>
-                              <span className="problem-number">#{problem.problemNumber}</span>
-                              <span className="problem-title">{problem.title}</span>
-                              <span className={`difficulty ${problem.difficulty?.toLowerCase() || 'easy'}`}>
-                                {problem.difficulty || 'Easy'}
-                              </span>
+                            <label htmlFor={`problem-${problem._id}`} className="problem-details-label">
+                              <div className="problem-header">
+                                <span className="problem-number">#{problem.problemNumber || 'N/A'}</span>
+                                <span className="problem-title">{problem.title}</span>
+                                <span className={`difficulty ${problem.difficulty?.toLowerCase() || 'easy'}`}>
+                                  {problem.difficulty || 'Easy'}
+                                </span>
+                              </div>
+                              <div className="problem-description">
+                                {problem.description ? (
+                                  <p className="description-text">
+                                    {problem.description.length > 150 
+                                      ? `${problem.description.substring(0, 150)}...` 
+                                      : problem.description
+                                    }
+                                  </p>
+                                ) : (
+                                  <p className="no-description">No description available</p>
+                                )}
+                              </div>
+                              {problem.topics && problem.topics.length > 0 && (
+                                <div className="problem-topics">
+                                  {problem.topics.slice(0, 3).map((topic, index) => (
+                                    <span key={index} className="topic-tag">{topic}</span>
+                                  ))}
+                                  {problem.topics.length > 3 && <span className="more-topics">+{problem.topics.length - 3} more</span>}
+                                </div>
+                              )}
                             </label>
                           </div>
                         );
                       })}
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {editingGroup && (
+            <div className="group-management-modal">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h3>Edit Group: {editingGroup.name}</h3>
+                  <button 
+                    className="close-btn"
+                    onClick={() => setEditingGroup(null)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <div className="modal-body">
+                  <form onSubmit={handleUpdateGroup} className="edit-group-form">
+                    <div className="form-group">
+                      <label>Group Name:</label>
+                      <input
+                        type="text"
+                        value={editGroupData.name}
+                        onChange={(e) => setEditGroupData({...editGroupData, name: e.target.value})}
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Difficulty Level:</label>
+                      <select
+                        value={editGroupData.difficulty}
+                        onChange={(e) => setEditGroupData({...editGroupData, difficulty: e.target.value})}
+                      >
+                        <option value="Beginner">Beginner</option>
+                        <option value="Intermediate">Intermediate</option>
+                        <option value="Advanced">Advanced</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Description:</label>
+                      <textarea
+                        value={editGroupData.description}
+                        onChange={(e) => setEditGroupData({...editGroupData, description: e.target.value})}
+                        placeholder="Describe this problem group..."
+                        rows="3"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Allowed Student Classes (comma-separated):</label>
+                      <input
+                        type="text"
+                        value={editGroupData.allowedStudentClasses.join(', ')}
+                        placeholder="10, 11, 12 (empty = all classes)"
+                        onChange={(e) => setEditGroupData({
+                          ...editGroupData, 
+                          allowedStudentClasses: e.target.value.split(',').map(c => c.trim()).filter(c => c)
+                        })}
+                      />
+                    </div>
+
+                    <div className="form-actions">
+                      <button type="button" className="cancel-btn" onClick={() => setEditingGroup(null)}>
+                        Cancel
+                      </button>
+                      <button type="submit" className="update-btn" disabled={loading}>
+                        {loading ? 'Updating...' : 'Update Group'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             </div>
@@ -1170,7 +1348,11 @@ Please create a coding problem following this exact format with all required fie
                           <td>
                             <span className="difficulty-count hard">{student.hardProblems}</span>
                           </td>
-                          <td>{student.totalSubmissions}</td>
+                          <td>
+                            <span className="submissions-count">
+                              {student.totalSubmissions || 0}
+                            </span>
+                          </td>
                           <td>
                             {(() => {
                               const acc = Number(student.accuracyRate) || 0;
@@ -1192,10 +1374,16 @@ Please create a coding problem following this exact format with all required fie
                             </div>
                           </td>
                           <td>
-                            {student.lastSolved ? 
-                              new Date(student.lastSolved).toLocaleDateString() : 
-                              'No activity'
-                            }
+                            <span className="last-activity">
+                              {student.lastSolved ? 
+                                new Date(student.lastSolved).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                }) : 
+                                'No activity'
+                              }
+                            </span>
                           </td>
                         </tr>
                       ))}

@@ -2963,6 +2963,200 @@
   height: 100vh;
 }
 
+/* Notes Panel Styles */
+.notes-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #333;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.notes-header h4 {
+  margin: 0;
+  color: #e1e1e1;
+  font-size: 16px;
+}
+
+.notes-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.save-notes-btn {
+  background: #00d9ff;
+  color: #000;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.save-notes-btn:hover {
+  background: #00b8e6;
+  transform: translateY(-1px);
+}
+
+.save-notes-btn.saved {
+  background: #22c55e;
+  color: white;
+}
+
+.save-notes-btn:disabled {
+  background: #666;
+  color: #999;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.notes-content {
+  flex: 1;
+  padding: 0;
+}
+
+.notes-textarea {
+  width: 100%;
+  height: 100%;
+  background: #1a1a1a;
+  border: none;
+  color: #e1e1e1;
+  font-size: 14px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  line-height: 1.5;
+  padding: 20px;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+  border-left: 3px solid #333;
+}
+
+.notes-textarea:focus {
+  border-left-color: #00d9ff;
+}
+
+.notes-textarea::placeholder {
+  color: #666;
+  font-style: italic;
+}
+
+.notes-info {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid #333;
+  text-align: center;
+}
+
+.notes-info small {
+  color: #888;
+  font-size: 12px;
+}
+
+/* Mobile Notes Styles */
+.mobile-notes-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.mobile-notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #333;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.mobile-notes-header h4 {
+  margin: 0;
+  color: #e1e1e1;
+  font-size: 16px;
+}
+
+.mobile-save-notes-btn {
+  background: #00d9ff;
+  color: #000;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 40px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-save-notes-btn:hover {
+  background: #00b8e6;
+}
+
+.mobile-save-notes-btn.saved {
+  background: #22c55e;
+  color: white;
+}
+
+.mobile-save-notes-btn:disabled {
+  background: #666;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.mobile-notes-content {
+  flex: 1;
+  padding: 0;
+}
+
+.mobile-notes-textarea {
+  width: 100%;
+  height: 100%;
+  background: #1a1a1a;
+  border: none;
+  color: #e1e1e1;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  padding: 15px;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.mobile-notes-textarea:focus {
+  outline: 1px solid #00d9ff;
+}
+
+.mobile-notes-textarea::placeholder {
+  color: #666;
+  font-style: italic;
+}
+
+.mobile-notes-info {
+  padding: 10px 15px;
+  background: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid #333;
+  text-align: center;
+}
+
+.mobile-notes-info small {
+  color: #888;
+  font-size: 12px;
+}
+
 /* Touch-friendly improvements */
 @media (hover: none) and (pointer: coarse) {
   .mobile-nav-btn {
@@ -2983,5 +3177,10 @@
   .mobile-tab {
     min-height: 44px;
     padding: 8px 12px;
+  }
+  
+  .mobile-save-notes-btn {
+    min-height: 44px;
+    min-width: 44px;
   }
 }

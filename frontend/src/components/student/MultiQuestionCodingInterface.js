@@ -208,6 +208,14 @@ const MultiQuestionCodingInterface = () => {
       editor.setPosition(newPosition);
     });
 
+  }, []);
+
+  // Separate effect to configure Monaco after both editor and test are loaded
+  useEffect(() => {
+    if (!editorRef.current || !test || !window.monaco) return;
+
+    const monaco = window.monaco;
+    
     // Add enhanced auto-completion for Python and Java
     const currentLang = getLanguageForBoard(test?.board);
     

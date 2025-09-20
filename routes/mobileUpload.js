@@ -5,7 +5,8 @@ const emailService = require('../services/emailService');
 const { authenticateStudent, authenticateAdmin } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = require('fs').promises;
 const crypto = require('crypto');
 const gdriveService = require('../services/gdrive');
 
@@ -15,7 +16,7 @@ const storage = multer.diskStorage({
     // Use /tmp for Vercel serverless compatibility
     const uploadDir = '/tmp';
     try {
-      await fs.mkdir(uploadDir, { recursive: true });
+      await fsPromises.mkdir(uploadDir, { recursive: true });
       cb(null, uploadDir);
     } catch (error) {
       // Directory might already exist in serverless environments
@@ -281,17 +282,20 @@ router.post('/upload/:token', validateUploadToken, (req, res) => {
       }
       
       // Upload to Google Drive
-      const driveResult = await gdriveService.uploadFile({
-        filePath: req.file.path,
-        fileName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        folderId: process.env.GOOGLE_DRIVE_MOBILE_UPLOADS_FOLDER_ID || null
-      });
-      
-      if (!driveResult.success) {
+      let driveResult;
+      try {
+        const fileBuffer = fs.readFileSync(req.file.path);
+        driveResult = await gdriveService.uploadToGDrive(
+          fileBuffer,
+          req.file.originalname,
+          req.file.mimetype
+        );
+      } catch (uploadError) {
+        console.error('Error uploading to Google Drive:', uploadError);
+        
         // Clean up local file
         try {
-          await fs.unlink(req.file.path);
+          await fsPromises.unlink(req.file.path);
         } catch (cleanupError) {
           console.error('Error cleaning up file:', cleanupError);
         }
@@ -313,7 +317,7 @@ router.post('/upload/:token', validateUploadToken, (req, res) => {
       
       // Clean up local file
       try {
-        await fs.unlink(req.file.path);
+        await fsPromises.unlink(req.file.path);
       } catch (cleanupError) {
         console.error('Error cleaning up local file:', cleanupError);
       }
@@ -352,7 +356,7 @@ router.post('/upload/:token', validateUploadToken, (req, res) => {
       // Clean up file if it exists
       if (req.file?.path) {
         try {
-          await fs.unlink(req.file.path);
+          await fsPromises.unlink(req.file.path);
         } catch (cleanupError) {
           console.error('Error cleaning up file:', cleanupError);
         }

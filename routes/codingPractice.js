@@ -4,6 +4,7 @@ const CodingProblem = require('../models/CodingProblem');
 const ProblemGroup = require('../models/ProblemGroup');
 const StudentSubmission = require('../models/StudentSubmission');
 const StudyPlanProgress = require('../models/StudyPlanProgress');
+const ProblemNotes = require('../models/ProblemNotes');
 const pistonService = require('../services/pistonService');
 const { authenticateStudent, authenticateAdmin } = require('../middleware/auth');
 
@@ -287,6 +288,130 @@ router.post('/admin/groups/:id/problems', authenticateAdmin, async (req, res) =>
     res.status(500).json({ 
       success: false, 
       message: 'Failed to add problems to group' 
+    });
+  }
+});
+
+// Update group (admin)
+router.put('/admin/groups/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { name, description, difficulty, allowedStudentClasses } = req.body;
+    
+    const updatedGroup = await ProblemGroup.findByIdAndUpdate(
+      req.params.id,
+      {
+        name,
+        description,
+        difficulty,
+        allowedStudentClasses
+      },
+      { new: true }
+    ).populate('problems', 'problemNumber title difficulty');
+
+    if (!updatedGroup) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Group updated successfully',
+      group: updatedGroup
+    });
+  } catch (error) {
+    console.error('Error updating group:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update group',
+      error: error.message 
+    });
+  }
+});
+
+// Delete group (admin)
+router.delete('/admin/groups/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const deletedGroup = await ProblemGroup.findByIdAndDelete(req.params.id);
+
+    if (!deletedGroup) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Group deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting group:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to delete group',
+      error: error.message 
+    });
+  }
+});
+
+// Get user notes for a problem
+router.get('/problems/:problemId/notes', authenticateStudent, async (req, res) => {
+  try {
+    const { problemId } = req.params;
+    const studentId = req.student._id;
+
+    // Find existing notes
+    const notes = await ProblemNotes.findOne({ studentId, problemId });
+    
+    res.json({
+      success: true,
+      notes: notes?.content || ''
+    });
+  } catch (error) {
+    console.error('Error fetching notes:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch notes',
+      error: error.message 
+    });
+  }
+});
+
+// Save user notes for a problem
+router.post('/problems/:problemId/notes', authenticateStudent, async (req, res) => {
+  try {
+    const { problemId } = req.params;
+    const { notes } = req.body;
+    const studentId = req.student._id;
+
+    // Update or create notes
+    const updatedNotes = await ProblemNotes.findOneAndUpdate(
+      { studentId, problemId },
+      { 
+        studentId, 
+        problemId, 
+        content: notes,
+        updatedAt: new Date()
+      },
+      { 
+        upsert: true, 
+        new: true 
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Notes saved successfully',
+      notes: updatedNotes
+    });
+  } catch (error) {
+    console.error('Error saving notes:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to save notes',
+      error: error.message 
     });
   }
 });

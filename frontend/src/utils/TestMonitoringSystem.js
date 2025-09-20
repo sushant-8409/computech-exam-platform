@@ -25,6 +25,29 @@ class TestMonitoringSystem {
     };
     this.lastActivity = Date.now();
     this.isVisible = true;
+    this.offlineViolations = []; // Store violations when offline/unauthorized
+  }
+
+  // Helper method for authenticated API calls
+  async makeAuthenticatedRequest(method, url, data = null) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    const config = {
+      method,
+      url,
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    };
+
+    if (data) {
+      config.data = data;
+    }
+
+    return axios(config);
   }
 
   // Initialize monitoring for a test session
@@ -37,15 +60,10 @@ class TestMonitoringSystem {
 
     try {
       // Start monitoring session on server
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/api/student/monitoring/start', {
+      const response = await this.makeAuthenticatedRequest('post', '/api/student/monitoring/start', {
         testId,
         sessionId: this.sessionId,
         settings: this.settings
-      }, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
       });
 
       console.log('📊 Monitoring start response:', response.data);
@@ -472,16 +490,11 @@ class TestMonitoringSystem {
     this.violations.push(violation); // Store locally
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/api/student/monitoring/violation', {
+      await this.makeAuthenticatedRequest('post', '/api/student/monitoring/violation', {
         sessionId: this.sessionId,
         type,
         details,
         severity
-      }, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
       });
 
       // Show warning to student
@@ -489,6 +502,14 @@ class TestMonitoringSystem {
 
     } catch (error) {
       console.error('❌ Failed to record violation:', error);
+      
+      // If it's a 401 error, the token might be expired
+      if (error.response?.status === 401) {
+        console.warn('⚠️ Authentication failed - token may be expired');
+      }
+      
+      // Store violation locally for later sync if needed
+      this.offlineViolations.push({ type, details, severity, timestamp: new Date() });
     }
   }
 

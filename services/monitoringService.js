@@ -107,33 +107,42 @@ class MonitoringService {
     }
 
     try {
-      // Generate filename with monitoring folder structure
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `monitoring-${session.testId}-${session.studentId}-${timestamp}.jpg`;
-      const monitoringDir = path.join(__dirname, '../tmp/monitoring');
       
-      // Ensure monitoring directory exists
-      try {
-        await fs.mkdir(monitoringDir, { recursive: true });
-      } catch (mkdirErr) {
-        console.warn('📁 Directory already exists or creation failed:', mkdirErr.message);
-      }
-      
-      const filepath = path.join(monitoringDir, filename);
-
       console.log(`📸 Storing monitoring image: ${filename}`);
 
-      // Save image data (assuming base64)
-      let imageBuffer;
-      if (imageData.startsWith('data:image')) {
-        const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
-        imageBuffer = Buffer.from(base64Data, 'base64');
-        await fs.writeFile(filepath, imageBuffer);
+      // In serverless/production environment, store monitoring data without file system
+      const isServerless = process.env.VERCEL || process.env.NODE_ENV === 'production';
+      let fileUrl = null;
+      
+      if (!isServerless) {
+        // Local development: save to file system
+        const monitoringDir = path.join(__dirname, '../tmp/monitoring');
+        
+        try {
+          await fs.mkdir(monitoringDir, { recursive: true });
+        } catch (mkdirErr) {
+          console.warn('📁 Directory already exists or creation failed:', mkdirErr.message);
+        }
+        
+        const filepath = path.join(monitoringDir, filename);
+        
+        if (imageData.startsWith('data:image')) {
+          const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
+          const imageBuffer = Buffer.from(base64Data, 'base64');
+          await fs.writeFile(filepath, imageBuffer);
+          fileUrl = `/tmp/monitoring/${filename}`;
+        }
+      } else {
+        // Serverless: store metadata only, image data handled differently
+        console.log('📸 Serverless environment: storing monitoring metadata only');
+        fileUrl = `monitoring-${session.testId}-${timestamp}`;
       }
 
       const monitoringImage = {
-        url: `/tmp/monitoring/${filename}`,
-        data: null, // Don't store large base64 in memory for performance
+        url: fileUrl,
+        data: isServerless ? null : null, // Don't store large base64 in memory for performance
         timestamp: new Date(),
         type,
         flagged,

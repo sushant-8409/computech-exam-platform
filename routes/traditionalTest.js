@@ -714,7 +714,8 @@ router.post('/exit-test/:testId', authenticateStudent, async (req, res) => {
           const timestamp = new Date(image.timestamp).toISOString().replace(/[:.]/g, '-');
           const filename = `monitoring-${studentId}-${testId}-${timestamp}.jpg`;
           
-          const fileId = await oauthDrive.uploadToGDrive(imageBuffer, filename, 'image/jpeg');
+          const uploadResult = await oauthDrive.uploadToGDrive(imageBuffer, filename, 'image/jpeg');
+          const fileId = uploadResult.fileId;
           console.log('� Uploaded monitoring image to Google Drive:', { filename, fileId });
 
           // Save to MongoDB

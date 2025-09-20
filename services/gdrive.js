@@ -59,10 +59,23 @@ async function uploadToGDrive(fileBuffer, fileName, mimeType, userAccessToken = 
 
     const drive = google.drive({ version: 'v3', auth: authClient });
 
-    // Create folder if it doesn't exist
+    // Create folder if it doesn't exist or verify access to existing folder
     let folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
     if (!folderId) {
       folderId = await findOrCreateFolder(drive, 'Exam Platform Files');
+    } else {
+      // Verify access to specified folder
+      try {
+        await drive.files.get({
+          fileId: folderId,
+          fields: 'id, name'
+        });
+        console.log('✅ Folder access verified:', folderId);
+      } catch (folderError) {
+        console.error('⚠️ Specified folder inaccessible:', folderError.message);
+        console.log('📁 Creating fallback folder instead');
+        folderId = await findOrCreateFolder(drive, 'Exam Platform Files');
+      }
     }
 
     const fileMeta = { 

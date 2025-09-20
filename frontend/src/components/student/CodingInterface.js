@@ -807,6 +807,9 @@ const CodingInterface = () => {
   const [timerActive, setTimerActive] = useState(false);
   const [testResults, setTestResults] = useState(null);
   const [activeTab, setActiveTab] = useState('description');
+  const [userNotes, setUserNotes] = useState('');
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
   const [fontSize, setFontSize] = useState(14);
   const [showDoubtSolver, setShowDoubtSolver] = useState(false);
   
@@ -1339,6 +1342,27 @@ int main() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Notes functions
+  const loadNotes = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/api/coding-practice/problems/${problemId}/notes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUserNotes(response.data.notes || '');
+    } catch (error) {
+      console.error('Error loading notes:', error);
+      // Don't show error toast for missing notes, it's normal
+    }
+  }, [problemId]);
+
+  // Load notes when problem is loaded
+  useEffect(() => {
+    if (problem) {
+      loadNotes();
+    }
+  }, [problem, loadNotes]);
+
   const resetCode = () => {
     const defaultCode = problem?.starterCode?.[language] || languageConfig[language].defaultCode;
     setCode(defaultCode);
@@ -1372,6 +1396,30 @@ int main() {
       </div>
     );
   }
+
+
+
+  const saveNotes = async () => {
+    setNotesLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`/api/coding-practice/problems/${problemId}/notes`, {
+        notes: userNotes
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotesSaved(true);
+      toast.success('Notes saved successfully!');
+      
+      // Reset saved status after 3 seconds
+      setTimeout(() => setNotesSaved(false), 3000);
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      toast.error('Failed to save notes');
+    } finally {
+      setNotesLoading(false);
+    }
+  };
 
   // Restore last submitted code
   const handleRestoreLastCode = () => {
@@ -1497,6 +1545,15 @@ int main() {
                 >
                   💬 Discussion
                 </button>
+                <button 
+                  className={`mobile-tab ${activeTab === 'notes' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab('notes');
+                    setShowMobileBottomSheet(false);
+                  }}
+                >
+                  📝 Notes
+                </button>
               </div>
               
               {/* AI Assistant Button */}
@@ -1585,6 +1642,12 @@ int main() {
                 onClick={() => setActiveTab('discussion')}
               >
                 Discussion
+              </button>
+              <button 
+                className={`tab ${activeTab === 'notes' ? 'active' : ''}`}
+                onClick={() => setActiveTab('notes')}
+              >
+                📝 Notes
               </button>
             </div>
 
@@ -1847,6 +1910,45 @@ int main() {
                 <DiscussionTab problemId={problemId} />
               </div>
             )}
+
+            {activeTab === 'notes' && (
+              <div className="notes-panel">
+                <div className="notes-header">
+                  <h4>📝 My Notes</h4>
+                  <div className="notes-actions">
+                    <button 
+                      className={`save-notes-btn ${notesSaved ? 'saved' : ''}`}
+                      onClick={saveNotes}
+                      disabled={notesLoading}
+                    >
+                      {notesLoading ? '💾 Saving...' : notesSaved ? '✅ Saved' : '💾 Save Notes'}
+                    </button>
+                  </div>
+                </div>
+                <div className="notes-content">
+                  <textarea
+                    className="notes-textarea"
+                    value={userNotes}
+                    onChange={(e) => {
+                      setUserNotes(e.target.value);
+                      setNotesSaved(false);
+                    }}
+                    placeholder="Write your notes, thoughts, approach, or solutions for this problem here...
+
+Tips:
+• Break down the problem step by step
+• Note the key insights or patterns
+• Write your approach before coding
+• Record what you learned from this problem
+• Save different solution approaches"
+                    rows={20}
+                  />
+                </div>
+                <div className="notes-info">
+                  <small>💡 Notes are automatically saved for this problem and synced across devices</small>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         )}
@@ -1952,6 +2054,41 @@ int main() {
               <div className="mobile-discussion-panel">
                 <h4>Discussion</h4>
                 <DiscussionTab problemId={problemId} />
+              </div>
+            )}
+
+            {activeTab === 'notes' && (
+              <div className="mobile-notes-panel">
+                <div className="mobile-notes-header">
+                  <h4>📝 My Notes</h4>
+                  <button 
+                    className={`mobile-save-notes-btn ${notesSaved ? 'saved' : ''}`}
+                    onClick={saveNotes}
+                    disabled={notesLoading}
+                  >
+                    {notesLoading ? '💾' : notesSaved ? '✅' : '💾'}
+                  </button>
+                </div>
+                <div className="mobile-notes-content">
+                  <textarea
+                    className="mobile-notes-textarea"
+                    value={userNotes}
+                    onChange={(e) => {
+                      setUserNotes(e.target.value);
+                      setNotesSaved(false);
+                    }}
+                    placeholder="Write your notes for this problem...
+
+• Break down the problem
+• Note key insights
+• Write your approach
+• Record what you learned"
+                    rows={15}
+                  />
+                </div>
+                <div className="mobile-notes-info">
+                  <small>💡 Notes are saved for this problem</small>
+                </div>
               </div>
             )}
           </div>

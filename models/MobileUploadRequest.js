@@ -232,6 +232,13 @@ mobileUploadRequestSchema.statics.createUploadRequest = function(options) {
 
 // Pre-save middleware
 mobileUploadRequestSchema.pre('save', function(next) {
+  // Ensure token is always present
+  if (!this.token) {
+    const crypto = require('crypto');
+    this.token = crypto.randomBytes(32).toString('hex');
+    console.log('🔧 Generated missing token for mobile upload request:', this.token);
+  }
+  
   if (this.isModified('status') && this.status === 'expired') {
     this.analytics.lastActivity = new Date();
   }
@@ -256,7 +263,11 @@ mobileUploadRequestSchema.virtual('timeRemaining').get(function() {
 // Virtual for upload URL
 mobileUploadRequestSchema.virtual('uploadUrl').get(function() {
   const baseUrl = process.env.FRONTEND_URL || 'https://computechexamplatform.vercel.app';
-  return `${baseUrl}/mobile-upload/${this.token}`;
+  const token = this.token || 'invalid-token';
+  if (!this.token) {
+    console.warn('⚠️ Mobile upload request has no token:', this._id);
+  }
+  return `${baseUrl}/mobile-upload/${token}`;
 });
 
 module.exports = mongoose.model('MobileUploadRequest', mobileUploadRequestSchema);
